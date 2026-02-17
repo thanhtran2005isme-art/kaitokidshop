@@ -45,3 +45,4 @@ public class ValidationException : AppException
         Errors = errors ?? [];
     }
 }
+// v1.1: Them NotFoundException va UnauthorizedException

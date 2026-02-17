@@ -46,3 +46,4 @@ public class ValidationException : AppException
     }
 }
 // v1.1: Them NotFoundException va UnauthorizedException
+// v1.2: Bo sung ForbiddenException, ConflictException, ValidationException

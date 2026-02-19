@@ -32,3 +32,4 @@ public class RequestLoggingMiddleware(RequestDelegate next, ILogger<RequestLoggi
         }
     }
 }
+// v1.1: Them canh bao request cham > 500ms

@@ -56,3 +56,4 @@ public class ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddlewa
         await context.Response.WriteAsync(json);
     }
 }
+// v1.1: Sua ExceptionMiddleware: them xu ly InvalidOperationException

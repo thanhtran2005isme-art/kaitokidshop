@@ -67,3 +67,4 @@ public static class ServiceExtensions
         return services;
     }
 }
+// v1.1: Bo sung cau hinh CORS cho React frontend

@@ -64,3 +64,4 @@ public static partial class SlugHelper
     [GeneratedRegex("-{2,}")]
     private static partial Regex MultipleDashRegex();
 }
+// v1.1: Dung GeneratedRegex thay vi Regex thuong de toi uu

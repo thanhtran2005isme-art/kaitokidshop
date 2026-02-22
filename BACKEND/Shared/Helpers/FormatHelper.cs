@@ -42,3 +42,4 @@ public static class FormatHelper
         return $"KK-{prefix}-{sequence:D3}";
     }
 }
+// v1.1: Bo sung ham tao ma don hang va SKU

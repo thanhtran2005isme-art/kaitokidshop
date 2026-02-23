@@ -48,3 +48,4 @@ public class PagedResponse<T>
         PageSize = pageSize
     };
 }
+// XML documentation added

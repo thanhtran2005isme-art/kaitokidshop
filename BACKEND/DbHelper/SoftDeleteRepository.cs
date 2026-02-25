@@ -58,3 +58,4 @@ public class SoftDeleteRepository<T>(DbContext context) : Repository<T>(context)
         DbSet.Update(entity);
     }
 }
+// v1.1: Them ham Restore cho SoftDeleteRepository

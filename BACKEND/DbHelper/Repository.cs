@@ -75,3 +75,4 @@ public class Repository<T>(DbContext context) : IRepository<T> where T : BaseEnt
         return await Context.SaveChangesAsync();
     }
 }
+// v1.1: Them UpdatedAt tu dong khi Update

@@ -44,3 +44,4 @@ public class AuditInterceptor : SaveChangesInterceptor
         }
     }
 }
+// v1.1: Ho tro ca sync va async SaveChanges

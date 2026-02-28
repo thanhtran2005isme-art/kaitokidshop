@@ -966,3 +966,4 @@ PRINT N'=== CSDL KaitoKid đã được tạo thành công! ===';
 PRINT N'=== 26 bảng + dữ liệu mẫu ===';
 PRINT N'=== Tài khoản admin: admin@kaitokid.vn / Admin@123 ===';
 GO
+-- v1.1: Bo sung schema DonHang, GioHang, DanhGia, MaGiamGia va 14 bang con lai

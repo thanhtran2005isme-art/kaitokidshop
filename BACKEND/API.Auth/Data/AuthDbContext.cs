@@ -16,3 +16,4 @@ public class AuthDbContext(DbContextOptions<AuthDbContext> options) : DbContext(
         });
     }
 }
+// v1.1: Them unique index cho Email

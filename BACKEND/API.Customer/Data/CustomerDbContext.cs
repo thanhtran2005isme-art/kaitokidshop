@@ -48,3 +48,4 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
         });
     }
 }
+// v1.1: Them indexes cho Slug, Status, OrderCode, Wishlist

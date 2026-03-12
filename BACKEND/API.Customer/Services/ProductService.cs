@@ -195,3 +195,4 @@ public class ProductService(CustomerDbContext db) : IProductService
         catch { return default; }
     }
 }
+// v1.1: Them GetById, GetBySlug

@@ -110,3 +110,4 @@ public class CartService(CustomerDbContext db) : ICartService
         await db.SaveChangesAsync();
     }
 }
+// v1.1: Gop item trung ProductId + Size + Color thay vi tao moi

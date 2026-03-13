@@ -196,3 +196,4 @@ public class ProductService(CustomerDbContext db) : IProductService
     }
 }
 // v1.1: Them GetById, GetBySlug
+// v1.2: Them GetNewArrivals, GetBestSellers, GetSaleProducts, GetRelated

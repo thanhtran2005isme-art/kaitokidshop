@@ -169,3 +169,4 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
         }).ToList()
     };
 }
+// v1.1: Tich hop coupon va hoan ton kho khi huy don

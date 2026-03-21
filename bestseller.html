@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sản Phẩm Bán Chạy - KAITO KID</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   
+    <link rel="icon" href="images/d53c7593-3c1b-437a-98bc-f71b44050b40.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/modern-fashion.css" />
+    <link rel="stylesheet" href="/css/products-page.css" />
+  </head>
+  <body>
+    <!-- Top Announcement Bar -->
+    <div class="top-bar">
+      <div class="top-bar-content">
+        <span>🚚 Freeship đơn từ 499K</span>
+        <span>🔁 Đổi trả trong 7 ngày</span>
+        <span>⚡ Sale tới 50% - Chỉ hôm nay</span>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <header class="main-header">
+      <div class="header-container">
+        <div class="logo">
+          <a href="index.html">
+            <img src="/images/logokaitokid.png" alt="KAITO KID" />
+          </a>
+        </div>
+
+        <div class="search-bar">
+          <input type="text" placeholder="Tìm áo sơ mi, quần jeans, váy..." />
+          <button><i class="fa fa-search"></i></button>
+        </div>
+
+        <div class="header-actions">
+          <div class="account-dropdown-wrapper">
+            <a href="#" class="icon-link" id="accountIcon">
+              <i class="fa fa-user"></i>
+            </a>
+            <div class="account-dropdown" id="accountDropdown">
+              <div class="account-dropdown-content">
+                <div class="account-guest" id="accountGuest">
+                  <h4>Chào mừng bạn!</h4>
+                  <p>Đăng nhập để trải nghiệm mua sắm tốt nhất</p>
+                  <div class="account-actions">
+                    <a href="login.html" class="btn-account-primary">Đăng nhập</a>
+                    <a href="login.html" class="btn-account-secondary">Đăng ký</a>
+                  </div>
+                </div>
+                <div class="account-user" id="accountUser" style="display: none;">
+                  <div class="account-user-info">
+                    <div class="account-avatar">
+                      <i class="fa fa-user-circle"></i>
+                    </div>
+                    <div class="account-details">
+                      <h4 id="userName">Tên người dùng</h4>
+                      <p id="userEmail">email@example.com</p>
+                    </div>
+                  </div>
+                  <div class="account-menu">
+                    <a href="taikhoan.html" class="account-menu-item">
+                      <i class="fa fa-user"></i>
+                      <span>Thông tin tài khoản</span>
+                    </a>
+                    <a href="donhang.html" class="account-menu-item">
+                      <i class="fa fa-box"></i>
+                      <span>Đơn hàng của tôi</span>
+                    </a>
+                    <a href="yeuthich.html" class="account-menu-item">
+                      <i class="fa fa-heart"></i>
+                      <span>Sản phẩm yêu thích</span>
+                    </a>
+                    <a href="admin/dashboard.html" class="account-menu-item admin-item" id="adminMenuItem" style="display: none;">
+                      <i class="fa fa-shield-alt"></i>
+                      <span>Trang quản trị</span>
+                    </a>
+                    <div class="account-divider"></div>
+                    <a href="#" class="account-menu-item logout-item" id="logoutBtn">
+                      <i class="fa fa-sign-out-alt"></i>
+                      <span>Đăng xuất</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <a href="yeuthich.html" class="icon-link">
+            <i class="fa fa-heart"></i>
+            <span id="wishlist-count" class="cart-badge">0</span>
+          </a>
+          <a href="GioHang.html" class="icon-link cart-link">
+            <i class="fa fa-shopping-bag"></i>
+            <span id="cart-count" class="cart-badge">0</span>
+          </a>
+          <button class="mobile-menu-btn" id="mobile-toggle">
+            <i class="fas fa-bars"></i>
+          </button>
+        </div>
+      </div>
+
+      <nav class="mega-menu">
+        <ul class="menu-list" id="mainMenuList">
+          <li><a href="sanphamnu.html">NỮ</a></li>
+          <li><a href="sanphamnam.html">NAM</a></li>
+          <li><a href="sanphamtreem.html">TRẺ EM</a></li>
+          <li><a href="samphammoi.html">NEW IN</a></li>
+          <li><a href="samphamsale.html">SALE</a></li>
+          <li><a href="bestseller.html" class="active">BEST SELLER</a></li>
+          <li><a href="bosuutap.html">BỘ SƯU TẬP</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <!-- Breadcrumb -->
+    <nav class="breadcrumb">
+      <a href="index.html">TRANG CHỦ</a> /
+      <span>SẢN PHẨM BÁN CHẠY</span> 
+    </nav>
+  
+    <div class="allsanpham">
+      <aside class="danhmuc">
+        <h3>Lọc sản phẩm</h3>
+        <ul class="danhsach">
+          <li><strong onclick="filterByCategory('Tất cả')">Tất cả sản phẩm</strong></li>
+          <li><strong onclick="filterByCategory('Nữ')">Thời trang Nữ</strong></li>
+          <li><strong onclick="filterByCategory('Nam')">Thời trang Nam</strong></li>
+          <li><strong onclick="filterByCategory('Trẻ em')">Thời trang Trẻ em</strong></li>
+        </ul>
+        
+        <h3 style="margin-top: 20px;">Sắp xếp theo</h3>
+        <ul class="danhsach">
+          <li><a href="#" onclick="sortProducts('sold-desc'); return false;" class="sort-link active" data-sort="sold-desc">🔥 Bán chạy nhất</a></li>
+          <li><a href="#" onclick="sortProducts('price-asc'); return false;" class="sort-link" data-sort="price-asc">💰 Giá thấp đến cao</a></li>
+          <li><a href="#" onclick="sortProducts('price-desc'); return false;" class="sort-link" data-sort="price-desc">💎 Giá cao đến thấp</a></li>
+          <li><a href="#" onclick="sortProducts('newest'); return false;" class="sort-link" data-sort="newest">✨ Mới nhất</a></li>
+        </ul>
+      </aside>
+
+      <main class="product-area">
+        <div class="header-filter">
+          <h2>🏆 SẢN PHẨM BÁN CHẠY</h2>
+          <p class="bestseller-desc">Những sản phẩm được yêu thích và mua nhiều nhất</p>
+        </div>
+
+        <div class="BanChay">
+          <div class="sanphams" id="bestseller-products-grid">
+            <p style="text-align: center; padding: 40px;">Đang tải sản phẩm...</p>
+          </div>
+        </div>
+        
+        <div class="pagination" id="pagination-container"></div>
+      </main>
+    </div>
+
+    <footer>
+      <div class="footer-container">
+        <div class="footer-column">
+          <h3>Giới thiệu</h3>
+          <a href="#">Giới thiệu</a>
+          <a href="#">Liên hệ</a>
+          <a href="#">Tuyển dụng</a>
+          <a href="#">Tin tức</a>
+          <p>Email : kaitokid@gmail.com</p>
+          <span>Hotline : 0906264126</span>
+        </div>
+        <div class="footer-column">
+          <h3>Hỗ trợ khách hàng</h3>
+          <a href="donhang.html"><i class="fa fa-box"></i> Tra cứu đơn hàng</a>
+          <a href="#">Hướng dẫn đặt hàng</a>
+          <a href="#">Hướng dẫn chọn size</a>
+          <a href="#">Câu hỏi thường gặp</a>
+        </div>
+        <div class="footer-column">
+          <h3>Hệ thống cửa hàng</h3>
+          <a href="#">Tìm địa chỉ cửa hàng gần bạn</a>
+        </div>
+        <div class="footer-column">
+          <h3>Kết nối với Kaito Kid Shop</h3>
+          <div class="social-links">
+            <a href="https://www.facebook.com/KaitooKidd.1412" target="_blank"><i class="fa-brands fa-facebook"></i></a>
+            <a href="https://www.youtube.com/@Kuroba_Kaito_GM" target="_blank"><i class="fa-brands fa-youtube"></i></a>
+            <a href="https://www.tiktok.com/@kurobaa_kaitoo" target="_blank"><i class="fa-brands fa-tiktok"></i></a>
+            <a href="https://www.instagram.com/kaitoo.kidd1412" target="_blank"><i class="fa-brands fa-instagram"></i></a>
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <script src="/javascript/modern-fashion.js"></script>
+    <script src="/javascript/mobile-menu.js"></script>
+    <script src="/javascript/mega-menu.js"></script>
+    <script src="/javascript/bestseller-products.js"></script>
+  </body>
+</html>

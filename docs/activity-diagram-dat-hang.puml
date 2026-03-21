@@ -1,0 +1,134 @@
+@startuml Biểu đồ hành động - Đặt hàng
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+    BackgroundColor #87CEEB
+    BorderColor #000000
+    ArrowColor #000000
+}
+
+title Biểu đồ hành động (Activity Diagram)\nChức năng: Đặt hàng\nWebsite bán quần áo KAITO KID
+
+|#LightBlue| Khách hàng |
+|#LightGreen| Hệ thống |
+
+|Khách hàng|
+start
+
+:Truy cập giỏ hàng;
+
+|Hệ thống|
+:Hiển thị danh sách sản phẩm trong giỏ;
+
+|Khách hàng|
+if (Giỏ hàng trống?) then (Có)
+    :Quay lại mua sắm;
+    stop
+else (Không)
+endif
+
+:Kiểm tra sản phẩm trong giỏ;
+:Nhấn "Tiến hành đặt hàng";
+
+|Hệ thống|
+:Hiển thị form thông tin đặt hàng;
+
+|Khách hàng|
+:Nhập thông tin nhận hàng;
+note right
+  - Họ tên
+  - Số điện thoại
+  - Email
+  - Địa chỉ nhận hàng
+end note
+
+|Hệ thống|
+:Kiểm tra thông tin hợp lệ;
+
+if (Thông tin hợp lệ?) then (Không)
+    |Khách hàng|
+    :Hiển thị lỗi, yêu cầu nhập lại;
+    :Nhập lại thông tin;
+    |Hệ thống|
+    :Kiểm tra thông tin hợp lệ;
+else (Có)
+endif
+
+|Khách hàng|
+:Chọn phương thức thanh toán;
+
+if (Có mã giảm giá?) then (Có)
+    :Nhập mã giảm giá;
+    
+    |Hệ thống|
+    :Kiểm tra mã giảm giá;
+    
+    if (Mã hợp lệ?) then (Có)
+        :Áp dụng giảm giá;
+        :Tính lại tổng tiền;
+    else (Không)
+        :Thông báo mã không hợp lệ;
+    endif
+else (Không)
+endif
+
+|Hệ thống|
+:Tính tổng tiền đơn hàng;
+note right
+  Tổng = Tiền hàng 
+       + Phí vận chuyển 
+       - Giảm giá
+end note
+
+:Hiển thị thông tin đơn hàng;
+
+|Khách hàng|
+:Xác nhận đặt hàng;
+
+|Hệ thống|
+fork
+    :Kiểm tra tồn kho;
+fork again
+    :Xác thực thông tin thanh toán;
+end fork
+
+if (Đủ hàng trong kho?) then (Không)
+    :Thông báo sản phẩm hết hàng;
+    |Khách hàng|
+    :Cập nhật giỏ hàng;
+    stop
+else (Có)
+endif
+
+:Tạo đơn hàng mới;
+:Lưu thông tin đơn hàng;
+:Cập nhật số lượng tồn kho;
+
+if (Có mã giảm giá?) then (Có)
+    :Cập nhật số lượng mã đã dùng;
+else (Không)
+endif
+
+:Xóa giỏ hàng;
+
+fork
+    :Gửi email xác nhận đơn hàng;
+fork again
+    :Gửi thông báo cho Admin;
+end fork
+
+:Hiển thị trang xác nhận đặt hàng thành công;
+note right
+  Thông tin hiển thị:
+  - Mã đơn hàng
+  - Chi tiết sản phẩm
+  - Tổng tiền
+  - Thời gian giao hàng dự kiến
+end note
+
+|Khách hàng|
+:Xem thông tin đơn hàng;
+
+stop
+
+@enduml

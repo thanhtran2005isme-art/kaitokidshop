@@ -1,0 +1,85 @@
+@startuml Use Case - Thanh toán Đơn hàng
+
+skinparam backgroundColor #87CEEB
+skinparam usecase {
+    BackgroundColor #87CEEB
+    BorderColor #000000
+}
+
+left to right direction
+
+actor "Khách hàng" as Customer
+
+rectangle "Thanh toán Đơn hàng" {
+    usecase "Thanh toán\nđơn hàng" as UC_Main
+    
+    ' === THÔNG TIN NGƯỜI NHẬN ===
+    usecase "Nhập thông tin\nngười nhận" as UC_CustomerInfo
+    usecase "Nhập họ tên" as UC_EnterName
+    usecase "Nhập số\nđiện thoại" as UC_EnterPhone
+    usecase "Nhập email" as UC_EnterEmail
+    
+    ' === HÌNH THỨC NHẬN HÀNG ===
+    usecase "Chọn hình thức\nnhận hàng" as UC_DeliveryMethod
+    usecase "Giao tận nơi" as UC_Delivery
+    usecase "Nhận tại\ncửa hàng" as UC_Pickup
+    usecase "Chọn địa chỉ\ngiao hàng" as UC_SelectAddress
+    usecase "Chọn cửa hàng" as UC_SelectStore
+    usecase "Nhập ghi chú" as UC_AddNote
+    
+    ' === XEM ĐƠN HÀNG ===
+    usecase "Xem chi tiết\nđơn hàng" as UC_ViewOrder
+    usecase "Xem tổng tiền" as UC_ViewTotal
+    usecase "Xem phí\nvận chuyển" as UC_ViewShipping
+    
+    ' === KHUYẾN MÃI ===
+    usecase "Áp dụng\nmã giảm giá" as UC_ApplyPromo
+    
+    ' === PHƯƠNG THỨC THANH TOÁN ===
+    usecase "Chọn phương thức\nthanh toán" as UC_PaymentMethod
+    usecase "Thanh toán COD" as UC_COD
+    usecase "Chuyển khoản\nngân hàng" as UC_BankTransfer
+    usecase "Xem thông tin\nchuyển khoản" as UC_ViewBankInfo
+    
+    ' === ĐẶT HÀNG ===
+    usecase "Xác nhận\nđặt hàng" as UC_PlaceOrder
+}
+
+' Main connection
+Customer --> UC_Main
+
+' Extend relationships - Thông tin người nhận
+UC_CustomerInfo .up.> UC_Main : <<extend>>
+UC_CustomerInfo ..> UC_EnterName : <<include>>
+UC_CustomerInfo ..> UC_EnterPhone : <<include>>
+UC_EnterEmail .up.> UC_CustomerInfo : <<extend>>
+
+' Extend relationships - Hình thức nhận hàng
+UC_DeliveryMethod .up.> UC_Main : <<extend>>
+UC_Delivery .up.> UC_DeliveryMethod : <<extend>>
+UC_Pickup .up.> UC_DeliveryMethod : <<extend>>
+UC_Delivery ..> UC_SelectAddress : <<include>>
+UC_Pickup ..> UC_SelectStore : <<include>>
+UC_AddNote .up.> UC_DeliveryMethod : <<extend>>
+
+' Extend relationships - Xem đơn hàng
+UC_ViewOrder .down.> UC_Main : <<extend>>
+UC_ViewOrder ..> UC_ViewTotal : <<include>>
+UC_ViewOrder ..> UC_ViewShipping : <<include>>
+
+' Extend relationships - Khuyến mãi
+UC_ApplyPromo .down.> UC_Main : <<extend>>
+
+' Extend relationships - Thanh toán
+UC_PaymentMethod .down.> UC_Main : <<extend>>
+UC_COD .down.> UC_PaymentMethod : <<extend>>
+UC_BankTransfer .down.> UC_PaymentMethod : <<extend>>
+UC_BankTransfer ..> UC_ViewBankInfo : <<include>>
+
+' Extend relationships - Đặt hàng
+UC_PlaceOrder .down.> UC_Main : <<extend>>
+UC_PlaceOrder ..> UC_CustomerInfo : <<include>>
+UC_PlaceOrder ..> UC_DeliveryMethod : <<include>>
+UC_PlaceOrder ..> UC_PaymentMethod : <<include>>
+
+@enduml

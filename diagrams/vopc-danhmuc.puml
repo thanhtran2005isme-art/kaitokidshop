@@ -1,0 +1,36 @@
+@startuml VOPC_DanhMuc
+
+class QLDanhMucView
+class QLDanhMucController
+
+class DanhMuc {
+    -MaDM : string
+    -TenDM : string
+    -MaNhom : string
+    -Icon : string
+    -MoTa : string
+    -TrangThai : string
+    -SoSanPham : int
+    -NgayTao : datetime
+    -NgayCapNhat : datetime
+}
+
+class NhomDM {
+    -MaNhom : string
+    -TenNhom : string
+}
+
+class SanPham {
+    -MaSP : int
+    -TenSP : string
+    -MaDM : string
+}
+
+QLDanhMucView --> QLDanhMucController
+QLDanhMucController --> DanhMuc
+QLDanhMucController --> NhomDM
+QLDanhMucController --> SanPham
+DanhMuc "0..*" -- "1" NhomDM
+SanPham "0..*" -- "1" DanhMuc
+
+@enduml

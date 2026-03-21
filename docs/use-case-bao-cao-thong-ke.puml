@@ -1,0 +1,75 @@
+@startuml Use Case - Báo cáo Thống kê
+
+skinparam backgroundColor #87CEEB
+skinparam usecase {
+    BackgroundColor #87CEEB
+    BorderColor #000000
+}
+
+left to right direction
+
+actor "Admin" as Admin
+
+rectangle "Báo cáo Thống kê" {
+    usecase "Xem báo cáo\nthống kê" as UC_Main
+    
+    ' === DASHBOARD ===
+    usecase "Xem Dashboard" as UC_Dashboard
+    usecase "Xem doanh thu\nhôm nay" as UC_TodayRevenue
+    usecase "Xem đơn hàng\nmới" as UC_NewOrders
+    usecase "Xem đơn đang\ngiao" as UC_ShippingOrders
+    usecase "Xem SP\nbán chạy" as UC_TopProducts
+    usecase "Xem đơn hàng\ngần đây" as UC_RecentOrders
+    usecase "Xem thông báo" as UC_Notifications
+    
+    ' === BÁO CÁO CHI TIẾT ===
+    usecase "Xem báo cáo\nchi tiết" as UC_Reports
+    usecase "Thống kê\ndoanh thu" as UC_RevenueStats
+    usecase "Thống kê\nđơn hàng" as UC_OrderStats
+    usecase "Thống kê\nkhách hàng" as UC_CustomerStats
+    usecase "Thống kê\nsản phẩm" as UC_ProductStats
+    usecase "Báo cáo theo\ndanh mục" as UC_CategoryReport
+    
+    ' === BIỂU ĐỒ ===
+    usecase "Xem biểu đồ\ndoanh thu" as UC_RevenueChart
+    usecase "Xem biểu đồ\nđơn hàng" as UC_OrderChart
+    usecase "Xem biểu đồ\nSP bán chạy" as UC_ProductChart
+    
+    ' === LỌC & XUẤT ===
+    usecase "Lọc theo\nthời gian" as UC_FilterTime
+    usecase "Xuất báo cáo\nExcel" as UC_Export
+}
+
+' Main connection
+Admin --> UC_Main
+
+' Extend to main categories
+UC_Dashboard .up.> UC_Main : <<extend>>
+UC_Reports .down.> UC_Main : <<extend>>
+
+' Dashboard sub-functions
+UC_TodayRevenue .up.> UC_Dashboard : <<extend>>
+UC_NewOrders .up.> UC_Dashboard : <<extend>>
+UC_ShippingOrders .up.> UC_Dashboard : <<extend>>
+UC_TopProducts .down.> UC_Dashboard : <<extend>>
+UC_RecentOrders .down.> UC_Dashboard : <<extend>>
+UC_Notifications .down.> UC_Dashboard : <<extend>>
+
+' Reports sub-functions
+UC_RevenueStats .down.> UC_Reports : <<extend>>
+UC_OrderStats .down.> UC_Reports : <<extend>>
+UC_CustomerStats .down.> UC_Reports : <<extend>>
+UC_ProductStats .down.> UC_Reports : <<extend>>
+UC_CategoryReport .down.> UC_Reports : <<extend>>
+
+' Include relationships
+UC_Reports ..> UC_FilterTime : <<include>>
+UC_Reports ..> UC_Export : <<include>>
+UC_Reports ..> UC_RevenueChart : <<include>>
+UC_Reports ..> UC_OrderChart : <<include>>
+UC_Reports ..> UC_ProductChart : <<include>>
+
+UC_Dashboard ..> UC_RevenueChart : <<include>>
+UC_Dashboard ..> UC_OrderChart : <<include>>
+
+@enduml

@@ -1,0 +1,36 @@
+/* Cấu trúc của menu dropdown */
+.menu-1 ul li.dropdown {
+    position: relative;
+  }
+  
+  .menu-1 ul li.dropdown .dropdown-menu {
+    display: none; /* Ẩn menu con mặc định */
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background-color: #fff;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    min-width: 200px;
+    z-index: 1;
+  }
+  
+  .menu-1 ul li.dropdown:hover .dropdown-menu {
+    display: block; /* Hiển thị menu con khi hover vào mục dropdown */
+  }
+  
+  .menu-1 ul li.dropdown .dropdown-menu li {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+  }
+  
+  .menu-1 ul li.dropdown .dropdown-menu li a {
+    color: #666;
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .menu-1 ul li.dropdown .dropdown-menu li a:hover {
+    color: #ffcc00;
+  }
+  
+  

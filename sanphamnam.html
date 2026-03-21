@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Thời Trang Nam - KAITO KID</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+   
+    <link rel="icon" href="images/d53c7593-3c1b-437a-98bc-f71b44050b40.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/modern-fashion.css" />
+    <link rel="stylesheet" href="/css/products-page.css" />
+  </head>
+  <body>
+    <!-- Top Announcement Bar -->
+    <div class="top-bar">
+      <div class="top-bar-content">
+        <span>🚚 Freeship đơn từ 499K</span>
+        <span>🔁 Đổi trả trong 7 ngày</span>
+        <span>⚡ Sale tới 50% - Chỉ hôm nay</span>
+      </div>
+    </div>
+
+    <!-- Header -->
+    <header class="main-header">
+      <div class="header-container">
+        <!-- Logo -->
+        <div class="logo">
+          <a href="index.html">
+            <img src="/images/logokaitokid.png" alt="KAITO KID" />
+          </a>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-bar">
+          <input type="text" placeholder="Tìm áo sơ mi, quần jeans, váy..." />
+          <button><i class="fa fa-search"></i></button>
+        </div>
+
+        <!-- Header Icons -->
+        <div class="header-actions">
+          <div class="account-dropdown-wrapper">
+            <a href="#" class="icon-link" id="accountIcon">
+              <i class="fa fa-user"></i>
+            </a>
+            <div class="account-dropdown" id="accountDropdown">
+              <div class="account-dropdown-content">
+                <!-- Not logged in -->
+                <div class="account-guest" id="accountGuest">
+                  <h4>Chào mừng bạn!</h4>
+                  <p>Đăng nhập để trải nghiệm mua sắm tốt nhất</p>
+                  <div class="account-actions">
+                    <a href="login.html" class="btn-account-primary">Đăng nhập</a>
+                    <a href="login.html" class="btn-account-secondary">Đăng ký</a>
+                  </div>
+                </div>
+                <!-- Logged in -->
+                <div class="account-user" id="accountUser" style="display: none;">
+                  <div class="account-user-info">
+                    <div class="account-avatar">
+                      <i class="fa fa-user-circle"></i>
+                    </div>
+                    <div class="account-details">
+                      <h4 id="userName">Tên người dùng</h4>
+                      <p id="userEmail">email@example.com</p>
+                    </div>
+                  </div>
+                  <div class="account-menu">
+                    <a href="#" class="account-menu-item">
+                      <i class="fa fa-user"></i>
+                      <span>Thông tin tài khoản</span>
+                    </a>
+                    <a href="donhang.html" class="account-menu-item">
+                      <i class="fa fa-box"></i>
+                      <span>Đơn hàng của tôi</span>
+                    </a>
+                    <a href="#" class="account-menu-item">
+                      <i class="fa fa-heart"></i>
+                      <span>Sản phẩm yêu thích</span>
+                    </a>
+                    <a href="#" class="account-menu-item">
+                      <i class="fa fa-location-dot"></i>
+                      <span>Địa chỉ giao hàng</span>
+                    </a>
+                    <!-- Admin button (only for admin) -->
+                    <a href="admin/dashboard.html" class="account-menu-item admin-item" id="adminMenuItem" style="display: none;">
+                      <i class="fa fa-shield-alt"></i>
+                      <span>Trang quản trị</span>
+                    </a>
+                    <div class="account-divider"></div>
+                    <a href="#" class="account-menu-item logout-item" id="logoutBtn">
+                      <i class="fa fa-sign-out-alt"></i>
+                      <span>Đăng xuất</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <a href="#" class="icon-link">
+            <i class="fa fa-heart"></i>
+          </a>
+          <a href="GioHang.html" class="icon-link cart-link">
+            <i class="fa fa-shopping-bag"></i>
+            <span id="cart-count" class="cart-badge">0</span>
+          </a>
+          <button class="mobile-menu-btn" id="mobile-toggle">
+            <i class="fas fa-bars"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Mega Menu -->
+      <nav class="mega-menu">
+        <ul class="menu-list" id="mainMenuList">
+          <li class="has-mega-dropdown">
+            <a href="sanphamnu.html">NỮ</a>
+          </li>
+          <li class="has-mega-dropdown">
+            <a href="sanphamnam.html">NAM</a>
+          </li>
+          <li class="has-mega-dropdown">
+            <a href="sanphamtreem.html">TRẺ EM</a>
+          </li>
+          <li><a href="samphammoi.html">NEW IN</a></li>
+          <li><a href="samphamsale.html">SALE</a></li>
+          <li><a href="bosuutap.html">BỘ SƯU TẬP</a></li>
+          <li><a href="#">LOOKBOOK</a></li>
+        </ul>
+      </nav>
+    </header>
+
+    <!-- Admin Button (Hidden) -->
+    <div id="adminButtonContainer" style="display: none; position: fixed; top: 100px; right: 20px; z-index: 999;">
+      <a href="admin/dashboard.html" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <i class="fas fa-shield-alt"></i>
+        <span>Admin</span>
+      </a>
+    </div>
+
+<!-- Breadcrumb -->
+<nav class="breadcrumb">
+    <a href="index.html">TRANG CHỦ</a> /
+    <span>THỜI TRANG NAM</span> 
+</nav>
+  
+  <div class="allsanpham">
+    <aside class="danhmuc">
+      <h3>Danh mục Nam</h3>
+      <ul class="danhsach">
+        <li><strong onclick="filterBySubCategory('Tất cả sản phẩm nam')">Tất cả sản phẩm nam</strong></li>
+        <li><strong>Áo</strong>
+          <ul>
+            <li><a href="#" onclick="filterBySubCategory('Áo thun'); return false;">Áo thun</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Áo sơ mi'); return false;">Áo sơ mi</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Áo polo'); return false;">Áo polo</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Áo len'); return false;">Áo len</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Áo hoodie'); return false;">Áo hoodie</a></li>
+          </ul>
+        </li>
+        <li><strong>Quần</strong>
+          <ul>
+            <li><a href="#" onclick="filterBySubCategory('Quần jeans'); return false;">Quần jeans</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Quần tây'); return false;">Quần tây</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Quần short'); return false;">Quần short</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Quần kaki'); return false;">Quần kaki</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Quần jogger'); return false;">Quần jogger</a></li>
+          </ul>
+        </li>
+        <li><strong>Outerwear</strong>
+          <ul>
+            <li><a href="#" onclick="filterBySubCategory('Áo khoác blazer'); return false;">Áo khoác blazer</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Áo khoác dạ'); return false;">Áo khoác dạ</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Áo khoác jean'); return false;">Áo khoác jean</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Áo khoác bomber'); return false;">Áo khoác bomber</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Áo khoác gió'); return false;">Áo khoác gió</a></li>
+          </ul>
+        </li>
+        <li><strong>Phụ kiện</strong>
+          <ul>
+            <li><a href="#" onclick="filterBySubCategory('Cà vạt'); return false;">Cà vạt</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Thắt lưng'); return false;">Thắt lưng</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Ví'); return false;">Ví</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Túi xách'); return false;">Túi xách</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Mũ nón'); return false;">Mũ nón</a></li>
+          </ul>
+        </li>
+        <li><strong>Phong cách</strong>
+          <ul>
+            <li><a href="#" onclick="filterBySubCategory('Đồ công sở'); return false;">Đồ công sở</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Đồ basic'); return false;">Đồ basic</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Đồ thể thao'); return false;">Đồ thể thao</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Đồ streetwear'); return false;">Đồ streetwear</a></li>
+            <li><a href="#" onclick="filterBySubCategory('Đồ mặc nhà'); return false;">Đồ mặc nhà</a></li>
+          </ul>
+        </li>
+      </ul>
+    </aside>
+
+    <main class="product-area">
+      <div class="header-filter">
+        <h2>THỜI TRANG NAM</h2>
+        <div class="filters">
+          <span>Kích cỡ ▾</span>
+          <span>Màu sắc ▾</span>
+          <span>Giá ▾</span>
+        </div>
+      </div>
+
+      <div class="BanChay">
+        <div class="sanphams" id="men-products-grid">
+            <p style="text-align: center; padding: 40px;">Đang tải sản phẩm...</p>
+        </div>
+      </div>
+      
+      <div class="pagination" id="pagination-container">
+      </div>
+      
+    </main>
+  </div>
+
+  <footer>
+    <div class="footer-container">
+      <div class="footer-column">
+        <h3>Giới thiệu</h3>
+        <a href="#">Giới thiệu</a>
+        <a href="#">Liên hệ</a>
+        <a href="#">Tuyển dụng</a>
+        <a href="#">Tin tức</a>
+        <p>Email : kaitokid@gmail.com</p>
+        <span>Hotline : 0906264126</span>
+      </div>
+
+      <div class="footer-column">
+        <h3>Hỗ trợ khách hàng</h3>
+        <a href="#">Hướng dẫn đặt hàng</a>
+        <a href="#">Hướng dẫn chọn size</a>
+        <a href="#">Câu hỏi thường gặp</a>
+        <a href="#">Chính sách khách hàng VIP</a>
+        <a href="#">Thanh toán - Giao hàng</a>
+      </div>
+
+      <div class="footer-column">
+        <h3>Hệ thống cửa hàng</h3>
+        <a href="#">Tìm địa chỉ cửa hàng gần bạn</a>
+        <iframe
+          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d29814.440691130083!2d106.1463321!3d20.920160099999993!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3135a29bd88fe4d3%3A0xae2d7685eca0b553!2zQ-G6p3UgU-G6t3Q!5e0!3m2!1svi!2s!4v1740448302515!5m2!1svi!2s"
+          style="width: 80%; height: 150px"
+        ></iframe>
+      </div>
+
+      <div class="footer-column">
+        <h3>Kết nối với Kaito Kid Shop</h3>
+        <div class="social-links">
+          <a href="https://www.facebook.com/KaitooKidd.1412" target="_blank">
+            <i class="fa-brands fa-facebook"></i
+          ></a>
+          <a href="https://www.youtube.com/@Kuroba_Kaito_GM" target="_blank">
+            <i class="fa-brands fa-youtube"></i
+          ></a>
+          <a href="https://www.tiktok.com/@kurobaa_kaitoo" target="_blank">
+            <i class="fa-brands fa-tiktok"></i
+          ></a>
+          <a href="https://www.instagram.com/kaitoo.kidd1412" target="_blank">
+            <i class="fa-brands fa-instagram"></i
+          ></a>
+        </div>
+      </div>
+    </div>
+    <h3>Đăng ký nhận email khuyến mãi</h3>
+    <div class="newsletter">
+      <input type="email" placeholder="Email của bạn" />
+      <button type="button">Đăng ký</button>
+    </div>
+  </footer>
+
+  <script src="/javascript/modern-fashion.js"></script>
+  <script src="/javascript/mobile-menu.js"></script>
+  <script src="/javascript/mega-menu.js"></script>
+  <script src="/javascript/men-products.js"></script>
+</body>
+</html>

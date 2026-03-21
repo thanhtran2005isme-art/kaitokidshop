@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản lý Lookbook - Admin KAITO KID</title>
+  <link rel="icon" href="/images/d53c7593-3c1b-437a-98bc-f71b44050b40.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin-layout.css">
+  <link rel="stylesheet" href="css/admin-common.css">
+  <link rel="stylesheet" href="css/admin-lookbook.css">
+</head>
+<body data-page="lookbook">
+  <div class="admin-container">
+    <aside class="sidebar" id="sidebar"></aside>
+    
+    <main class="main-content">
+      <div class="top-bar" id="topBar"></div>
+      
+      <div class="content-wrapper">
+        <div class="page-header">
+          <div class="page-title">
+            <h1><i class="fa fa-images"></i> Quản lý Lookbook</h1>
+            <p>Tạo và quản lý các bộ outfit gợi ý cho khách hàng</p>
+          </div>
+          <button class="btn btn-primary" onclick="openAddModal()">
+            <i class="fa fa-plus"></i> Thêm Lookbook
+          </button>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+              <i class="fa fa-images"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="totalLookbooks">0</span>
+              <span class="stat-label">Tổng Lookbook</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #11998e, #38ef7d);">
+              <i class="fa fa-check-circle"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="activeLookbooks">0</span>
+              <span class="stat-label">Đang hiển thị</span>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+              <i class="fa fa-box"></i>
+            </div>
+            <div class="stat-info">
+              <span class="stat-value" id="totalProducts">0</span>
+              <span class="stat-label">Sản phẩm trong Lookbook</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Lookbook Grid -->
+        <div class="lookbook-grid" id="lookbookGrid">
+          <!-- Lookbooks will be loaded here -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div class="modal-overlay" id="lookbookModal">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3 id="modalTitle"><i class="fa fa-plus"></i> Thêm Lookbook mới</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="lookbookForm">
+          <input type="hidden" id="lookbookId">
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tên Lookbook <span class="required">*</span></label>
+              <input type="text" id="lookbookName" placeholder="VD: Office Chic, Street Style..." required>
+            </div>
+            <div class="form-group">
+              <label>Phong cách</label>
+              <select id="lookbookStyle">
+                <option value="office">Office Chic</option>
+                <option value="street">Street Style</option>
+                <option value="casual">Casual</option>
+                <option value="party">Party</option>
+                <option value="weekend">Weekend Chill</option>
+                <option value="sport">Sporty</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Mô tả ngắn</label>
+            <input type="text" id="lookbookDesc" placeholder="VD: 3 items – 5 outfit đi làm cả tuần">
+          </div>
+
+          <div class="form-group">
+            <label>Hình ảnh Lookbook</label>
+            <div class="image-upload-area" id="imageUploadArea">
+              <input type="file" id="lookbookImage" accept="image/*" onchange="previewImage(this)">
+              <div class="upload-placeholder" id="uploadPlaceholder">
+                <i class="fa fa-cloud-upload-alt"></i>
+                <p>Kéo thả hoặc click để tải ảnh</p>
+              </div>
+              <img id="imagePreview" src="" alt="" style="display: none;">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Chọn sản phẩm cho Lookbook</label>
+            <div class="product-search-box">
+              <i class="fa fa-search"></i>
+              <input type="text" id="productSearch" placeholder="Tìm sản phẩm..." oninput="searchProducts()">
+            </div>
+            <div class="product-select-grid" id="productSelectGrid">
+              <!-- Products will be loaded here -->
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Sản phẩm đã chọn (<span id="selectedCount">0</span>)</label>
+            <div class="selected-products" id="selectedProducts">
+              <p class="empty-text">Chưa chọn sản phẩm nào</p>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tổng giá set</label>
+              <input type="text" id="totalPrice" readonly>
+            </div>
+            <div class="form-group">
+              <label>Trạng thái</label>
+              <select id="lookbookStatus">
+                <option value="active">Hiển thị</option>
+                <option value="inactive">Ẩn</option>
+              </select>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Hủy</button>
+        <button type="button" class="btn btn-primary" onclick="saveLookbook()">
+          <i class="fa fa-save"></i> Lưu Lookbook
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/admin-sidebar.js"></script>
+  <script src="js/admin-layout.js"></script>
+  <script src="js/admin-lookbook.js"></script>
+</body>
+</html>

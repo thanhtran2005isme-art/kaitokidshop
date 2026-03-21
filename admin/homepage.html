@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản lý Trang chủ - KAITO KID Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/css/admin-layout.css">
+  <link rel="stylesheet" href="/admin/css/admin-homepage.css">
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <img src="/images/logokaitokid.png" alt="KAITO KID">
+        <span class="sidebar-title">KAITO KID</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle">
+        <i class="fa fa-bars"></i>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <ul class="nav-list">
+        <li class="nav-item">
+          <a href="dashboard.html" class="nav-link">
+            <i class="fa fa-chart-line"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        
+        <li class="nav-item has-submenu">
+          <a href="#" class="nav-link">
+            <i class="fa fa-shopping-cart"></i>
+            <span>Đơn hàng</span>
+            <i class="fa fa-chevron-down submenu-arrow"></i>
+          </a>
+          <ul class="submenu">
+            <li><a href="orders.html">Tất cả đơn hàng</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item has-submenu">
+          <a href="#" class="nav-link">
+            <i class="fa fa-box"></i>
+            <span>Sản phẩm</span>
+            <i class="fa fa-chevron-down submenu-arrow"></i>
+          </a>
+          <ul class="submenu">
+            <li><a href="products.html">Danh sách sản phẩm</a></li>
+            <li><a href="product-add.html">Thêm sản phẩm</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item has-submenu open active">
+          <a href="#" class="nav-link">
+            <i class="fa fa-palette"></i>
+            <span>Giao diện</span>
+            <i class="fa fa-chevron-down submenu-arrow"></i>
+          </a>
+          <ul class="submenu">
+            <li><a href="homepage.html" class="active">Trang chủ</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item">
+          <a href="settings.html" class="nav-link">
+            <i class="fa fa-cog"></i>
+            <span>Cài đặt</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+          <i class="fa fa-bars"></i>
+        </button>
+        <h2>Quản lý Trang chủ</h2>
+      </div>
+      <div class="top-bar-right">
+        <a href="../index.html" class="view-site-btn" target="_blank">
+          <i class="fa fa-external-link-alt"></i>
+          <span>Xem trang chủ</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- Homepage Content -->
+    <div class="content-wrapper">
+      <!-- NEW ARRIVALS Section -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fa fa-sparkles"></i>
+            <h3>NEW ARRIVALS</h3>
+          </div>
+          <button class="btn-add-products" onclick="openProductPicker('newArrivals')">
+            <i class="fa fa-plus"></i> Thêm sản phẩm
+          </button>
+        </div>
+        <p class="section-desc">Sản phẩm mới - Hiển thị trên trang chủ</p>
+        <div class="selected-products" id="newArrivals-products">
+          <p class="empty-text">Chưa có sản phẩm nào được chọn</p>
+        </div>
+      </div>
+
+      <!-- SALE Section -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fa fa-fire"></i>
+            <h3>🔥 ĐANG GIẢM GIÁ</h3>
+          </div>
+          <button class="btn-add-products" onclick="openProductPicker('saleProducts')">
+            <i class="fa fa-plus"></i> Thêm sản phẩm
+          </button>
+        </div>
+        <p class="section-desc">Sản phẩm đang giảm giá - Hiển thị trên trang chủ</p>
+        <div class="selected-products" id="saleProducts-products">
+          <p class="empty-text">Chưa có sản phẩm nào được chọn</p>
+        </div>
+      </div>
+
+      <!-- BEST SELLERS Section -->
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">
+            <i class="fa fa-trophy"></i>
+            <h3>BEST SELLERS</h3>
+          </div>
+          <button class="btn-add-products" onclick="openProductPicker('bestSellers')">
+            <i class="fa fa-plus"></i> Thêm sản phẩm
+          </button>
+        </div>
+        <p class="section-desc">Sản phẩm bán chạy - Hiển thị trên trang chủ</p>
+        <div class="selected-products" id="bestSellers-products">
+          <p class="empty-text">Chưa có sản phẩm nào được chọn</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Product Picker Modal -->
+  <div id="productPickerModal" class="modal">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="pickerTitle">Chọn sản phẩm</h3>
+          <button class="modal-close" onclick="closeProductPicker()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="picker-search">
+            <i class="fa fa-search"></i>
+            <input type="text" id="pickerSearch" placeholder="Tìm kiếm sản phẩm...">
+          </div>
+          <div class="picker-products" id="pickerProducts">
+            <!-- Products will be loaded here -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" onclick="closeProductPicker()">Hủy</button>
+          <button class="btn-primary" onclick="saveSelectedProducts()">
+            <i class="fa fa-check"></i> Xác nhận
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin/js/admin-layout.js"></script>
+  <script src="/admin/js/admin-homepage.js"></script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1">
+  <xmi:Documentation exporter="Kiro" exporterVersion="1.0"/>
+  
+  <uml:Model xmi:type="uml:Model" xmi:id="model_dang_nhap" name="Biểu đồ Sequence - Đăng Nhập">
+    
+    <!-- Collaboration for Sequence Diagram -->
+    <packagedElement xmi:type="uml:Collaboration" xmi:id="collab_dang_nhap" name="Đăng Nhập">
+      <ownedAttribute xmi:type="uml:Property" xmi:id="lifeline_user" name="Người Dùng"/>
+      <ownedAttribute xmi:type="uml:Property" xmi:id="lifeline_login_page" name="Trang Đăng Nhập"/>
+      <ownedAttribute xmi:type="uml:Property" xmi:id="lifeline_auth" name="Hệ Thống Xác Thực"/>
+      <ownedAttribute xmi:type="uml:Property" xmi:id="lifeline_user_db" name="Cơ Sở Dữ Liệu"/>
+      <ownedAttribute xmi:type="uml:Property" xmi:id="lifeline_session" name="Session Storage"/>
+    </packagedElement>
+    
+    <!-- Interaction (Sequence Diagram) -->
+    <packagedElement xmi:type="uml:Interaction" xmi:id="interaction_dang_nhap" name="Quy trình Đăng Nhập">
+      
+      <!-- Lifelines -->
+      <lifeline xmi:type="uml:Lifeline" xmi:id="ll_user" name="Người Dùng" represents="lifeline_user"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="ll_login" name="Trang Đăng Nhập" represents="lifeline_login_page"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="ll_auth" name="Hệ Thống Xác Thực" represents="lifeline_auth"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="ll_user_db" name="Cơ Sở Dữ Liệu" represents="lifeline_user_db"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="ll_session" name="Session Storage" represents="lifeline_session"/>
+      
+      <!-- Messages -->
+      <message xmi:type="uml:Message" xmi:id="msg_dn_1" name="1. Truy cập trang đăng nhập" messageSort="synchCall" sendEvent="send_dn_1" receiveEvent="recv_dn_1"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_2" name="2. Hiển thị form đăng nhập" messageSort="reply" sendEvent="send_dn_2" receiveEvent="recv_dn_2"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_3" name="3. Nhập email và mật khẩu" messageSort="synchCall" sendEvent="send_dn_3" receiveEvent="recv_dn_3"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_4" name="4. Nhấn nút Đăng nhập" messageSort="synchCall" sendEvent="send_dn_4" receiveEvent="recv_dn_4"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_5" name="5. Validate dữ liệu đầu vào" messageSort="synchCall" sendEvent="send_dn_5" receiveEvent="recv_dn_5"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_6" name="6. Gửi yêu cầu xác thực" messageSort="synchCall" sendEvent="send_dn_6" receiveEvent="recv_dn_6"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_7" name="7. Tìm kiếm tài khoản" messageSort="synchCall" sendEvent="send_dn_7" receiveEvent="recv_dn_7"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_8" name="8. Trả về thông tin tài khoản" messageSort="reply" sendEvent="send_dn_8" receiveEvent="recv_dn_8"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_9" name="9. Kiểm tra mật khẩu" messageSort="synchCall" sendEvent="send_dn_9" receiveEvent="recv_dn_9"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_10" name="10. Tạo session đăng nhập" messageSort="synchCall" sendEvent="send_dn_10" receiveEvent="recv_dn_10"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_11" name="11. Lưu thông tin session" messageSort="synchCall" sendEvent="send_dn_11" receiveEvent="recv_dn_11"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_12" name="12. Xác nhận lưu thành công" messageSort="reply" sendEvent="send_dn_12" receiveEvent="recv_dn_12"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_13" name="13. Trả về kết quả xác thực" messageSort="reply" sendEvent="send_dn_13" receiveEvent="recv_dn_13"/>
+      <message xmi:type="uml:Message" xmi:id="msg_dn_14" name="14. Chuyển hướng trang chủ" messageSort="reply" sendEvent="send_dn_14" receiveEvent="recv_dn_14"/>
+      
+      <!-- Message Occurrence Specifications -->
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_1" covered="ll_user" message="msg_dn_1"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_1" covered="ll_login" message="msg_dn_1"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_2" covered="ll_login" message="msg_dn_2"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_2" covered="ll_user" message="msg_dn_2"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_3" covered="ll_user" message="msg_dn_3"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_3" covered="ll_login" message="msg_dn_3"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_4" covered="ll_user" message="msg_dn_4"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_4" covered="ll_login" message="msg_dn_4"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_5" covered="ll_login" message="msg_dn_5"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_5" covered="ll_login" message="msg_dn_5"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_6" covered="ll_login" message="msg_dn_6"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_6" covered="ll_auth" message="msg_dn_6"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_7" covered="ll_auth" message="msg_dn_7"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_7" covered="ll_user_db" message="msg_dn_7"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_8" covered="ll_user_db" message="msg_dn_8"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_8" covered="ll_auth" message="msg_dn_8"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_9" covered="ll_auth" message="msg_dn_9"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_9" covered="ll_auth" message="msg_dn_9"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_10" covered="ll_auth" message="msg_dn_10"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_10" covered="ll_auth" message="msg_dn_10"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_11" covered="ll_auth" message="msg_dn_11"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_11" covered="ll_session" message="msg_dn_11"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_12" covered="ll_session" message="msg_dn_12"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_12" covered="ll_auth" message="msg_dn_12"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_13" covered="ll_auth" message="msg_dn_13"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_13" covered="ll_login" message="msg_dn_13"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_dn_14" covered="ll_login" message="msg_dn_14"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_dn_14" covered="ll_user" message="msg_dn_14"/>
+      
+    </packagedElement>
+    
+  </uml:Model>
+  
+</xmi:XMI>

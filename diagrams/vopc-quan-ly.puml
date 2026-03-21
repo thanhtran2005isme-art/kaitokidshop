@@ -1,0 +1,139 @@
+@startuml VOPC_SanPham
+title VOPC - Quản lý Sản phẩm
+
+boundary QLSanPhamView
+control QLSanPhamController
+
+class SanPham {
+    -MaSP : string
+    -TenSP : string
+    -GiaBan : int
+    -SoLuongTon : int
+    -HinhAnh : string
+}
+
+class LoaiSP {
+    -MaLoai : string
+    -TenLoai : string
+    -MoTa : string
+}
+
+QLSanPhamView --> QLSanPhamController
+QLSanPhamController --> SanPham
+QLSanPhamController --> LoaiSP
+SanPham "0..*" -- "1" LoaiSP
+@enduml
+
+
+@startuml VOPC_DanhMuc
+title VOPC - Quản lý Danh mục
+
+boundary QLDanhMucView
+control QLDanhMucController
+
+class DanhMuc {
+    -MaDM : string
+    -TenDM : string
+    -Icon : string
+    -TrangThai : string
+}
+
+class NhomDM {
+    -MaNhom : string
+    -TenNhom : string
+}
+
+QLDanhMucView --> QLDanhMucController
+QLDanhMucController --> DanhMuc
+QLDanhMucController --> NhomDM
+DanhMuc "0..*" -- "1" NhomDM
+@enduml
+
+
+@startuml VOPC_DonHang
+title VOPC - Quản lý Đơn hàng
+
+boundary QLDonHangView
+control QLDonHangController
+
+class DonHang {
+    -MaDH : string
+    -MaKH : string
+    -TongTien : int
+    -NgayDat : datetime
+}
+
+class CTDH {
+    -MaDH : string
+    -MaSP : string
+    -SoLuong : int
+    -DonGia : int
+}
+
+class KhachHang {
+    -MaKH : string
+    -TenKH : string
+    -SDT : string
+    -DiaChi : string
+}
+
+QLDonHangView --> QLDonHangController
+QLDonHangController --> DonHang
+QLDonHangController --> CTDH
+QLDonHangController --> KhachHang
+CTDH "1..*" -- "1" DonHang
+DonHang "0..*" -- "1" KhachHang
+@enduml
+
+
+@startuml VOPC_KhachHang
+title VOPC - Quản lý Khách hàng
+
+boundary QLKhachHangView
+control QLKhachHangController
+
+class KhachHang {
+    -MaKH : string
+    -TenKH : string
+    -NgaySinh : datetime
+    -GioiTinh : string
+    -SDT : string
+    -DiaChi : string
+}
+
+class HangKH {
+    -MaHang : string
+    -TenHang : string
+}
+
+QLKhachHangView --> QLKhachHangController
+QLKhachHangController --> KhachHang
+QLKhachHangController --> HangKH
+KhachHang "0..*" -- "1" HangKH
+@enduml
+
+
+@startuml VOPC_TonKho
+title VOPC - Quản lý Tồn kho
+
+boundary QLTonKhoView
+control QLTonKhoController
+
+class TonKho {
+    -MaSP : string
+    -TenSP : string
+    -SoLuong : int
+}
+
+class LichSuKho {
+    -MaLS : string
+    -MaSP : string
+    -SoLuong : int
+    -NgayNhap : datetime
+}
+
+QLTonKhoView --> QLTonKhoController
+QLTonKhoController --> TonKho
+QLTonKhoController --> LichSuKho
+LichSuKho "0..*" -- "1" TonKho
+@enduml

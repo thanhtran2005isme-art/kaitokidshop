@@ -1,0 +1,85 @@
+@startuml BDTT_ThemGioHang_DonGian
+!theme plain
+skinparam backgroundColor #FFFFFF
+
+title Biểu đồ tuần tự: Thêm sản phẩm vào giỏ hàng
+
+actor "Khách hàng" as KH
+participant "GiaoDienChiTietSP" as UI
+participant "SanPham" as SP
+participant "GioHang" as GH
+participant "LocalStorage" as LS
+
+== Xem sản phẩm ==
+
+KH -> UI : 1. Truy cập trang chi tiết SP
+activate UI
+
+UI -> SP : 1.1. getProductById(id)
+activate SP
+SP -> LS : 1.1.1. getItem('products')
+activate LS
+LS --> SP : 1.1.2. products[]
+deactivate LS
+SP --> UI : 1.2. productData
+deactivate SP
+
+UI --> KH : 1.3. Hiển thị thông tin SP
+deactivate UI
+
+== Chọn thuộc tính ==
+
+KH -> UI : 2. Chọn màu sắc
+activate UI
+UI -> UI : 2.1. selectColor()
+UI -> UI : 2.2. updateStockStatus()
+UI --> KH : 2.3. Cập nhật UI
+deactivate UI
+
+KH -> UI : 3. Chọn kích thước
+activate UI
+UI -> UI : 3.1. selectSize()
+UI -> UI : 3.2. updateStockStatus()
+UI --> KH : 3.3. Hiển thị tồn kho
+deactivate UI
+
+KH -> UI : 4. Chọn số lượng
+activate UI
+UI -> UI : 4.1. validateQuantity()
+UI --> KH : 4.2. Cập nhật số lượng
+deactivate UI
+
+== Thêm vào giỏ ==
+
+KH -> UI : 5. Nhấn "Thêm vào giỏ"
+activate UI
+
+UI -> GH : 5.1. addToCart(cartItem)
+activate GH
+
+GH -> LS : 5.1.1. getItem('cart')
+activate LS
+LS --> GH : 5.1.2. cart[]
+deactivate LS
+
+GH -> GH : 5.1.3. Kiểm tra SP đã có?
+
+alt SP đã có trong giỏ
+    GH -> GH : 5.1.4a. Tăng số lượng
+else SP chưa có
+    GH -> GH : 5.1.4b. Thêm mới vào cart
+end
+
+GH -> LS : 5.1.5. setItem('cart', cart)
+activate LS
+LS --> GH : 5.1.6. OK
+deactivate LS
+
+GH --> UI : 5.2. success
+deactivate GH
+
+UI -> UI : 5.3. updateCartCount()
+UI --> KH : 5.4. "Đã thêm vào giỏ hàng!"
+deactivate UI
+
+@enduml

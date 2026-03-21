@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xác nhận đặt hàng - KAITO KID</title>
+  <link rel="icon" href="images/d53c7593-3c1b-437a-98bc-f71b44050b40.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/modern-fashion.css" />
+  <link rel="stylesheet" href="/css/checkout-page.css" />
+</head>
+<body>
+  <!-- Simple Header -->
+  <header class="checkout-header">
+    <a href="GioHang.html" class="back-btn">
+      <i class="fa fa-arrow-left"></i>
+    </a>
+    <h1>Xác nhận đặt hàng</h1>
+    <div></div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="checkout-page">
+    <div class="checkout-container">
+      <!-- Left Column -->
+      <div class="checkout-left">
+        <!-- Customer Info -->
+        <section class="checkout-section">
+          <h3><i class="fa fa-user"></i> Thông tin người nhận</h3>
+          <div class="form-group">
+            <input type="text" id="customerName" placeholder="Nhập tên khách hàng" required>
+          </div>
+          <div class="form-group">
+            <div class="input-prefix">
+              <span>(+84)</span>
+              <input type="tel" id="customerPhone" placeholder="Nhập số điện thoại" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <input type="email" id="customerEmail" placeholder="Nhập địa chỉ email (không bắt buộc)">
+          </div>
+        </section>
+
+        <!-- Delivery Method -->
+        <section class="checkout-section">
+          <h3><i class="fa fa-truck"></i> Hình thức nhận hàng</h3>
+          <div class="delivery-tabs">
+            <button class="delivery-tab active" data-tab="delivery" onclick="switchDeliveryTab('delivery')">
+              Giao tận nơi
+            </button>
+            <button class="delivery-tab" data-tab="pickup" onclick="switchDeliveryTab('pickup')">
+              Nhận tại cửa hàng
+            </button>
+          </div>
+          
+          <!-- Delivery Content -->
+          <div id="delivery-content" class="delivery-content active">
+            <div class="form-group address-select" onclick="openAddressModal()">
+              <span>Tỉnh/Thành phố, Quận/Huyện, Phường/Xã</span>
+              <i class="fa fa-chevron-right"></i>
+            </div>
+            <div class="form-group">
+              <input type="text" id="addressDetail" placeholder="Số nhà, tên đường...">
+            </div>
+          </div>
+          
+          <!-- Pickup Content -->
+          <div id="pickup-content" class="delivery-content">
+            <div class="form-group store-select" onclick="openStoreModal()">
+              <span id="selectedStore">Chọn cửa hàng nhận hàng</span>
+              <i class="fa fa-chevron-right"></i>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <input type="text" id="orderNote" placeholder="Nhập ghi chú (không bắt buộc)">
+          </div>
+        </section>
+
+        <!-- Order Items -->
+        <section class="checkout-section">
+          <h3><i class="fa fa-box"></i> Chi tiết đơn hàng</h3>
+          <div id="order-items" class="order-items">
+            <!-- Items will be loaded here -->
+          </div>
+        </section>
+      </div>
+
+      <!-- Right Column -->
+      <div class="checkout-right">
+        <!-- Promotion -->
+        <div class="promo-section" onclick="openPromoModal()">
+          <i class="fa fa-ticket"></i>
+          <span>Chọn khuyến mãi</span>
+          <i class="fa fa-chevron-right"></i>
+        </div>
+
+        <!-- Payment Method -->
+        <div class="payment-section" id="paymentMethods">
+          <!-- Payment methods will be loaded from settings -->
+        </div>
+        
+        <!-- Bank Transfer Info (hidden by default) -->
+        <div class="bank-transfer-info" id="bankTransferInfo" style="display: none;">
+          <h4><i class="fa fa-university"></i> Thông tin chuyển khoản</h4>
+          <div id="bankAccountInfo"></div>
+        </div>
+
+        <!-- Order Summary -->
+        <div class="order-summary">
+          <h4>Chi tiết đơn hàng</h4>
+          <div class="summary-row">
+            <span>Tổng tiền</span>
+            <span id="subtotal">0₫</span>
+          </div>
+          <div class="summary-row discount">
+            <span>Giảm giá</span>
+            <span id="discount">0₫</span>
+          </div>
+          <div class="summary-row">
+            <span>Phí vận chuyển</span>
+            <span id="shipping">20.000₫</span>
+          </div>
+          <div class="summary-row total">
+            <span>Thành tiền</span>
+            <span id="total">0₫</span>
+          </div>
+          <p class="savings" id="savings"></p>
+        </div>
+
+        <!-- Free Shipping Note -->
+        <div class="free-shipping-note">
+          <i class="fa fa-truck"></i>
+          <span>Đơn từ 499k được miễn phí vận chuyển nhé!</span>
+        </div>
+
+        <!-- Place Order Button -->
+        <button class="btn-place-order" onclick="placeOrder()">
+          Đặt hàng <i class="fa fa-arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </main>
+
+
+  <!-- Store Selection Modal -->
+  <div id="storeModal" class="modal">
+    <div class="modal-content store-modal">
+      <div class="modal-header">
+        <h3>Chọn cửa hàng nhận hàng</h3>
+        <button class="modal-close" onclick="closeStoreModal()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="store-filters">
+          <select id="storeProvince" onchange="filterStores()">
+            <option value="">Chọn Tỉnh/Thành phố</option>
+            <option value="hanoi">Hà Nội</option>
+            <option value="hcm">TP. Hồ Chí Minh</option>
+            <option value="danang">Đà Nẵng</option>
+            <option value="haiphong">Hải Phòng</option>
+          </select>
+          <select id="storeDistrict" onchange="filterStores()">
+            <option value="">Chọn Quận/Huyện</option>
+          </select>
+        </div>
+        <p class="store-hours"><i class="fa fa-clock"></i> KAITO KID mở cửa từ 08:00 - 22:00 hằng ngày</p>
+        <div class="store-list" id="storeList">
+          <label class="store-item">
+            <input type="radio" name="store" value="store1">
+            <div class="store-info">
+              <h4>KAITO KID Cầu Giấy</h4>
+              <p><i class="fa fa-map-marker-alt"></i> 123 Xuân Thủy, Cầu Giấy, Hà Nội</p>
+              <p><i class="fa fa-phone"></i> 0906264126</p>
+            </div>
+          </label>
+          <label class="store-item">
+            <input type="radio" name="store" value="store2">
+            <div class="store-info">
+              <h4>KAITO KID Đống Đa</h4>
+              <p><i class="fa fa-map-marker-alt"></i> 456 Tây Sơn, Đống Đa, Hà Nội</p>
+              <p><i class="fa fa-phone"></i> 0906264127</p>
+            </div>
+          </label>
+          <label class="store-item">
+            <input type="radio" name="store" value="store3">
+            <div class="store-info">
+              <h4>KAITO KID Quận 1</h4>
+              <p><i class="fa fa-map-marker-alt"></i> 789 Nguyễn Huệ, Quận 1, TP.HCM</p>
+              <p><i class="fa fa-phone"></i> 0906264128</p>
+            </div>
+          </label>
+          <label class="store-item">
+            <input type="radio" name="store" value="store4">
+            <div class="store-info">
+              <h4>KAITO KID Quận 7</h4>
+              <p><i class="fa fa-map-marker-alt"></i> 321 Nguyễn Văn Linh, Quận 7, TP.HCM</p>
+              <p><i class="fa fa-phone"></i> 0906264129</p>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-confirm" onclick="confirmStore()">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Address Modal -->
+  <div id="addressModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Chọn địa chỉ giao hàng</h3>
+        <button class="modal-close" onclick="closeAddressModal()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <select id="province">
+            <option value="">Chọn Tỉnh/Thành phố</option>
+            <option value="hanoi">Hà Nội</option>
+            <option value="hcm">TP. Hồ Chí Minh</option>
+            <option value="danang">Đà Nẵng</option>
+            <option value="haiphong">Hải Phòng</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="district">
+            <option value="">Chọn Quận/Huyện</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <select id="ward">
+            <option value="">Chọn Phường/Xã</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-confirm" onclick="confirmAddress()">Xác nhận</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Promo Code Modal -->
+  <div id="promoModal" class="modal">
+    <div class="modal-content promo-modal">
+      <div class="modal-header">
+        <h3>Mã giảm giá</h3>
+        <button class="modal-close" onclick="closePromoModal()">
+          <i class="fa fa-times"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="promo-input-group">
+          <input type="text" id="promoCode" placeholder="Nhập mã giảm giá" />
+          <button class="btn-apply-promo" onclick="applyPromoCode()">Áp dụng</button>
+        </div>
+        <p class="promo-error" id="promoError" style="display: none;"></p>
+        
+        <div class="available-coupons">
+          <h4>Mã giảm giá khả dụng</h4>
+          <div id="availableCoupons" class="coupons-list">
+            <!-- Coupons will be loaded here -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/javascript/checkout-page.js"></script>
+</body>
+</html>

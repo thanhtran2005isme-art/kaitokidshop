@@ -1,0 +1,214 @@
+@startuml BDTT_NhapHDBan
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+title Biểu đồ tuần tự: Nhập Hóa Đơn Bán (NhapHDBan)\nWebsite bán quần áo KAITO KID
+
+actor "Nhân viên\nbán hàng" as NV
+boundary "FrmQuanLyBanHang\n<<boundary>>" as UI
+control "Ctr_QuanLyBanHang\n<<control>>" as CTRL
+entity "HoaDonBan\n<<entity>>" as HDB
+entity "CTHDB\n<<entity>>" as CTHDB
+entity "HangHoa\n<<entity>>" as HH
+entity "GiaBan\n<<entity>>" as GB
+entity "KhachHang\n<<entity>>" as KH
+entity "MaGiamGia\n<<entity>>" as MGG
+
+== Luồng chính: Nhập hóa đơn bán thành công ==
+
+NV -> UI : 1. ChonChucNangBanHang()
+activate UI
+
+UI -> CTRL : 1.1. TaoHoaDonMoi()
+activate CTRL
+
+CTRL -> CTRL : 1.1.1. SinhMaHoaDon(ngayThang : string)
+note right: Sinh mã HDB theo format:\nHDB + YYYYMMDD + số thứ tự
+
+CTRL -> HDB : 1.1.2. LayHoaDonCungNgay(ngay : date)
+activate HDB
+HDB --> CTRL : 1.1.3. return hoaDonList[]
+deactivate HDB
+
+CTRL --> UI : 1.2. return maHoaDon : string
+deactivate CTRL
+
+UI --> NV : 1.3. HienThiMaHoaDon(maHDB)
+deactivate UI
+
+== Nhập thông tin khách hàng ==
+
+NV -> UI : 2. NhapMaKhachHang(maKH : string)
+activate UI
+
+UI -> CTRL : 2.1. LayThongTinKhachHang(maKH : string)
+activate CTRL
+
+CTRL -> KH : 2.1.1. LayThongTinKH(maKH : string)
+activate KH
+KH --> CTRL : 2.1.2. return khachHang : KhachHang
+deactivate KH
+
+CTRL --> UI : 2.2. return khachHang : KhachHang
+deactivate CTRL
+
+UI --> NV : 2.3. Hiển thị thông tin KH\n(tên, SĐT, hạng thành viên)
+deactivate UI
+
+== Nhập chi tiết sản phẩm (lặp cho mỗi SP) ==
+
+loop Với mỗi sản phẩm cần bán
+
+    NV -> UI : 3. NhapMaHang(maHang : string)
+    activate UI
+    
+    UI -> CTRL : 3.1. LayThongTinHangBan(maHang : string)
+    activate CTRL
+    
+    CTRL -> HH : 3.1.1. LayHangHoa(maHang : string)
+    activate HH
+    HH --> CTRL : 3.1.2. return hangHoa : HangHoa
+    deactivate HH
+    
+    CTRL -> GB : 3.1.3. LayGiaHienTai(maHang : string)
+    activate GB
+    GB -> GB : KiemTraGiaConHieuLuc()
+    GB --> CTRL : 3.1.4. return gia : decimal
+    deactivate GB
+    
+    CTRL --> UI : 3.2. return {hangHoa, giaBan}
+    deactivate CTRL
+    
+    UI --> NV : 3.3. HienThiThongTinSP(sp : HangHoa)
+    deactivate UI
+    
+    NV -> UI : 4. NhapSoLuong(soLuong : int)
+    activate UI
+    
+    UI -> CTRL : 4.1. KiemTraTonKho(maHang, soLuong)
+    activate CTRL
+    
+    CTRL -> HH : 4.1.1. KiemTraTonKho()
+    activate HH
+    HH --> CTRL : 4.1.2. return soLuongCon : int
+    deactivate HH
+    
+    alt soLuong <= soLuongCon
+        CTRL --> UI : 4.2a. return true
+        
+        UI -> CTRL : 4.3. ThemChiTietHDB(ct : CTHDB)
+        
+        CTRL -> CTHDB : 4.3.1. TinhThanhTien()
+        activate CTHDB
+        note right: thanhTien = soLuong * donGia
+        CTHDB --> CTRL : 4.3.2. return thanhTien : decimal
+        deactivate CTHDB
+        
+        CTRL -> CTRL : 4.3.3. TinhTongTien(danhSachCT)
+        
+        CTRL --> UI : 4.4. return {success: true, tongTien}
+        deactivate CTRL
+        
+        UI --> NV : 4.5. HienThiChiTietHDB(ctList)\nHienThiTongTien(tongTien)
+        
+    else soLuong > soLuongCon
+        CTRL --> UI : 4.2b. return false
+        deactivate CTRL
+        UI --> NV : 4.6. HienThiThongBao("Không đủ hàng trong kho!")
+    end
+    
+    deactivate UI
+
+end
+
+== Áp dụng mã giảm giá (tùy chọn) ==
+
+opt Khách hàng có mã giảm giá
+
+    NV -> UI : 5. Nhập mã giảm giá
+    activate UI
+    
+    UI -> CTRL : 5.1. ApDungMaGiamGia(maGG, tongTien)
+    activate CTRL
+    
+    CTRL -> MGG : 5.1.1. KiemTraHopLe(tongTien : decimal)
+    activate MGG
+    MGG --> CTRL : 5.1.2. return isValid : boolean
+    deactivate MGG
+    
+    alt Mã hợp lệ
+        CTRL -> MGG : 5.1.3. TinhGiamGia(tongTien : decimal)
+        activate MGG
+        MGG --> CTRL : 5.1.4. return soTienGiam : decimal
+        deactivate MGG
+        
+        CTRL --> UI : 5.2a. return tongTienSauGiam : decimal
+    else Mã không hợp lệ
+        CTRL --> UI : 5.2b. return {error: "Mã không hợp lệ"}
+    end
+    
+    deactivate CTRL
+    
+    UI --> NV : 5.3. Cập nhật tổng tiền
+    deactivate UI
+
+end
+
+== Lưu hóa đơn ==
+
+NV -> UI : 6. XacNhanLuuHDB()
+activate UI
+
+UI -> CTRL : 6.1. BanHang(hoaDon : HoaDonBan, danhSachHangBan : CTHDB[])
+activate CTRL
+
+CTRL -> HDB : 6.1.1. LuuHoaDon()
+activate HDB
+HDB --> CTRL : 6.1.2. return success : boolean
+deactivate HDB
+
+loop Với mỗi chi tiết HDB
+    CTRL -> CTHDB : 6.1.3. LuuChiTiet()
+    activate CTHDB
+    CTHDB --> CTRL : return success
+    deactivate CTHDB
+    
+    CTRL -> HH : 6.1.4. CapNhatSoLuong(soLuongMoi : int)
+    activate HH
+    note right: soLuongMoi = soLuongCon - soLuongBan
+    HH --> CTRL : return success
+    deactivate HH
+end
+
+opt Có sử dụng mã giảm giá
+    CTRL -> MGG : 6.1.5. CapNhatSoLuongDung()
+    activate MGG
+    MGG --> CTRL : return success
+    deactivate MGG
+end
+
+opt Khách hàng thành viên
+    CTRL -> KH : 6.1.6. CapNhatDiemTichLuy(diem : int)
+    activate KH
+    KH --> CTRL : return success
+    deactivate KH
+end
+
+CTRL --> UI : 6.2. return {success: true, maHDB}
+deactivate CTRL
+
+UI -> UI : 6.3. ResetForm()
+UI --> NV : 6.4. HienThiThongBao("Lưu hóa đơn thành công!")
+deactivate UI
+
+== Luồng thay thế: Hủy hóa đơn ==
+
+NV -> UI : 7. Nhấn "Hủy"
+activate UI
+UI -> UI : 7.1. ResetForm()
+UI --> NV : 7.2. Quay về màn hình chính
+deactivate UI
+
+@enduml

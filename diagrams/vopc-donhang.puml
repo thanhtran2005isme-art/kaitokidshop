@@ -1,0 +1,54 @@
+@startuml VOPC_DonHang
+
+class QLDonHangView
+class QLDonHangController
+
+class DonHang {
+    -MaDH : string
+    -MaKH : string
+    -NgayDat : datetime
+    -TongTien : int
+    -TrangThai : string
+    -PTThanhToan : string
+    -TTThanhToan : string
+    -PhuongThucGiao : string
+    -DiaChi : string
+    -GhiChu : string
+}
+
+class CTDH {
+    -MaCTDH : string
+    -MaDH : string
+    -MaSP : string
+    -TenSP : string
+    -SoLuong : int
+    -DonGia : int
+    -MauSac : string
+    -Size : string
+    -HinhAnh : string
+}
+
+class KhachHang {
+    -MaKH : string
+    -TenKH : string
+    -SDT : string
+    -Email : string
+    -DiaChi : string
+}
+
+class SanPham {
+    -MaSP : string
+    -TenSP : string
+    -GiaBan : int
+}
+
+QLDonHangView --> QLDonHangController
+QLDonHangController --> DonHang
+QLDonHangController --> CTDH
+QLDonHangController --> KhachHang
+QLDonHangController --> SanPham
+CTDH "1..*" -- "1" DonHang
+DonHang "0..*" -- "1" KhachHang
+CTDH "0..*" -- "1" SanPham
+
+@enduml

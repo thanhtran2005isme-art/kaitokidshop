@@ -1,0 +1,73 @@
+@startuml Use Case - Khách hàng Quản lý Giỏ hàng
+
+skinparam backgroundColor #87CEEB
+skinparam usecase {
+    BackgroundColor #87CEEB
+    BorderColor #000000
+}
+
+left to right direction
+
+actor "Khách hàng" as Customer
+
+rectangle "Quản lý Giỏ hàng" {
+    usecase "Quản lý\ngiỏ hàng" as UC_Main
+    
+    ' === THÊM SẢN PHẨM ===
+    usecase "Thêm sản phẩm\nvào giỏ" as UC_AddToCart
+    usecase "Chọn size" as UC_SelectSize
+    usecase "Chọn màu sắc" as UC_SelectColor
+    usecase "Chọn số lượng" as UC_SelectQty
+    
+    ' === XEM GIỎ HÀNG ===
+    usecase "Xem giỏ hàng" as UC_ViewCart
+    usecase "Xem tổng tiền" as UC_ViewTotal
+    usecase "Xem phí\nvận chuyển" as UC_ViewShipping
+    
+    ' === CẬP NHẬT GIỎ HÀNG ===
+    usecase "Cập nhật\nsố lượng" as UC_UpdateQty
+    usecase "Tăng số lượng" as UC_IncreaseQty
+    usecase "Giảm số lượng" as UC_DecreaseQty
+    
+    ' === XÓA SẢN PHẨM ===
+    usecase "Xóa sản phẩm\nkhỏi giỏ" as UC_RemoveItem
+    usecase "Xóa toàn bộ\ngiỏ hàng" as UC_ClearCart
+    
+    ' === GHI CHÚ ===
+    usecase "Thêm ghi chú\nđơn hàng" as UC_AddNote
+    
+    ' === THANH TOÁN ===
+    usecase "Tiến hành\nthanh toán" as UC_Checkout
+}
+
+' Main connection
+Customer --> UC_Main
+
+' Extend relationships - Thêm sản phẩm
+UC_AddToCart .up.> UC_Main : <<extend>>
+UC_AddToCart ..> UC_SelectSize : <<include>>
+UC_AddToCart ..> UC_SelectColor : <<include>>
+UC_AddToCart ..> UC_SelectQty : <<include>>
+
+' Extend relationships - Xem giỏ hàng
+UC_ViewCart .up.> UC_Main : <<extend>>
+UC_ViewCart ..> UC_ViewTotal : <<include>>
+UC_ViewCart ..> UC_ViewShipping : <<include>>
+
+' Extend relationships - Cập nhật
+UC_UpdateQty .down.> UC_Main : <<extend>>
+UC_IncreaseQty .down.> UC_UpdateQty : <<extend>>
+UC_DecreaseQty .down.> UC_UpdateQty : <<extend>>
+
+' Extend relationships - Xóa
+UC_RemoveItem .down.> UC_Main : <<extend>>
+UC_ClearCart .down.> UC_Main : <<extend>>
+
+' Extend relationships - Ghi chú & Thanh toán
+UC_AddNote .down.> UC_Main : <<extend>>
+UC_Checkout .down.> UC_Main : <<extend>>
+
+' Include relationships
+UC_Checkout ..> UC_ViewCart : <<include>>
+
+@enduml

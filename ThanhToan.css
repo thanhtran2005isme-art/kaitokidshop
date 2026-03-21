@@ -1,0 +1,155 @@
+
+  
+  .checkout-container {
+    display: flex;
+    justify-content: space-between;
+    max-width: 1200px;
+    margin: auto;
+    gap: 30px;
+  }
+  
+  .checkout-left, .checkout-right {
+    background: #f9f9f9;
+    padding: 25px;
+    border-radius: 8px;
+    flex: 1;
+  }
+  
+  .checkout-right {
+    max-width: 400px;
+  }
+  
+  h2, h3, h4 {
+    margin-top: 0;
+  }
+  
+  label {
+    display: block;
+    margin-top: 15px;
+    font-weight: bold;
+  }
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  textarea,
+  select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  
+  textarea {
+    height: 60px;
+  }
+  
+  .select-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  
+  .select-row select {
+    flex: 1;
+  }
+  
+  .product-item {
+    display: flex;
+    gap: 15px;
+  }
+  
+  .product-item img {
+    width: 90px;
+    height: 90px;
+    object-fit: cover;
+  }
+  
+  .product-info p {
+    margin: 4px 0;
+    font-size: 14px;
+  }
+  
+  .cost, .total {
+    display: flex;
+    justify-content: space-between;
+    margin: 10px 0;
+  }
+  
+  .payment-methods {
+    margin-top: 20px;
+  }
+  
+  .payment-methods label {
+    display: block;
+    margin-top: 10px;
+  }
+
+  .btn-dathang {
+    background-color: #3498db;
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .btn-dathang:hover {
+    background-color: #2980b9;
+  }
+  
+  /* =================== */
+  @media (max-width: 768px) {
+    .checkout-container {
+      flex-direction: column;
+      padding: 10px;
+    }
+  
+    .checkout-left, .checkout-right {
+      width: 100%;
+      max-width: 100%;
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+  
+    .select-row {
+      flex-direction: column;
+      gap: 10px;
+    }
+  
+    .select-row select {
+      width: 100%;
+    }
+  
+    .product-item {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  
+    .product-item img {
+      width: 100%;
+      height: auto;
+    }
+  
+    .cost, .total {
+      flex-direction: row;
+      justify-content: space-between;
+      font-size: 15px;
+    }
+  
+    .payment-methods label {
+      font-size: 14px;
+    }
+  
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    textarea,
+    select {
+      font-size: 14px;
+    }
+  } 

@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chi tiết sản phẩm - KAITO KID</title>
+  <link rel="icon" href="images/d53c7593-3c1b-437a-98bc-f71b44050b40.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/modern-fashion.css">
+  <link rel="stylesheet" href="/css/product-detail.css">
+</head>
+<body>
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="top-bar-content">
+      <span>🚚 Freeship đơn từ 499K</span>
+      <span>🔁 Đổi trả trong 7 ngày</span>
+      <span>⚡ Sale tới 50%</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="main-header">
+    <div class="header-container">
+      <div class="logo">
+        <a href="index.html">
+          <img src="/images/logokaitokid.png" alt="KAITO KID">
+        </a>
+      </div>
+      <div class="search-bar">
+        <input type="text" placeholder="Tìm kiếm sản phẩm...">
+        <button><i class="fa fa-search"></i></button>
+      </div>
+      <div class="header-actions">
+        <a href="login.html" class="icon-link"><i class="fa fa-user"></i></a>
+        <a href="#" class="icon-link"><i class="fa fa-heart"></i></a>
+        <a href="GioHang.html" class="icon-link cart-link">
+          <i class="fa fa-shopping-bag"></i>
+          <span id="cart-count" class="cart-badge">0</span>
+        </a>
+      </div>
+    </div>
+    <nav class="mega-menu">
+      <ul class="menu-list" id="mainMenuList">
+        <li><a href="sanphamnu.html">NỮ</a></li>
+        <li><a href="sanphamnam.html">NAM</a></li>
+        <li><a href="sanphamtreem.html">TRẺ EM</a></li>
+        <li><a href="samphammoi.html">NEW IN</a></li>
+        <li><a href="samphamsale.html">SALE</a></li>
+        <li><a href="bosuutap.html">BỘ SƯU TẬP</a></li>
+        <li><a href="lookbook.html">LOOKBOOK</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb">
+    <div class="breadcrumb-container">
+      <a href="index.html">Trang chủ</a>
+      <i class="fa fa-chevron-right"></i>
+      <a href="#" id="breadcrumb-category">Danh mục</a>
+      <i class="fa fa-chevron-right"></i>
+      <span id="breadcrumb-product">Tên sản phẩm</span>
+    </div>
+  </nav>
+
+  <!-- Product Detail -->
+  <div class="product-detail-container">
+    <!-- Left: Images -->
+    <div class="product-images">
+      <div class="thumbnail-list" id="thumbnail-list">
+        <!-- Thumbnails will be loaded here -->
+      </div>
+      <div class="main-image-wrapper">
+        <img src="" alt="" id="main-image" class="main-image">
+        <button class="nav-btn prev-btn" onclick="prevImage()"><i class="fa fa-chevron-left"></i></button>
+        <button class="nav-btn next-btn" onclick="nextImage()"><i class="fa fa-chevron-right"></i></button>
+      </div>
+    </div>
+
+    <!-- Right: Info -->
+    <div class="product-info">
+      <div class="product-price" id="product-price">0₫</div>
+      <h1 class="product-name" id="product-name">Tên sản phẩm</h1>
+      <div class="product-sku">
+        <span id="product-sku">SKU: ---</span>
+        <button class="copy-btn" onclick="copySKU()"><i class="fa fa-copy"></i></button>
+      </div>
+
+      <!-- Colors -->
+      <div class="option-group">
+        <label>Màu sắc: <span id="selected-color">---</span></label>
+        <div class="color-options" id="color-options">
+          <!-- Colors will be loaded here -->
+        </div>
+      </div>
+
+      <!-- Sizes -->
+      <div class="option-group">
+        <label>Kích thước: <span id="selected-size">---</span></label>
+        <a href="#" class="size-guide-link">Hướng dẫn chọn size</a>
+        <div class="size-options" id="size-options">
+          <!-- Sizes will be loaded here -->
+        </div>
+      </div>
+
+      <!-- Stock Status -->
+      <div id="stock-status" class="stock-status in-stock">
+        <i class="fa fa-check-circle"></i> Còn hàng
+      </div>
+
+      <!-- Quantity & Add to Cart -->
+      <div class="add-to-cart-section">
+        <div class="quantity-selector">
+          <button class="qty-btn" onclick="decreaseQty()">−</button>
+          <input type="number" id="quantity" value="1" min="1">
+          <button class="qty-btn" onclick="increaseQty()">+</button>
+        </div>
+        <button class="btn-add-cart" onclick="addToCart()">
+          Thêm vào giỏ <i class="fa fa-shopping-bag"></i>
+        </button>
+      </div>
+
+      <!-- Store Check -->
+      <div class="store-check">
+        <i class="fa fa-store"></i>
+        <a href="#">Xem cửa hàng còn sản phẩm</a>
+      </div>
+
+      <!-- Commitments -->
+      <div class="commitments">
+        <h4>KAITO KID cam kết <i class="fa fa-check-circle"></i></h4>
+        <div class="commitment-grid">
+          <div class="commitment-item">
+            <i class="fa fa-truck"></i>
+            <div>
+              <strong>Giao trong 3-5 ngày</strong>
+              <span>Freeship đơn từ 499k</span>
+            </div>
+          </div>
+          <div class="commitment-item">
+            <i class="fa fa-rotate-left"></i>
+            <div>
+              <strong>Đổi trả trong 7 ngày</strong>
+              <a href="#">Xem chính sách →</a>
+            </div>
+          </div>
+          <div class="commitment-item">
+            <i class="fa fa-shield-alt"></i>
+            <div>
+              <strong>Cam kết bảo mật</strong>
+              <span>Thông tin khách hàng</span>
+            </div>
+          </div>
+          <div class="commitment-item">
+            <i class="fa fa-comments"></i>
+            <div>
+              <strong>Cần tư vấn thêm?</strong>
+              <a href="#">Chat ngay!</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Product Description Tabs -->
+  <div class="product-tabs-container">
+    <div class="product-tabs">
+      <button class="tab-btn active" data-tab="description">Mô tả sản phẩm</button>
+      <button class="tab-btn" data-tab="details">Chi tiết</button>
+      <button class="tab-btn" data-tab="reviews">Đánh giá</button>
+    </div>
+    <div class="tab-content active" id="tab-description">
+      <div id="product-description">
+        <p>Đang tải mô tả sản phẩm...</p>
+      </div>
+    </div>
+    <div class="tab-content" id="tab-details">
+      <table class="details-table">
+        <tr><td>Chất liệu</td><td id="detail-material">---</td></tr>
+        <tr><td>Xuất xứ</td><td>Việt Nam</td></tr>
+        <tr><td>Bảo quản</td><td>Giặt máy ở nhiệt độ thường</td></tr>
+      </table>
+    </div>
+    <div class="tab-content" id="tab-reviews">
+      <div class="reviews-summary">
+        <div class="rating-big">
+          <span class="rating-number">5.0</span>
+          <div class="stars">
+            <i class="fa fa-star"></i>
+            <i class="fa fa-star"></i>
+            <i class="fa fa-star"></i>
+            <i class="fa fa-star"></i>
+            <i class="fa fa-star"></i>
+          </div>
+          <span class="review-count">0 đánh giá</span>
+        </div>
+      </div>
+      <p style="text-align:center;color:#666;">Chưa có đánh giá nào cho sản phẩm này.</p>
+    </div>
+  </div>
+
+  <!-- Related Products -->
+  <div class="related-products">
+    <h2>Sản phẩm liên quan</h2>
+    <div class="related-grid" id="related-products">
+      <!-- Related products will be loaded here -->
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-container">
+      <div class="footer-column">
+        <h3>Giới thiệu</h3>
+        <a href="#">Về chúng tôi</a>
+        <a href="#">Liên hệ</a>
+        <p>Email: kaitokid@gmail.com</p>
+        <span>Hotline: 0906264126</span>
+      </div>
+      <div class="footer-column">
+        <h3>Hỗ trợ khách hàng</h3>
+        <a href="#">Hướng dẫn đặt hàng</a>
+        <a href="#">Hướng dẫn chọn size</a>
+        <a href="#">Chính sách đổi trả</a>
+      </div>
+      <div class="footer-column">
+        <h3>Kết nối với chúng tôi</h3>
+        <div class="social-links">
+          <a href="#"><i class="fab fa-facebook"></i></a>
+          <a href="#"><i class="fab fa-instagram"></i></a>
+          <a href="#"><i class="fab fa-tiktok"></i></a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/javascript/modern-fashion.js"></script>
+  <script src="/javascript/mega-menu.js"></script>
+  <script src="/javascript/product-detail.js"></script>
+</body>
+</html>

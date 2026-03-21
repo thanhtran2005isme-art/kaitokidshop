@@ -1,0 +1,288 @@
+
+  .allsanpham {
+    display: flex;
+    padding: 20px;
+  }
+  
+  .danhmuc {
+    width: 220px;
+    padding-right: 20px;
+  }
+  
+  .danhmuc h3 {
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+  
+  .danhsach {
+    list-style: none;
+    
+  }
+  
+  .danhsach li {
+    margin: 5px 0;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  
+  .danhsach li ul {
+    padding-left: 15px;
+    color: #888;
+    list-style: none;
+  }
+  
+  .product-area {
+    flex: 1;
+  }
+  
+  .header-filter {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+  }
+  
+  .header-filter h2 {
+    font-size: 20px;
+    font-weight: bold;
+  }
+  
+  .filters span {
+    margin-left: 20px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  
+  .product-grid {
+    display: flex;
+    gap: 30px;
+  }
+  
+  .product-card {
+    width: 30%;
+    text-align: center;
+  }
+  
+  .product-card img {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+  }
+  
+  .product-name {
+    margin-top: 10px;
+    font-weight: bold;
+    color: #444;
+  }
+/* =================== */
+:root {
+    --bodyBack: #00827f;
+    --textColor: #1b2741;
+    --starColor: #f67034;
+    --sectionBack: #f7f6f9;
+  }
+  .BanChay {
+    margin-left: 0;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  
+  
+    .tieude h2 {
+      text-align: center;
+      font-size: 3em;
+      color: black;
+      margin-bottom: 40px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+  
+    .sanphams {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 35px;
+      /* justify-content: center;
+      padding: 0 15p; */
+    }
+  
+    .sanpham {
+      background-color: var(--sectionBack);
+      padding: 20px;
+      border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.3s ease;
+      position: relative;
+    }
+  
+  .sanpham:hover {
+    transform: translateY(-10px);
+  }
+  
+  .image {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 15px;
+  }
+  
+  .image img {
+    width: 100%;
+    max-width: 200px;
+    border-radius: 10px;
+  }
+  
+  .namePrice {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  
+  .namePrice h3 {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--textColor);
+  }
+  
+  .namePrice span {
+    color: var(--starColor);
+    font-weight: bold;
+  }
+  
+  .sanpham p {
+    font-size: 0.95em;
+    color: #333;
+    margin-bottom: 10px;
+  }
+  .bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+  }
+  
+  .stars {
+    color: var(--starColor);
+    font-size: 14px;
+  }
+  
+  .buy {
+    text-align: right;
+    margin: 0;
+  }
+  
+  .buy button {
+    padding: 8px 20px;
+    border-radius: 20px;
+    border: none;
+    background-color: var(--textColor);
+    color: var(--sectionBack);
+    font-size: 14px;
+    text-transform: capitalize;
+    cursor: pointer;
+    transition: .3s ease;
+  }
+  
+  .buy button:hover {
+    transform: scale(1.05);
+  } button:hover {
+    background-color: #12203b;
+  }
+  
+  .view-all {
+    text-align: center;
+    margin-top: 0px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #007bff;
+    cursor: pointer;
+  }
+  
+
+  /* ============================== */
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 40px;
+    margin-bottom: 40px;
+    gap: 8px;
+  }
+  
+  .pagination .page,
+  .pagination .dots {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 45px;
+    height: 45px;
+    background-color: #f7f7f7;
+    color: #000;
+    font-weight: bold;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+  }
+  
+  .pagination .page:hover {
+    background-color: #ddd;
+  }
+  
+  .pagination .page.active {
+    background-color: #000;
+    color: #fff;
+    pointer-events: none;
+  }
+  
+  .pagination .dots {
+    cursor: default;
+    background: none;
+  }
+  
+
+  /* CSS cho breadcrumb */
+  @media (max-width: 768px) {
+    .sanphams {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+  
+    .sanpham {
+      padding: 15px;
+    }
+  
+    .image img {
+      max-width: 100%;
+    }
+  
+    .namePrice h3 {
+      font-size: 1em;
+    }
+  
+    .namePrice span {
+      font-size: 0.95em;
+    }
+  
+    .buy button {
+      font-size: 12px;
+      padding: 6px 16px;
+    }
+  }
+  @media (max-width: 768px) {
+    .allsanpham {
+      flex-direction: column;
+    }
+  
+    .danhmuc {
+      order: 2;
+      width: 100%;
+      padding: 10px 0;
+    }
+  
+    .product-area {
+      order: 1;
+    }
+  }

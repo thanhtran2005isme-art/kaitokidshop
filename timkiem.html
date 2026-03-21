@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kết quả tìm kiếm - KAITO KID</title>
+  <link rel="icon" href="images/d53c7593-3c1b-437a-98bc-f71b44050b40.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/modern-fashion.css">
+  <link rel="stylesheet" href="/css/products-page.css">
+</head>
+<body>
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="top-bar-content">
+      <span>🚚 Freeship đơn từ 499K</span>
+      <span>🔁 Đổi trả trong 7 ngày</span>
+      <span>⚡ Sale tới 50% - Chỉ hôm nay</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="main-header">
+    <div class="header-container">
+      <div class="logo">
+        <a href="index.html">
+          <img src="/images/logokaitokid.png" alt="KAITO KID">
+        </a>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Tìm áo sơ mi, quần jeans, váy..." autocomplete="off">
+        <button onclick="performSearch()"><i class="fa fa-search"></i></button>
+        <div class="search-suggestions" id="searchSuggestions"></div>
+      </div>
+      <div class="header-actions">
+        <a href="yeuthich.html" class="icon-link">
+          <i class="fa fa-heart"></i>
+          <span id="wishlist-count" class="cart-badge">0</span>
+        </a>
+        <a href="GioHang.html" class="icon-link cart-link">
+          <i class="fa fa-shopping-bag"></i>
+          <span id="cart-count" class="cart-badge">0</span>
+        </a>
+      </div>
+    </div>
+    <nav class="mega-menu">
+      <ul class="menu-list">
+        <li><a href="sanphamnu.html">NỮ</a></li>
+        <li><a href="sanphamnam.html">NAM</a></li>
+        <li><a href="sanphamtreem.html">TRẺ EM</a></li>
+        <li><a href="samphammoi.html">NEW IN</a></li>
+        <li><a href="samphamsale.html">SALE</a></li>
+        <li><a href="bestseller.html">BEST SELLER</a></li>
+        <li><a href="bosuutap.html">BỘ SƯU TẬP</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <!-- Breadcrumb -->
+  <nav class="breadcrumb">
+    <a href="index.html">TRANG CHỦ</a> /
+    <span>KẾT QUẢ TÌM KIẾM</span>
+  </nav>
+
+  <!-- Search Results -->
+  <div class="search-results-page">
+    <div class="search-header">
+      <h1><i class="fa fa-search"></i> Kết quả tìm kiếm</h1>
+      <p id="searchQuery">Đang tìm kiếm...</p>
+      <p id="resultCount"></p>
+    </div>
+
+    <div class="search-filters">
+      <div class="filter-group">
+        <label>Sắp xếp:</label>
+        <select id="sortFilter" onchange="sortResults()">
+          <option value="relevant">Liên quan nhất</option>
+          <option value="price-asc">Giá thấp đến cao</option>
+          <option value="price-desc">Giá cao đến thấp</option>
+          <option value="newest">Mới nhất</option>
+          <option value="bestseller">Bán chạy nhất</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>Danh mục:</label>
+        <select id="categoryFilter" onchange="filterResults()">
+          <option value="all">Tất cả</option>
+          <option value="nu">Nữ</option>
+          <option value="nam">Nam</option>
+          <option value="treem">Trẻ em</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="search-results-grid" id="searchResultsGrid">
+      <!-- Results will be loaded here -->
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="main-footer">
+    <div class="footer-container">
+      <div class="footer-column">
+        <h3>Giới thiệu</h3>
+        <a href="#">Về chúng tôi</a>
+        <a href="#">Liên hệ</a>
+        <p>Email: <span id="footer-email">kaitokid@gmail.com</span></p>
+        <span>Hotline: <span id="footer-phone">0906264126</span></span>
+      </div>
+      <div class="footer-column">
+        <h3>Hỗ trợ khách hàng</h3>
+        <a href="donhang.html">Tra cứu đơn hàng</a>
+        <a href="#">Hướng dẫn đặt hàng</a>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/javascript/modern-fashion.js"></script>
+  <script src="/javascript/search.js"></script>
+</body>
+</html>

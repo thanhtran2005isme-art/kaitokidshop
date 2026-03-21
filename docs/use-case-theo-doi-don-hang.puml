@@ -1,0 +1,83 @@
+@startuml Use Case - Theo dõi và Hủy Đơn hàng
+
+skinparam backgroundColor #87CEEB
+skinparam usecase {
+    BackgroundColor #87CEEB
+    BorderColor #000000
+}
+
+left to right direction
+
+actor "Khách hàng" as Customer
+
+rectangle "Theo dõi / Hủy Đơn hàng" {
+    usecase "Theo dõi\nđơn hàng" as UC_Main
+    
+    ' === ĐĂNG NHẬP ===
+    usecase "Đăng nhập" as UC_Login
+    
+    ' === XEM DANH SÁCH ĐƠN HÀNG ===
+    usecase "Xem danh sách\nđơn hàng" as UC_ViewOrders
+    usecase "Xem trạng thái\nđơn hàng" as UC_ViewStatus
+    usecase "Xem tổng tiền" as UC_ViewTotal
+    usecase "Xem ngày đặt" as UC_ViewDate
+    
+    ' === XEM CHI TIẾT ===
+    usecase "Xem chi tiết\nđơn hàng" as UC_ViewDetail
+    usecase "Xem thông tin\nngười nhận" as UC_ViewCustomer
+    usecase "Xem danh sách\nsản phẩm" as UC_ViewProducts
+    usecase "Xem phương thức\nthanh toán" as UC_ViewPayment
+    usecase "Xem địa chỉ\ngiao hàng" as UC_ViewAddress
+    usecase "Xem phí\nvận chuyển" as UC_ViewShipping
+    
+    ' === ĐÁNH GIÁ ===
+    usecase "Đánh giá\nsản phẩm" as UC_Review
+    usecase "Chọn số sao" as UC_SelectRating
+    usecase "Viết nhận xét" as UC_WriteComment
+    usecase "Gửi đánh giá" as UC_SubmitReview
+    
+    ' === HỦY ĐƠN (Kế hoạch) ===
+    usecase "Hủy đơn hàng" as UC_CancelOrder
+}
+
+' Main connection
+Customer --> UC_Main
+
+' Include - Đăng nhập
+UC_Main ..> UC_Login : <<include>>
+
+' Extend relationships - Xem danh sách
+UC_ViewOrders .up.> UC_Main : <<extend>>
+UC_ViewOrders ..> UC_ViewStatus : <<include>>
+UC_ViewOrders ..> UC_ViewTotal : <<include>>
+UC_ViewOrders ..> UC_ViewDate : <<include>>
+
+' Extend relationships - Xem chi tiết
+UC_ViewDetail .up.> UC_Main : <<extend>>
+UC_ViewDetail ..> UC_ViewCustomer : <<include>>
+UC_ViewDetail ..> UC_ViewProducts : <<include>>
+UC_ViewDetail ..> UC_ViewPayment : <<include>>
+UC_ViewDetail ..> UC_ViewAddress : <<include>>
+UC_ViewDetail ..> UC_ViewShipping : <<include>>
+
+' Extend relationships - Đánh giá
+UC_Review .down.> UC_Main : <<extend>>
+UC_Review ..> UC_SelectRating : <<include>>
+UC_Review ..> UC_WriteComment : <<include>>
+UC_Review ..> UC_SubmitReview : <<include>>
+
+' Extend relationships - Hủy đơn
+UC_CancelOrder .down.> UC_Main : <<extend>>
+
+' Điều kiện
+note right of UC_Review
+  Chỉ đánh giá được khi
+  đơn hàng "Hoàn thành"
+end note
+
+note right of UC_CancelOrder
+  Chỉ hủy được khi
+  đơn "Chờ xác nhận"
+end note
+
+@enduml

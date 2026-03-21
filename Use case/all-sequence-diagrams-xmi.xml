@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1">
+  <xmi:Documentation exporter="Kiro" exporterVersion="1.0"/>
+  
+  <uml:Model xmi:type="uml:Model" xmi:id="root_model" name="Website Thời Trang - Sequence Diagrams">
+    
+    <!-- ========================================== -->
+    <!-- BIỂU ĐỒ 1: ĐẶT HÀNG -->
+    <!-- ========================================== -->
+    <packagedElement xmi:type="uml:Interaction" xmi:id="seq_dat_hang" name="BDTT Đặt Hàng">
+      
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dh_ll_1" name="Khách Hàng"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dh_ll_2" name="Trang Thanh Toán"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dh_ll_3" name="Giỏ Hàng"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dh_ll_4" name="Hệ Thống Đơn Hàng"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dh_ll_5" name="Cổng Thanh Toán"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dh_ll_6" name="Cơ Sở Dữ Liệu"/>
+      
+      <message xmi:type="uml:Message" xmi:id="dh_msg_1" name="1. Truy cập trang thanh toán" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_2" name="2. Lấy thông tin giỏ hàng" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_3" name="3. Trả về danh sách sản phẩm" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_4" name="4. Hiển thị form thanh toán" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_5" name="5. Nhập thông tin giao hàng" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_6" name="6. Chọn phương thức thanh toán" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_7" name="7. Xác nhận đặt hàng" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_8" name="8. Tạo đơn hàng mới" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_9" name="9. Lưu đơn hàng vào DB" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_10" name="10. Xác nhận lưu thành công" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_11" name="11. Xử lý thanh toán" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_12" name="12. Kết quả thanh toán" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_13" name="13. Cập nhật trạng thái đơn hàng" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_14" name="14. Xóa giỏ hàng" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dh_msg_15" name="15. Hiển thị xác nhận đơn hàng" messageSort="reply"/>
+      
+    </packagedElement>
+    
+    <!-- ========================================== -->
+    <!-- BIỂU ĐỒ 2: THÊM VÀO GIỎ HÀNG -->
+    <!-- ========================================== -->
+    <packagedElement xmi:type="uml:Interaction" xmi:id="seq_them_gio_hang" name="BDTT Thêm vào Giỏ Hàng">
+      
+      <lifeline xmi:type="uml:Lifeline" xmi:id="gh_ll_1" name="Khách Hàng"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="gh_ll_2" name="Trang Chi Tiết SP"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="gh_ll_3" name="Giỏ Hàng"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="gh_ll_4" name="LocalStorage"/>
+      
+      <message xmi:type="uml:Message" xmi:id="gh_msg_1" name="1. Chọn sản phẩm" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_2" name="2. Hiển thị chi tiết sản phẩm" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_3" name="3. Chọn size, màu, số lượng" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_4" name="4. Nhấn Thêm vào giỏ" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_5" name="5. Kiểm tra SP đã có trong giỏ" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_6" name="6. Lấy giỏ hàng hiện tại" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_7" name="7. Trả về dữ liệu giỏ hàng" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_8" name="8. Thêm/Cập nhật sản phẩm" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_9" name="9. Lưu giỏ hàng mới" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_10" name="10. Xác nhận lưu thành công" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_11" name="11. Cập nhật số lượng hiển thị" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="gh_msg_12" name="12. Hiển thị thông báo thành công" messageSort="reply"/>
+      
+    </packagedElement>
+    
+    <!-- ========================================== -->
+    <!-- BIỂU ĐỒ 3: ĐĂNG NHẬP -->
+    <!-- ========================================== -->
+    <packagedElement xmi:type="uml:Interaction" xmi:id="seq_dang_nhap" name="BDTT Đăng Nhập">
+      
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dn_ll_1" name="Người Dùng"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dn_ll_2" name="Trang Đăng Nhập"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dn_ll_3" name="Hệ Thống Xác Thực"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dn_ll_4" name="Cơ Sở Dữ Liệu"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="dn_ll_5" name="Session Storage"/>
+      
+      <message xmi:type="uml:Message" xmi:id="dn_msg_1" name="1. Truy cập trang đăng nhập" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_2" name="2. Hiển thị form đăng nhập" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_3" name="3. Nhập email và mật khẩu" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_4" name="4. Nhấn nút Đăng nhập" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_5" name="5. Validate dữ liệu đầu vào" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_6" name="6. Gửi yêu cầu xác thực" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_7" name="7. Tìm kiếm tài khoản" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_8" name="8. Trả về thông tin tài khoản" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_9" name="9. Kiểm tra mật khẩu" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_10" name="10. Tạo session đăng nhập" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_11" name="11. Lưu thông tin session" messageSort="synchCall"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_12" name="12. Xác nhận lưu thành công" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_13" name="13. Trả về kết quả xác thực" messageSort="reply"/>
+      <message xmi:type="uml:Message" xmi:id="dn_msg_14" name="14. Chuyển hướng trang chủ" messageSort="reply"/>
+      
+    </packagedElement>
+    
+  </uml:Model>
+  
+</xmi:XMI>

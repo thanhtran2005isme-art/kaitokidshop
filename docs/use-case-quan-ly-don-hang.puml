@@ -1,0 +1,46 @@
+@startuml Use Case - Quản lý Đơn hàng
+
+skinparam backgroundColor #87CEEB
+skinparam usecase {
+    BackgroundColor #87CEEB
+    BorderColor #000000
+}
+
+left to right direction
+
+actor "Admin" as Admin
+
+rectangle "Quản lý Đơn hàng" {
+    usecase "Quản lý\nđơn hàng" as UC_Main
+    
+    usecase "Xem danh sách\nđơn hàng" as UC_ViewList
+    usecase "Xem chi tiết\nđơn hàng" as UC_ViewDetail
+    usecase "Cập nhật trạng\nthái đơn" as UC_UpdateStatus
+    usecase "Xóa đơn hàng" as UC_Delete
+    usecase "Tìm kiếm\nđơn hàng" as UC_Search
+    usecase "Lọc theo\ntrạng thái" as UC_FilterStatus
+    usecase "Lọc theo phương\nthức thanh toán" as UC_FilterPayment
+    usecase "Xuất Excel" as UC_Export
+    usecase "Xem thống kê\nđơn hàng" as UC_Stats
+    usecase "Hủy đơn hàng" as UC_Cancel
+}
+
+' Main connection
+Admin --> UC_Main
+
+' Extend relationships
+UC_ViewList .up.> UC_Main : <<extend>>
+UC_ViewDetail .up.> UC_Main : <<extend>>
+UC_UpdateStatus .up.> UC_Main : <<extend>>
+UC_Delete .down.> UC_Main : <<extend>>
+UC_Search .down.> UC_Main : <<extend>>
+UC_Export .down.> UC_Main : <<extend>>
+UC_Cancel .down.> UC_Main : <<extend>>
+
+' Include relationships
+UC_ViewList ..> UC_FilterStatus : <<include>>
+UC_ViewList ..> UC_FilterPayment : <<include>>
+UC_ViewList ..> UC_Stats : <<include>>
+UC_Cancel ..> UC_UpdateStatus : <<include>>
+
+@enduml

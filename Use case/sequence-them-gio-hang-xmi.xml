@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmlns:xmi="http://schema.omg.org/spec/XMI/2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1">
+  <xmi:Documentation exporter="Kiro" exporterVersion="1.0"/>
+  
+  <uml:Model xmi:type="uml:Model" xmi:id="model_them_gio_hang" name="Biểu đồ Sequence - Thêm vào Giỏ Hàng">
+    
+    <!-- Collaboration for Sequence Diagram -->
+    <packagedElement xmi:type="uml:Collaboration" xmi:id="collab_them_gio_hang" name="Thêm vào Giỏ Hàng">
+      <ownedAttribute xmi:type="uml:Property" xmi:id="lifeline_kh" name="Khách Hàng"/>
+      <ownedAttribute xmi:type="uml:Property" xmi:id="lifeline_sp" name="Trang Chi Tiết SP"/>
+      <ownedAttribute xmi:type="uml:Property" xmi:id="lifeline_gh" name="Giỏ Hàng"/>
+      <ownedAttribute xmi:type="uml:Property" xmi:id="lifeline_ls" name="LocalStorage"/>
+    </packagedElement>
+    
+    <!-- Interaction (Sequence Diagram) -->
+    <packagedElement xmi:type="uml:Interaction" xmi:id="interaction_them_gio_hang" name="Quy trình Thêm vào Giỏ Hàng">
+      
+      <!-- Lifelines -->
+      <lifeline xmi:type="uml:Lifeline" xmi:id="ll_kh" name="Khách Hàng" represents="lifeline_kh"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="ll_sp" name="Trang Chi Tiết SP" represents="lifeline_sp"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="ll_gh" name="Giỏ Hàng" represents="lifeline_gh"/>
+      <lifeline xmi:type="uml:Lifeline" xmi:id="ll_ls" name="LocalStorage" represents="lifeline_ls"/>
+      
+      <!-- Messages -->
+      <message xmi:type="uml:Message" xmi:id="msg_gh_1" name="1. Chọn sản phẩm" messageSort="synchCall" sendEvent="send_gh_1" receiveEvent="recv_gh_1"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_2" name="2. Hiển thị chi tiết sản phẩm" messageSort="reply" sendEvent="send_gh_2" receiveEvent="recv_gh_2"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_3" name="3. Chọn size, màu, số lượng" messageSort="synchCall" sendEvent="send_gh_3" receiveEvent="recv_gh_3"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_4" name="4. Nhấn Thêm vào giỏ" messageSort="synchCall" sendEvent="send_gh_4" receiveEvent="recv_gh_4"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_5" name="5. Kiểm tra sản phẩm đã có trong giỏ" messageSort="synchCall" sendEvent="send_gh_5" receiveEvent="recv_gh_5"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_6" name="6. Lấy giỏ hàng hiện tại" messageSort="synchCall" sendEvent="send_gh_6" receiveEvent="recv_gh_6"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_7" name="7. Trả về dữ liệu giỏ hàng" messageSort="reply" sendEvent="send_gh_7" receiveEvent="recv_gh_7"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_8" name="8. Thêm/Cập nhật sản phẩm" messageSort="synchCall" sendEvent="send_gh_8" receiveEvent="recv_gh_8"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_9" name="9. Lưu giỏ hàng mới" messageSort="synchCall" sendEvent="send_gh_9" receiveEvent="recv_gh_9"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_10" name="10. Xác nhận lưu thành công" messageSort="reply" sendEvent="send_gh_10" receiveEvent="recv_gh_10"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_11" name="11. Cập nhật số lượng hiển thị" messageSort="reply" sendEvent="send_gh_11" receiveEvent="recv_gh_11"/>
+      <message xmi:type="uml:Message" xmi:id="msg_gh_12" name="12. Hiển thị thông báo thành công" messageSort="reply" sendEvent="send_gh_12" receiveEvent="recv_gh_12"/>
+      
+      <!-- Message Occurrence Specifications -->
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_1" covered="ll_kh" message="msg_gh_1"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_1" covered="ll_sp" message="msg_gh_1"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_2" covered="ll_sp" message="msg_gh_2"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_2" covered="ll_kh" message="msg_gh_2"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_3" covered="ll_kh" message="msg_gh_3"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_3" covered="ll_sp" message="msg_gh_3"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_4" covered="ll_kh" message="msg_gh_4"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_4" covered="ll_sp" message="msg_gh_4"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_5" covered="ll_sp" message="msg_gh_5"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_5" covered="ll_gh" message="msg_gh_5"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_6" covered="ll_gh" message="msg_gh_6"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_6" covered="ll_ls" message="msg_gh_6"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_7" covered="ll_ls" message="msg_gh_7"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_7" covered="ll_gh" message="msg_gh_7"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_8" covered="ll_gh" message="msg_gh_8"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_8" covered="ll_gh" message="msg_gh_8"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_9" covered="ll_gh" message="msg_gh_9"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_9" covered="ll_ls" message="msg_gh_9"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_10" covered="ll_ls" message="msg_gh_10"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_10" covered="ll_gh" message="msg_gh_10"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_11" covered="ll_gh" message="msg_gh_11"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_11" covered="ll_sp" message="msg_gh_11"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="send_gh_12" covered="ll_sp" message="msg_gh_12"/>
+      <fragment xmi:type="uml:MessageOccurrenceSpecification" xmi:id="recv_gh_12" covered="ll_kh" message="msg_gh_12"/>
+      
+    </packagedElement>
+    
+  </uml:Model>
+  
+</xmi:XMI>

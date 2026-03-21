@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản lý Thuộc tính - KAITO KID Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/admin/css/admin-layout.css">
+  <link rel="stylesheet" href="/admin/css/admin-common.css">
+  <link rel="stylesheet" href="/admin/css/admin-attributes.css">
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo">
+        <img src="/images/logokaitokid.png" alt="KAITO KID">
+        <span class="sidebar-title">KAITO KID</span>
+      </div>
+      <button class="sidebar-toggle" id="sidebarToggle">
+        <i class="fa fa-bars"></i>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <ul class="nav-list">
+        <li class="nav-item">
+          <a href="dashboard.html" class="nav-link">
+            <i class="fa fa-chart-line"></i>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        
+        <li class="nav-item has-submenu">
+          <a href="#" class="nav-link">
+            <i class="fa fa-shopping-cart"></i>
+            <span>Đơn hàng</span>
+            <i class="fa fa-chevron-down submenu-arrow"></i>
+          </a>
+          <ul class="submenu">
+            <li><a href="orders.html">Tất cả đơn hàng</a></li>
+            <li><a href="orders.html?status=pending">Chờ xác nhận</a></li>
+            <li><a href="orders.html?status=shipping">Đang giao</a></li>
+            <li><a href="orders.html?status=completed">Hoàn thành</a></li>
+            <li><a href="orders.html?status=cancelled">Đã huỷ</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item has-submenu open active">
+          <a href="#" class="nav-link">
+            <i class="fa fa-box"></i>
+            <span>Sản phẩm</span>
+            <i class="fa fa-chevron-down submenu-arrow"></i>
+          </a>
+          <ul class="submenu">
+            <li><a href="products.html">Danh sách sản phẩm</a></li>
+            <li><a href="product-add.html">Thêm sản phẩm</a></li>
+            <li><a href="categories.html">Danh mục</a></li>
+            <li><a href="collections.html">Bộ sưu tập</a></li>
+            <li><a href="attributes.html" class="active">Thuộc tính</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item has-submenu">
+          <a href="#" class="nav-link">
+            <i class="fa fa-warehouse"></i>
+            <span>Kho hàng</span>
+            <i class="fa fa-chevron-down submenu-arrow"></i>
+          </a>
+          <ul class="submenu">
+            <li><a href="inventory.html">Tồn kho</a></li>
+            <li><a href="inventory-history.html">Lịch sử nhập/xuất</a></li>
+            <li><a href="inventory-alerts.html">Cảnh báo hết hàng</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item">
+          <a href="customers.html" class="nav-link">
+            <i class="fa fa-users"></i>
+            <span>Khách hàng</span>
+          </a>
+        </li>
+
+        <li class="nav-item has-submenu">
+          <a href="#" class="nav-link">
+            <i class="fa fa-tags"></i>
+            <span>Khuyến mãi</span>
+            <i class="fa fa-chevron-down submenu-arrow"></i>
+          </a>
+          <ul class="submenu">
+            <li><a href="coupons.html">Mã giảm giá</a></li>
+            <li><a href="promotions.html">Chương trình KM</a></li>
+            <li><a href="flash-sales.html">Flash Sale</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item has-submenu">
+          <a href="#" class="nav-link">
+            <i class="fa fa-palette"></i>
+            <span>Giao diện</span>
+            <i class="fa fa-chevron-down submenu-arrow"></i>
+          </a>
+          <ul class="submenu">
+            <li><a href="homepage.html">Trang chủ</a></li>
+            <li><a href="banners.html">Banner & Slider</a></li>
+            <li><a href="pages.html">Trang nội dung</a></li>
+            <li><a href="menus.html">Menu & Footer</a></li>
+          </ul>
+        </li>
+
+        <li class="nav-item">
+          <a href="reviews.html" class="nav-link">
+            <i class="fa fa-star"></i>
+            <span>Đánh giá</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a href="reports.html" class="nav-link">
+            <i class="fa fa-chart-bar"></i>
+            <span>Báo cáo</span>
+          </a>
+        </li>
+
+        <li class="nav-item">
+          <a href="settings.html" class="nav-link">
+            <i class="fa fa-cog"></i>
+            <span>Cài đặt</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="admin-info">
+        <div class="admin-avatar">
+          <i class="fa fa-user-shield"></i>
+        </div>
+        <div class="admin-details">
+          <span class="admin-name" id="adminName">Admin</span>
+          <span class="admin-role">Owner</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+          <i class="fa fa-bars"></i>
+        </button>
+        <div class="search-box">
+          <i class="fa fa-search"></i>
+          <input type="text" placeholder="Tìm thuộc tính..." id="searchInput">
+        </div>
+      </div>
+      <div class="top-bar-right">
+        <button class="notification-btn">
+          <i class="fa fa-bell"></i>
+          <span class="notification-badge">5</span>
+        </button>
+        <a href="../index.html" class="view-site-btn" target="_blank">
+          <i class="fa fa-external-link-alt"></i>
+          <span>Xem trang chủ</span>
+        </a>
+        <div class="admin-dropdown">
+          <button class="admin-btn">
+            <div class="admin-avatar-small">
+              <i class="fa fa-user"></i>
+            </div>
+            <span id="topAdminName">Admin</span>
+            <i class="fa fa-chevron-down"></i>
+          </button>
+          <div class="admin-dropdown-menu">
+            <a href="profile.html"><i class="fa fa-user"></i> Hồ sơ</a>
+            <a href="settings.html"><i class="fa fa-cog"></i> Cài đặt</a>
+            <div class="dropdown-divider"></div>
+            <a href="#" id="logoutBtn"><i class="fa fa-sign-out-alt"></i> Đăng xuất</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Attributes Content -->
+    <div class="content-wrapper">
+      <div class="page-header">
+        <h1>Quản lý Thuộc tính</h1>
+        <div class="page-actions">
+          <button class="btn-add" onclick="openAttributeModal()">
+            <i class="fa fa-plus"></i> Thêm thuộc tính
+          </button>
+        </div>
+      </div>
+
+      <!-- Attributes List -->
+      <div class="attributes-container" id="attributesContainer">
+        <!-- Attributes will be loaded here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Attribute Modal -->
+  <div id="attributeModal" class="modal">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle">Thêm thuộc tính</h3>
+          <button class="modal-close" onclick="closeAttributeModal()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <form id="attributeForm" class="modal-body">
+          <input type="hidden" id="attributeId">
+          
+          <div class="form-group">
+            <label>Tên thuộc tính <span class="required">*</span></label>
+            <input type="text" id="attributeName" required placeholder="Ví dụ: Chất liệu, Kiểu dáng">
+          </div>
+          
+          <div class="form-group">
+            <label>Loại thuộc tính</label>
+            <select id="attributeType">
+              <option value="text">Văn bản</option>
+              <option value="select">Lựa chọn</option>
+              <option value="color">Màu sắc</option>
+            </select>
+          </div>
+
+          <div class="form-group" id="valuesGroup">
+            <label>Giá trị <span class="help-text">(Nhập mỗi giá trị trên một dòng)</span></label>
+            <textarea id="attributeValues" rows="6" placeholder="Cotton&#10;Polyester&#10;Linen&#10;Silk"></textarea>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="closeAttributeModal()">Hủy</button>
+            <button type="submit" class="btn-primary">
+              <i class="fa fa-save"></i> Lưu
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Value Modal -->
+  <div id="valueModal" class="modal">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Thêm giá trị</h3>
+          <button class="modal-close" onclick="closeValueModal()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <form id="valueForm" class="modal-body">
+          <input type="hidden" id="valueAttributeId">
+          
+          <div class="form-group">
+            <label>Giá trị mới</label>
+            <input type="text" id="newValue" required placeholder="Nhập giá trị">
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn-secondary" onclick="closeValueModal()">Hủy</button>
+            <button type="submit" class="btn-primary">
+              <i class="fa fa-plus"></i> Thêm
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="/admin/js/admin-layout.js"></script>
+  <script src="/admin/js/admin-attributes.js"></script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Project Author="Kiro" Name="SequenceDiagrams" UmlVersion="2.x" Xml_structure="simple">
+	<ProjectInfo>
+		<LogicalView/>
+	</ProjectInfo>
+	<Models>
+		<!-- Actor: Khách Hàng -->
+		<Actor BacklogActivityId="0" Id="actor_kh_001" Name="Khách Hàng" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		
+		<!-- Lifelines cho Đặt Hàng -->
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_dh_checkout" Name="Trang Thanh Toán" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_dh_cart" Name="Giỏ Hàng" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_dh_order" Name="Hệ Thống Đơn Hàng" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_dh_payment" Name="Cổng Thanh Toán" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_dh_db" Name="Cơ Sở Dữ Liệu" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		
+		<!-- Lifelines cho Thêm Giỏ Hàng -->
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_gh_product" Name="Trang Chi Tiết SP" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_gh_cart" Name="Giỏ Hàng" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_gh_storage" Name="LocalStorage" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		
+		<!-- Lifelines cho Đăng Nhập -->
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_dn_login" Name="Trang Đăng Nhập" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_dn_auth" Name="Hệ Thống Xác Thực" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_dn_db" Name="Cơ Sở Dữ Liệu" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		<InteractionLifeLine BacklogActivityId="0" Id="ll_dn_session" Name="Session Storage" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+		
+		<!-- Messages Container -->
+		<ModelRelationshipContainer BacklogActivityId="0" Id="msg_container" Name="relationships" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000">
+			<ModelChildren>
+				<ModelRelationshipContainer BacklogActivityId="0" Id="msg_dat_hang" Name="Message Đặt Hàng" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+				<ModelRelationshipContainer BacklogActivityId="0" Id="msg_gio_hang" Name="Message Giỏ Hàng" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+				<ModelRelationshipContainer BacklogActivityId="0" Id="msg_dang_nhap" Name="Message Đăng Nhập" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000"/>
+			</ModelChildren>
+		</ModelRelationshipContainer>
+	</Models>
+	<Diagrams>
+		<!-- Biểu đồ Sequence: Đặt Hàng -->
+		<InteractionDiagram AlignToGrid="false" AutoExtendActivations="true" DiagramBackground="rgb(255, 255, 255)" Editable="true" Height="800" Id="diagram_dat_hang" Name="BDTT Đặt Hàng" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000" ShowActivations="true" ShowSequenceNumbers="true" Width="1200">
+			<Shapes>
+				<!-- Actor Shape -->
+				<Actor Background="rgb(255, 255, 255)" Height="60" Id="shape_actor_dh" MetaModelElement="actor_kh_001" Name="Khách Hàng" Width="40" X="50" Y="50"/>
+				<!-- Lifeline Shapes -->
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_checkout" MetaModelElement="ll_dh_checkout" Name="Trang Thanh Toán" Width="100" X="150" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_cart" MetaModelElement="ll_dh_cart" Name="Giỏ Hàng" Width="100" X="300" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_order" MetaModelElement="ll_dh_order" Name="Hệ Thống Đơn Hàng" Width="100" X="450" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_payment" MetaModelElement="ll_dh_payment" Name="Cổng Thanh Toán" Width="100" X="600" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_db" MetaModelElement="ll_dh_db" Name="Cơ Sở Dữ Liệu" Width="100" X="750" Y="50"/>
+			</Shapes>
+		</InteractionDiagram>
+		
+		<!-- Biểu đồ Sequence: Thêm vào Giỏ Hàng -->
+		<InteractionDiagram AlignToGrid="false" AutoExtendActivations="true" DiagramBackground="rgb(255, 255, 255)" Editable="true" Height="800" Id="diagram_gio_hang" Name="BDTT Thêm vào Giỏ Hàng" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000" ShowActivations="true" ShowSequenceNumbers="true" Width="1200">
+			<Shapes>
+				<Actor Background="rgb(255, 255, 255)" Height="60" Id="shape_actor_gh" MetaModelElement="actor_kh_001" Name="Khách Hàng" Width="40" X="50" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_product" MetaModelElement="ll_gh_product" Name="Trang Chi Tiết SP" Width="100" X="150" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_gh_cart" MetaModelElement="ll_gh_cart" Name="Giỏ Hàng" Width="100" X="300" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_storage" MetaModelElement="ll_gh_storage" Name="LocalStorage" Width="100" X="450" Y="50"/>
+			</Shapes>
+		</InteractionDiagram>
+		
+		<!-- Biểu đồ Sequence: Đăng Nhập -->
+		<InteractionDiagram AlignToGrid="false" AutoExtendActivations="true" DiagramBackground="rgb(255, 255, 255)" Editable="true" Height="800" Id="diagram_dang_nhap" Name="BDTT Đăng Nhập" PmAuthor="Kiro" PmCreateDateTime="2025-12-08T10:00:00.000" ShowActivations="true" ShowSequenceNumbers="true" Width="1200">
+			<Shapes>
+				<Actor Background="rgb(255, 255, 255)" Height="60" Id="shape_actor_dn" MetaModelElement="actor_kh_001" Name="Người Dùng" Width="40" X="50" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_login" MetaModelElement="ll_dn_login" Name="Trang Đăng Nhập" Width="100" X="150" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_auth" MetaModelElement="ll_dn_auth" Name="Hệ Thống Xác Thực" Width="100" X="300" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_dn_db" MetaModelElement="ll_dn_db" Name="Cơ Sở Dữ Liệu" Width="100" X="450" Y="50"/>
+				<InteractionLifeLine Background="rgb(255, 255, 255)" Height="600" Id="shape_ll_session" MetaModelElement="ll_dn_session" Name="Session Storage" Width="100" X="600" Y="50"/>
+			</Shapes>
+		</InteractionDiagram>
+	</Diagrams>
+</Project>

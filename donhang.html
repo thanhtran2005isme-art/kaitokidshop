@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tra cứu đơn hàng - KAITO KID</title>
+  <link rel="icon" href="images/d53c7593-3c1b-437a-98bc-f71b44050b40.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/modern-fashion.css">
+  <link rel="stylesheet" href="/css/order-tracking.css">
+</head>
+<body>
+  <!-- Header -->
+  <header class="order-header">
+    <a href="index.html" class="back-btn">
+      <i class="fa fa-arrow-left"></i>
+    </a>
+    <h1>Tra cứu đơn hàng</h1>
+    <div></div>
+  </header>
+
+  <main class="order-tracking-page">
+    <!-- User Info Section -->
+    <section class="user-section" id="userSection">
+      <!-- Will be loaded by JS -->
+    </section>
+
+    <!-- Orders List -->
+    <section class="orders-section" id="ordersSection" style="display: none;">
+      <h3><i class="fa fa-box"></i> Đơn hàng của bạn</h3>
+      <div class="orders-list" id="ordersList">
+        <!-- Orders will be loaded here -->
+      </div>
+    </section>
+
+    <!-- Order Detail Modal -->
+    <div id="orderDetailModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Chi tiết đơn hàng</h3>
+          <button class="modal-close" onclick="closeOrderModal()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body" id="orderDetailContent">
+          <!-- Order detail will be loaded here -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Review Modal -->
+    <div id="reviewModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Đánh giá sản phẩm</h3>
+          <button class="modal-close" onclick="closeReviewModal()">
+            <i class="fa fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="reviewOrderId">
+          <input type="hidden" id="reviewProductName">
+          
+          <div class="review-product-info" id="reviewProductInfo"></div>
+          
+          <div class="rating-select">
+            <label>Đánh giá của bạn</label>
+            <div class="stars" id="ratingStars">
+              <i class="fa fa-star" data-rating="1"></i>
+              <i class="fa fa-star" data-rating="2"></i>
+              <i class="fa fa-star" data-rating="3"></i>
+              <i class="fa fa-star" data-rating="4"></i>
+              <i class="fa fa-star" data-rating="5"></i>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Nhận xét</label>
+            <textarea id="reviewComment" rows="4" placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm..."></textarea>
+          </div>
+          
+          <button class="btn-submit-review" onclick="submitReview()">
+            <i class="fa fa-paper-plane"></i> Gửi đánh giá
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/javascript/order-tracking.js"></script>
+</body>
+</html>

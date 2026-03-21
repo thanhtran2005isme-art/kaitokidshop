@@ -210,3 +210,4 @@ public class NhatKyHoatDong
     public string? DiaChiIP { get; set; }
     public DateTime NgayTao { get; set; } = DateTime.UtcNow;
 }
+// v1.1: Them FlashSale, ChiTietFlashSale, KhuyenMai, TrangTinh

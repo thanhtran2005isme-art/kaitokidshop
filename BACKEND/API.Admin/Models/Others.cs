@@ -211,3 +211,4 @@ public class NhatKyHoatDong
     public DateTime NgayTao { get; set; } = DateTime.UtcNow;
 }
 // v1.1: Them FlashSale, ChiTietFlashSale, KhuyenMai, TrangTinh
+// v1.2: Them MenuDieuHuong, ThuocTinhSanPham, TonKhoLichSu, CauHinh, NhatKy

@@ -76,3 +76,4 @@ public class AdminProductsController(AdminDbContext db) : ControllerBase
     }
 }
 // v1.1: Them GET chi tiet, POST tao moi
+// v1.2: Them PUT cap nhat va DELETE xoa

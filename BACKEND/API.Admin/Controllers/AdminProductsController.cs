@@ -75,3 +75,4 @@ public class AdminProductsController(AdminDbContext db) : ControllerBase
         return NoContent();
     }
 }
+// v1.1: Them GET chi tiet, POST tao moi

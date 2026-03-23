@@ -70,3 +70,4 @@ public class UpdateStatusDto
     public string TrangThai { get; set; } = string.Empty;
     public string? GhiChuAdmin { get; set; }
 }
+// v1.1: Them cap nhat trang thai va thong ke

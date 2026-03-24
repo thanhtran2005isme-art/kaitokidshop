@@ -212,3 +212,4 @@ public class NhatKyHoatDong
 }
 // v1.1: Them FlashSale, ChiTietFlashSale, KhuyenMai, TrangTinh
 // v1.2: Them MenuDieuHuong, ThuocTinhSanPham, TonKhoLichSu, CauHinh, NhatKy
+// v1.3: Them TenSanPham vao TonKhoLichSu de khong can join

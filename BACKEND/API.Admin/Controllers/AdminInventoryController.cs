@@ -112,3 +112,4 @@ public class AdjustStockDto
 }
 // v1.1: Them POST adjust
 // v1.2: Doi logic adjust sang LoaiThayDoi ro rang (import/export/set)
+// v1.3: Tra loi khi xuat vuot ton thay vi clamp ve 0

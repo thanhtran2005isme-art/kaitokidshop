@@ -114,3 +114,4 @@ public class AdjustStockDto
 // v1.2: Doi logic adjust sang LoaiThayDoi ro rang (import/export/set)
 // v1.3: Tra loi khi xuat vuot ton thay vi clamp ve 0
 // v1.4: Them GET lich su ton kho
+// v1.5: Tra TenSanPham trong projection lich su

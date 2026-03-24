@@ -111,3 +111,4 @@ public class AdjustStockDto
     public string? GhiChu { get; set; }
 }
 // v1.1: Them POST adjust
+// v1.2: Doi logic adjust sang LoaiThayDoi ro rang (import/export/set)

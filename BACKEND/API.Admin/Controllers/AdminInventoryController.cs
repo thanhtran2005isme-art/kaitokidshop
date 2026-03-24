@@ -110,3 +110,4 @@ public class AdjustStockDto
     public string LoaiThayDoi { get; set; } = "import";
     public string? GhiChu { get; set; }
 }
+// v1.1: Them POST adjust

@@ -265,7 +265,6 @@ export default function Dashboard() {
   const filteredOrders = orders.filter((order) => isDateInRange(order.createdAt, periodRange.start, periodRange.end));
   const validOrders = filteredOrders.filter((order) => order.status !== 'cancelled');
   const periodRevenue = validOrders.reduce((sum, order) => sum + (order.total || 0), 0);
-  const periodAverageOrderValue = validOrders.length > 0 ? periodRevenue / validOrders.length : 0;
   const newCustomers = customers.filter((customer) =>
     isDateInRange(customer.createdAt, periodRange.start, periodRange.end)
   ).length;
@@ -273,7 +272,7 @@ export default function Dashboard() {
   const outOfStockProducts = products.filter(
     (product) => product.stock <= 0 || product.status === 'out-of-stock'
   ).length;
-  const activeProducts = products.filter((product) => product.status === 'active').length;
+  const inventoryIssueCount = lowStockProducts + outOfStockProducts;
   const pendingOrders = orders.filter((order) => order.status === 'pending').length;
   const pendingOrdersInPeriod = filteredOrders.filter((order) => order.status === 'pending').length;
   const shippingOrdersInPeriod = filteredOrders.filter(
@@ -281,11 +280,7 @@ export default function Dashboard() {
   ).length;
   const completedOrders = filteredOrders.filter((order) => order.status === 'completed').length;
   const cancelledOrders = filteredOrders.filter((order) => order.status === 'cancelled').length;
-  const completionRate = filteredOrders.length > 0 ? Math.round((completedOrders / filteredOrders.length) * 100) : 0;
   const totalUnitsSold = products.reduce((sum, product) => sum + (product.soldCount || 0), 0);
-  const averageReviewRating = reviews.length
-    ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
-    : 0;
 
   const chartOrders = orders.filter((order) => isDateInRange(order.createdAt, chartRange.start, chartRange.end));
   const chartValidOrders = chartOrders.filter((order) => order.status !== 'cancelled');
@@ -308,7 +303,10 @@ export default function Dashboard() {
   ];
   const hasStatusData = statusChartData.some((item) => item.value > 0);
 
-  const topProducts = [...products].sort((a, b) => b.soldCount - a.soldCount).slice(0, 5);
+  const topProducts = [...products]
+    .filter((product) => product.soldCount > 0)
+    .sort((a, b) => b.soldCount - a.soldCount)
+    .slice(0, 5);
   const recentOrders = orders.slice(0, 5);
   const latestPendingOrder = orders.find((order) => order.status === 'pending');
   const latestCancelledOrder = orders.find((order) => order.status === 'cancelled');
@@ -340,8 +338,8 @@ export default function Dashboard() {
       value: String(filteredOrders.length),
       iconClass: 'orders',
       icon: 'fa-shopping-cart',
-      change: `${pendingOrders} đơn chờ xử lý`,
-      changeType: pendingOrders > 0 ? 'positive' : 'neutral',
+      change: `${pendingOrdersInPeriod} đơn chờ xử lý trong kỳ`,
+      changeType: pendingOrdersInPeriod > 0 ? 'positive' : 'neutral',
       changeIcon: 'fa-clock',
     },
     {
@@ -356,99 +354,18 @@ export default function Dashboard() {
     },
     {
       eyebrow: 'Inventory watch',
-      label: 'Sản phẩm sắp hết hàng',
-      value: String(lowStockProducts),
+      label: 'SKU cần xử lý',
+      value: String(inventoryIssueCount),
       iconClass: 'alert',
       icon: 'fa-exclamation-triangle',
-      change: `${outOfStockProducts} sản phẩm đã hết hàng`,
-      changeType: outOfStockProducts > 0 ? 'negative' : 'neutral',
+      change:
+        inventoryIssueCount > 0
+          ? `${outOfStockProducts} hết hàng · ${lowStockProducts} sắp hết`
+          : 'Không có cảnh báo tồn kho',
+      changeType: inventoryIssueCount > 0 ? 'negative' : 'neutral',
       changeIcon: 'fa-box-open',
     },
   ];
-
-  const heroHighlights = [
-    {
-      title: 'Doanh thu chốt trong kỳ',
-      value: formatCurrency(periodRevenue),
-      meta: `${validOrders.length} đơn hợp lệ, trung bình ${formatCurrency(periodAverageOrderValue)}/đơn`,
-      icon: 'fa-chart-line',
-      tone: 'indigo',
-    },
-    {
-      title: 'Khách hàng mới',
-      value: `${newCustomers}`,
-      meta: `${customersThisWeek} khách mới trong 7 ngày gần nhất`,
-      icon: 'fa-user-plus',
-      tone: 'emerald',
-    },
-    {
-      title: 'Sức khỏe tồn kho',
-      value: `${lowStockProducts + outOfStockProducts} SKU`,
-      meta:
-        outOfStockProducts > 0
-          ? `${outOfStockProducts} sản phẩm đã hết hàng, cần bổ sung sớm`
-          : 'Tồn kho đang ổn, chỉ còn vài SKU cần theo dõi',
-      icon: 'fa-warehouse',
-      tone: 'amber',
-    },
-  ];
-
-  const heroMiniMetrics = [
-    {
-      label: 'AOV',
-      value: formatCurrency(periodAverageOrderValue),
-      icon: 'fa-receipt',
-      tone: 'indigo',
-    },
-    {
-      label: 'SP đang bán',
-      value: String(activeProducts),
-      icon: 'fa-box',
-      tone: 'sky',
-    },
-    {
-      label: 'Điểm đánh giá',
-      value: reviews.length > 0 ? `${averageReviewRating.toFixed(1)}/5` : 'Chưa có',
-      icon: 'fa-star',
-      tone: 'amber',
-    },
-    {
-      label: 'Hoàn thành',
-      value: `${completionRate}%`,
-      icon: 'fa-check-circle',
-      tone: 'emerald',
-    },
-  ];
-
-  const operationSpotlight =
-    pendingOrders > 0
-      ? {
-          icon: 'fa-clock',
-          tone: 'warning',
-          title: `${pendingOrders} đơn đang chờ xác nhận`,
-          description: latestPendingOrder
-            ? `Đơn gần nhất là #${latestPendingOrder.id}, hãy ưu tiên xử lý để giữ trải nghiệm mua hàng mượt hơn.`
-            : 'Có đơn hàng đang đợi đội ngũ xử lý.',
-          ctaLabel: 'Mở danh sách đơn chờ',
-          to: '/admin/orders?status=pending',
-        }
-      : outOfStockProducts > 0
-        ? {
-            icon: 'fa-box-open',
-            tone: 'danger',
-            title: `${outOfStockProducts} sản phẩm đã hết hàng`,
-            description: 'Kiểm tra lại tồn kho và lịch nhập hàng để tránh hụt đơn trong khung giờ cao điểm.',
-            ctaLabel: 'Xem cảnh báo tồn kho',
-            to: '/admin/inventory/alerts',
-          }
-        : {
-            icon: 'fa-check-circle',
-            tone: 'success',
-            title: 'Vận hành đang ở trạng thái tốt',
-            description: 'Không có cảnh báo lớn cần ưu tiên ngay. Đây là thời điểm phù hợp để tối ưu trưng bày và chiến dịch.',
-            ctaLabel: 'Mở trang sản phẩm',
-            to: '/admin/products',
-          };
 
   const notifications = [
     adminSettings.notifyNewOrder && pendingOrders > 0
@@ -526,8 +443,7 @@ export default function Dashboard() {
           <span className="dashboard-page-eyebrow">Admin command center</span>
           <h1>Dashboard</h1>
           <p>
-            Theo dõi doanh thu, đơn hàng, khách hàng và vận hành trong <strong>{selectedPeriod.label}</strong> theo
-            một bố cục rõ nhịp hơn để ra quyết định nhanh.
+            Xem nhanh tình hình cửa hàng trong <strong>{selectedPeriod.label}</strong>. Các phân tích sâu được tách sang trang báo cáo.
           </p>
         </div>
 
@@ -559,75 +475,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <section className="dashboard-hero">
-        <div className="dashboard-hero-main">
-          <span className="dashboard-hero-badge">
-            <AdminIcon name="fa-bolt" />
-            Performance snapshot
-          </span>
-
-          <h2>
-            {periodRevenue > 0
-              ? `Cửa hàng đang chốt ${formatShortCurrency(periodRevenue)} trong ${selectedPeriod.shortLabel}.`
-              : `Chưa có doanh thu nổi bật trong ${selectedPeriod.shortLabel}.`}
-          </h2>
-
-          <p>
-            {pendingOrders > 0
-              ? `Hiện có ${pendingOrders} đơn đang chờ xử lý. Ưu tiên xác nhận đơn và theo dõi các SKU sắp hết để giữ nhịp bán hàng ổn định.`
-              : `Vận hành đang khá êm. Đây là lúc phù hợp để tối ưu banner, sản phẩm nổi bật và chuẩn bị chiến dịch tiếp theo.`}
-          </p>
-
-          <div className="dashboard-hero-highlight-grid">
-            {heroHighlights.map((item) => (
-              <div key={item.title} className={`dashboard-hero-highlight tone-${item.tone}`}>
-                <div className="dashboard-hero-highlight-icon">
-                  <AdminIcon name={item.icon} />
-                </div>
-                <div className="dashboard-hero-highlight-copy">
-                  <span>{item.title}</span>
-                  <strong>{item.value}</strong>
-                  <p>{item.meta}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="dashboard-hero-side">
-          <div className={`dashboard-spotlight-card tone-${operationSpotlight.tone}`}>
-            <div className="dashboard-card-kicker">Cần chú ý</div>
-            <div className="dashboard-spotlight-icon">
-              <AdminIcon name={operationSpotlight.icon} />
-            </div>
-            <h3>{operationSpotlight.title}</h3>
-            <p>{operationSpotlight.description}</p>
-            <Link to={operationSpotlight.to} className="dashboard-inline-link">
-              <span>{operationSpotlight.ctaLabel}</span>
-              <AdminIcon name="fa-arrow-right" />
-            </Link>
-          </div>
-
-          <div className="dashboard-mini-grid">
-            {heroMiniMetrics.map((metric) => (
-              <div key={metric.label} className={`dashboard-mini-card tone-${metric.tone}`}>
-                <div className="dashboard-mini-icon">
-                  <AdminIcon name={metric.icon} />
-                </div>
-                <span>{metric.label}</span>
-                <strong>{metric.value}</strong>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <div className="dashboard-section-heading">
         <div>
           <span>KPI chính</span>
           <h2>Toàn cảnh kinh doanh</h2>
         </div>
-        <p>Những chỉ số cần nhìn đầu tiên để biết cửa hàng đang tăng tốc ở đâu và đang nghẽn ở đâu.</p>
+        <p>Các chỉ số gọn để nắm tình hình trước khi đi vào từng module chi tiết.</p>
       </div>
 
       <div className="stats-grid">
@@ -651,9 +504,9 @@ export default function Dashboard() {
       <div className="dashboard-section-heading">
         <div>
           <span>Biểu đồ</span>
-          <h2>Nhịp doanh thu và trạng thái đơn hàng</h2>
+          <h2>Xu hướng nhanh</h2>
         </div>
-        <p>Dùng biểu đồ để đọc xu hướng nhanh thay vì chỉ nhìn từng con số rời rạc.</p>
+        <p>Chỉ giữ biểu đồ tóm tắt, phần phân tích sâu nằm ở trang báo cáo.</p>
       </div>
 
       <div className="charts-row">

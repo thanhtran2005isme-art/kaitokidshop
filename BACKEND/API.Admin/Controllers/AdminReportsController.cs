@@ -64,3 +64,4 @@ public class AdminReportsController(AdminDbContext db) : ControllerBase
     }
 }
 // v1.1: Them doanh thu theo ngay va top san pham
+// v1.2: Them thong ke don hang theo trang thai

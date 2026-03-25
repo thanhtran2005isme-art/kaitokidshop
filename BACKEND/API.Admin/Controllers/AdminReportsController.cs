@@ -63,3 +63,4 @@ public class AdminReportsController(AdminDbContext db) : ControllerBase
         return Ok(stats);
     }
 }
+// v1.1: Them doanh thu theo ngay va top san pham

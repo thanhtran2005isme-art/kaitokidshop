@@ -63,3 +63,4 @@ public class ReviewService(CustomerDbContext db) : IReviewService
         };
     }
 }
+// fix: clamp rating trong khoang 1-5

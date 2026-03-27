@@ -116,3 +116,4 @@ public class AdjustStockDto
 // v1.4: Them GET lich su ton kho
 // v1.5: Tra TenSanPham trong projection lich su
 // fix: them validation SoLuong >= 0
+// fix: them validation LoaiThayDoi hop le

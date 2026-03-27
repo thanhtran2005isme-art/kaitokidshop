@@ -105,3 +105,4 @@ public class AddressService(CustomerDbContext db) : IAddressService
         IsDefault = a.IsDefault
     };
 }
+// refactor: dung ExecuteUpdateAsync thay vi load toan bo

@@ -117,3 +117,4 @@ public class AdjustStockDto
 // v1.5: Tra TenSanPham trong projection lich su
 // fix: them validation SoLuong >= 0
 // fix: them validation LoaiThayDoi hop le
+/// <summary>XML summary comments cho tat ca endpoint</summary>

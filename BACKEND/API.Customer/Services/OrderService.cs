@@ -171,3 +171,4 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
 }
 // v1.1: Tich hop coupon va hoan ton kho khi huy don
 // v1.2: Xu ly tong tien am sau giam gia
+// fix: tong tien co the am sau giam gia

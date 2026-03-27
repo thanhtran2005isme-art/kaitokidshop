@@ -115,3 +115,4 @@ public class AdjustStockDto
 // v1.3: Tra loi khi xuat vuot ton thay vi clamp ve 0
 // v1.4: Them GET lich su ton kho
 // v1.5: Tra TenSanPham trong projection lich su
+// fix: them validation SoLuong >= 0

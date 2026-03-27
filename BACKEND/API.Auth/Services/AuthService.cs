@@ -125,3 +125,4 @@ public class AuthService(AuthDbContext db, IJwtService jwtService, IConfiguratio
 }
 // v1.1: Them refresh token va doi mat khau
 // fix: validate ten khong duoc trong khi dang ky
+// fix: validate mat khau toi thieu 6 ky tu

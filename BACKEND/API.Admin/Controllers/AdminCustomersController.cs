@@ -46,3 +46,4 @@ public class AdminCustomersController(AdminDbContext db) : ControllerBase
         return Ok(new { nd.Id, nd.TrangThai });
     }
 }
+// improve: tra them orderCount va totalSpent

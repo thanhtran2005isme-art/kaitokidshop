@@ -48,3 +48,4 @@ public class AdminCategoriesController(AdminDbContext db) : ControllerBase
         return NoContent();
     }
 }
+// style: dinh dang lai code

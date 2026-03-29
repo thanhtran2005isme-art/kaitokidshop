@@ -244,17 +244,16 @@ export default function AdminCustomers() {
       <div className="customers-concierge-shell">
         <aside className="customers-sideboard">
           <section className="customers-brand-card">
-            <span className="customers-overline">Customer concierge</span>
+            <span className="customers-overline">Quản lý khách hàng</span>
             <h1>Khách hàng</h1>
             <p>
-              Một không gian quản lý khách hàng theo kiểu CRM: nhìn nhanh tệp khách, lọc phân khúc,
-              rồi chăm sóc từng hồ sơ ngay trên cùng một mặt bàn làm việc.
+              Quản lý tệp khách, lọc phân khúc và mở nhanh hồ sơ chăm sóc trên cùng một màn hình.
             </p>
           </section>
 
-          <section className="customers-side-panel">
+          <section className="customers-side-panel customers-snapshot-panel">
             <div className="customers-side-head">
-              <span className="customers-overline">Snapshot</span>
+              <span className="customers-overline">Tổng quan</span>
               <strong>{stats.total} hồ sơ</strong>
             </div>
 
@@ -278,13 +277,13 @@ export default function AdminCustomers() {
             </div>
 
             <div className="customers-money-block">
-              <span className="customers-overline">Total spend</span>
+              <span className="customers-overline">Tổng chi tiêu</span>
               <strong>{formatCurrency(stats.totalRevenue)}</strong>
               <p>{stats.repeated} khách đã mua từ 2 đơn trở lên, {stats.tagged} hồ sơ đã có gắn tag.</p>
             </div>
           </section>
 
-          <section className="customers-side-panel">
+          <section className="customers-side-panel customers-filter-panel">
             <div className="customers-side-head">
               <span className="customers-overline">Bộ lọc</span>
               <strong>Lọc & tìm nhanh</strong>
@@ -328,9 +327,9 @@ export default function AdminCustomers() {
             </div>
           </section>
 
-          <section className="customers-side-panel">
+          <section className="customers-side-panel customers-care-panel">
             <div className="customers-side-head">
-              <span className="customers-overline">Care pulse</span>
+              <span className="customers-overline">Nhịp chăm sóc</span>
               <strong>Nhịp chăm sóc</strong>
             </div>
 
@@ -356,7 +355,7 @@ export default function AdminCustomers() {
         <section className="customers-roster-stage">
           <div className="customers-stage-head">
             <div>
-              <span className="customers-overline">Roster</span>
+              <span className="customers-overline">Danh sách</span>
               <h2>Danh sách khách hàng</h2>
               <p>Chọn một hồ sơ để mở panel chăm sóc chi tiết ở bên phải.</p>
             </div>
@@ -462,7 +461,7 @@ export default function AdminCustomers() {
               <section className="customers-dossier-hero">
                 <div className="customers-dossier-avatar">{getInitials(selectedCustomer.name)}</div>
                 <div className="customers-dossier-copy">
-                  <span className="customers-overline">Customer dossier</span>
+                  <span className="customers-overline">Hồ sơ khách hàng</span>
                   <h2>{selectedCustomer.name}</h2>
                   <p>{selectedCustomer.email} • {selectedCustomer.phone || 'Chưa có số điện thoại'}</p>
                   <div className="customers-pill-row">
@@ -475,10 +474,10 @@ export default function AdminCustomers() {
               <section className="customers-dossier-card">
                 <div className="customers-dossier-head">
                   <div>
-                    <span className="customers-overline">Overview</span>
+                    <span className="customers-overline">Tổng quan</span>
                     <h3>Tổng quan hồ sơ</h3>
                   </div>
-                  <span className="customers-rank-badge">#{selectedRank || '--'} revenue rank</span>
+                  <span className="customers-rank-badge">#{selectedRank || '--'} theo doanh thu</span>
                 </div>
 
                 <div className="customers-dossier-metrics">
@@ -499,7 +498,7 @@ export default function AdminCustomers() {
               <section className="customers-dossier-card">
                 <div className="customers-dossier-head">
                   <div>
-                    <span className="customers-overline">Care desk</span>
+                    <span className="customers-overline">Chăm sóc</span>
                     <h3>Chăm sóc & ghi chú</h3>
                   </div>
                 </div>
@@ -548,7 +547,7 @@ export default function AdminCustomers() {
               <section className="customers-dossier-card">
                 <div className="customers-dossier-head">
                   <div>
-                    <span className="customers-overline">Preference map</span>
+                    <span className="customers-overline">Sở thích</span>
                     <h3>Sở thích & danh mục</h3>
                   </div>
                 </div>
@@ -586,7 +585,7 @@ export default function AdminCustomers() {
               <section className="customers-dossier-card">
                 <div className="customers-dossier-head">
                   <div>
-                    <span className="customers-overline">Order timeline</span>
+                    <span className="customers-overline">Lịch sử đơn</span>
                     <h3>Lịch sử đơn hàng</h3>
                   </div>
                 </div>

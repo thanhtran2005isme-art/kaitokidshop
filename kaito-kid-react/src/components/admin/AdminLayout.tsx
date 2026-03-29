@@ -493,7 +493,7 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="admin-wrapper">
+    <div className={`admin-wrapper ${location.pathname.startsWith('/admin/dashboard') ? 'dashboard-frame' : ''}`}>
       {/* Sidebar */}
       <aside className={`sidebar ${collapsed ? 'collapsed' : ''} ${mobileMenuOpen ? 'active' : ''}`} id="sidebar">
         <div className="sidebar-header">

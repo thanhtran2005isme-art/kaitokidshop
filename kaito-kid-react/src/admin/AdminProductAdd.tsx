@@ -41,9 +41,9 @@ const MENU_TO_GENDER: Record<ProductMenuKey, Product['gender']> = {
 };
 
 const MENU_OPTIONS: Array<{ value: ProductMenuKey; label: string; description: string }> = [
-  { value: 'nu', label: 'Nữ', description: 'Dành cho các sản phẩm nữ và fashion line cho nữ.' },
-  { value: 'nam', label: 'Nam', description: 'Dành cho sản phẩm nam và các item basic / smart casual.' },
-  { value: 'treem', label: 'Trẻ em', description: 'Dành cho sản phẩm kids và nhóm size trẻ em.' },
+  { value: 'nu', label: 'Nữ', description: 'Sản phẩm nữ.' },
+  { value: 'nam', label: 'Nam', description: 'Sản phẩm nam.' },
+  { value: 'treem', label: 'Trẻ em', description: 'Sản phẩm trẻ em.' },
 ];
 
 const STATUS_OPTIONS: Array<{
@@ -55,19 +55,19 @@ const STATUS_OPTIONS: Array<{
   {
     value: 'active',
     label: 'Đang bán',
-    hint: 'Sản phẩm sẵn sàng hiển thị trên storefront ngay sau khi tạo.',
+    hint: 'Hiển thị trên storefront.',
     icon: 'fa-check-circle',
   },
   {
     value: 'draft',
     label: 'Bản nháp',
-    hint: 'Lưu tạm để bổ sung media, SEO và variant sau.',
+    hint: 'Lưu để bổ sung sau.',
     icon: 'fa-folder-open',
   },
   {
     value: 'out-of-stock',
     label: 'Hết hàng',
-    hint: 'Tạo truoc SKU và thông tin merchandising, mở bán sau.',
+    hint: 'Tạo SKU, mở bán sau.',
     icon: 'fa-box-open',
   },
 ];
@@ -92,12 +92,12 @@ const COLOR_OPTIONS = [
 ];
 
 const STUDIO_STEPS = [
-  { id: 'identity', label: 'Thông tin chính', icon: 'fa-pen-ruler', detail: 'Tên, mô tả, story và thông số.' },
-  { id: 'media', label: 'Media', icon: 'fa-image', detail: 'Ảnh cover, gallery và thứ tự hiển thị.' },
-  { id: 'pricing', label: 'Giá & bán hàng', icon: 'fa-tag', detail: 'Giá gốc, giá sale và cờ merchandising.' },
-  { id: 'variants', label: 'Variants', icon: 'fa-layer-group', detail: 'Size, màu và planning cho SKU.' },
-  { id: 'publishing', label: 'Publish', icon: 'fa-diagram-project', detail: 'Trạng thái, taxonomy và collection.' },
-  { id: 'seo', label: 'SEO', icon: 'fa-globe', detail: 'Slug, meta và preview tìm kiếm.' },
+  { id: 'identity', label: 'Thông tin', icon: 'fa-pen-ruler', detail: 'Tên và mô tả.' },
+  { id: 'media', label: 'Ảnh', icon: 'fa-image', detail: 'Cover và gallery.' },
+  { id: 'pricing', label: 'Giá', icon: 'fa-tag', detail: 'Giá bán và sale.' },
+  { id: 'variants', label: 'Size/màu', icon: 'fa-layer-group', detail: 'Biến thể.' },
+  { id: 'publishing', label: 'Phân loại', icon: 'fa-diagram-project', detail: 'Menu và danh mục.' },
+  { id: 'seo', label: 'SEO', icon: 'fa-globe', detail: 'Slug và meta.' },
 ];
 
 const DEFAULT_FORM: BuilderFormState = {
@@ -299,38 +299,38 @@ export default function AdminProductAdd() {
     () => [
       {
         key: 'name',
-        label: 'Tên sản phẩm đã rõ ràng',
-        description: 'Tên sản phẩm nên đủ dài và đúng phong cách merchandising.',
+        label: 'Tên rõ ràng',
+        description: 'Tên sản phẩm đủ để nhận diện nhanh.',
         done: form.name.trim().length >= 8,
       },
       {
         key: 'media',
-        label: 'Đã có ảnh cover',
-        description: 'Cần tối thiểu 1 ảnh để listing và preview hoạt động đẹp.',
+        label: 'Có ảnh cover',
+        description: 'Cần tối thiểu 1 ảnh để hiển thị.',
         done: images.length > 0,
       },
       {
         key: 'pricing',
-        label: 'Giá bán hợp lệ',
-        description: 'Giá gốc phải lớn hơn 0 và giá sale phải nhỏ hơn giá gốc nếu có.',
+        label: 'Giá hợp lệ',
+        description: 'Giá gốc lớn hơn 0, giá sale nhỏ hơn giá gốc.',
         done: form.price > 0 && !invalidSalePrice,
       },
       {
         key: 'taxonomy',
-        label: 'Đã chọn menu và danh mục',
-        description: 'Taxonomy giúp routing, bộ lọc và collection đúng logic.',
+        label: 'Có danh mục',
+        description: 'Chọn menu và danh mục chính.',
         done: !!form.menu && !!form.category,
       },
       {
         key: 'variants',
-        label: 'Đã tạo bộ size / màu',
-        description: 'Chọn ít nhất 1 size và 1 màu để builder được đầy đủ hơn.',
+        label: 'Có size / màu',
+        description: 'Chọn size và màu nếu sản phẩm có biến thể.',
         done: selectedSizes.length > 0 && selectedColors.length > 0,
       },
       {
         key: 'seo',
-        label: 'SEO có ban sẵn sàng',
-        description: 'Slug, meta title và meta description đang ở mức có thể xuất bản.',
+        label: 'SEO cơ bản',
+        description: 'Slug, title và description đã đủ dùng.',
         done: resolvedSlug.length >= 5 && seoTitleTone === 'good' && seoDescTone === 'good',
       },
     ],
@@ -601,12 +601,9 @@ export default function AdminProductAdd() {
     <div className="product-add-page">
       <div className="page-header product-builder-header">
         <div className="product-builder-copy">
-          <span className="product-builder-eyebrow">Product Builder Studio</span>
+          <span className="product-builder-eyebrow">Catalog</span>
           <h1>{form.name.trim() || 'Thêm sản phẩm mới'}</h1>
-          <p>
-            Xây dựng sản phẩm mới theo từng lớp: nội dung, media, giá bán, variant, taxonomy và SEO. Workspace này ưu tiên
-            tính logic thao tác và preview để bạn có thể tạo sản phẩm đẹp ngay từ lần lưu đầu tiên.
-          </p>
+          <p>Nhập thông tin cần thiết để tạo sản phẩm. Các phần nâng cao có thể bổ sung sau.</p>
         </div>
 
         <div className="page-actions product-builder-actions">
@@ -625,76 +622,39 @@ export default function AdminProductAdd() {
         </div>
       </div>
 
-      <section className="builder-hero-grid">
-        <div className="builder-hero-card builder-progress-card">
-          <div className="builder-hero-kicker">Tiến độ sản phẩm</div>
-          <div className="builder-progress-main">
-            <strong>{completionRate}%</strong>
-            <span>
-              {completedChecklistCount}/{checklist.length} mục da sẵn sàng
-            </span>
-          </div>
+      <section className="builder-compact-bar">
+        <div className="builder-compact-progress">
+          <span>Hoàn thiện</span>
+          <strong>{completionRate}%</strong>
           <div className="builder-progress-bar">
             <span style={{ width: `${completionRate}%` }} />
           </div>
-          <div className="builder-progress-list">
-            {checklist.slice(0, 3).map((item) => (
-              <div key={item.key} className={`builder-progress-item ${item.done ? 'done' : ''}`}>
-                <AdminIcon name={item.done ? 'fa-check-circle' : 'fa-circle-exclamation'} />
-                <span>{item.label}</span>
-              </div>
-            ))}
-          </div>
-          {invalidSalePrice && (
-            <div className="builder-inline-alert danger">
-              <AdminIcon name="fa-circle-exclamation" />
-              <span>Giá sale đang lớn hơn hoặc bằng giá gốc. Cần chỉnh lại trước khi tạo sản phẩm.</span>
-            </div>
-          )}
         </div>
 
-        <div className="builder-hero-card builder-step-card">
-          <div className="builder-hero-kicker">Builder map</div>
-          <div className="builder-step-list">
-            {STUDIO_STEPS.map((step) => (
-              <a key={step.id} href={`#${step.id}`} className="builder-step-link">
-                <span className="builder-step-icon">
-                  <AdminIcon name={step.icon} />
-                </span>
-                <span className="builder-step-copy">
-                  <strong>{step.label}</strong>
-                  <small>{step.detail}</small>
-                </span>
-              </a>
-            ))}
-          </div>
+        <div className="builder-compact-checks">
+          {checklist.slice(0, 4).map((item) => (
+            <span key={item.key} className={item.done ? 'done' : ''}>
+              <AdminIcon name={item.done ? 'fa-check-circle' : 'fa-circle'} />
+              {item.label}
+            </span>
+          ))}
         </div>
 
-        <div className="builder-hero-card builder-snapshot-card">
-          <div className="builder-hero-kicker">Quick snapshot</div>
-          <div className="builder-snapshot-grid">
-            <div className="builder-snapshot-item">
-              <span>Media</span>
-              <strong>{images.length}</strong>
-              <small>{images.length > 0 ? 'ảnh đã sẵn sàng' : 'chưa có ảnh cover'}</small>
-            </div>
-            <div className="builder-snapshot-item">
-              <span>Variants</span>
-              <strong>{variantPairs.length}</strong>
-              <small>{variantPairs.length > 0 ? 'tổ hợp size x màu' : 'đang dùng bộ default'}</small>
-            </div>
-            <div className="builder-snapshot-item">
-              <span>Giá bán</span>
-              <strong>{effectivePrice > 0 ? formatCurrency(effectivePrice) : '--'}</strong>
-              <small>{hasSalePrice ? `sale ${Math.round(((form.price - form.salePrice) / form.price) * 100)}%` : 'chưa bat sale'}</small>
-            </div>
-            <div className="builder-snapshot-item">
-              <span>Taxonomy</span>
-              <strong>{selectedCategoryLabel}</strong>
-              <small>{selectedMenuLabel}</small>
-            </div>
+        <nav className="builder-compact-nav" aria-label="Đi tới phần nhập liệu">
+          {STUDIO_STEPS.map((step) => (
+            <a key={step.id} href={`#${step.id}`}>
+              <AdminIcon name={step.icon} />
+              <span>{step.label}</span>
+            </a>
+          ))}
+        </nav>
+
+        {invalidSalePrice && (
+          <div className="builder-inline-alert danger">
+            <AdminIcon name="fa-circle-exclamation" />
+            <span>Giá sale cần nhỏ hơn giá gốc.</span>
           </div>
-        </div>
+        )}
       </section>
 
       <div className="builder-workspace">
@@ -702,9 +662,9 @@ export default function AdminProductAdd() {
           <section id="identity" className="builder-section-card">
             <div className="builder-section-header">
               <div>
-                <span className="builder-section-kicker">01. Product identity</span>
-                <h2>Nội dung chính và merchandising story</h2>
-                <p>Nhập tên, mô tả ngắn, mô tả chi tiết và các ghi chú để listing, product detail và SEO có cùng một voice.</p>
+                <span className="builder-section-kicker">01. Thông tin</span>
+                <h2>Thông tin chính</h2>
+                <p>Tên, mô tả ngắn và điểm nhấn cơ bản của sản phẩm.</p>
               </div>
             </div>
 
@@ -727,7 +687,7 @@ export default function AdminProductAdd() {
                   rows={4}
                   value={form.shortDesc}
                   onChange={(event) => handleShortDescChange(event.target.value)}
-                  placeholder="Tóm tắt nhanh sản phẩm để card và social preview trong 1-2 câu."
+                  placeholder="Mô tả ngắn để hiển thị trên card sản phẩm."
                 />
               </div>
 
@@ -738,7 +698,7 @@ export default function AdminProductAdd() {
                   rows={4}
                   value={form.specs}
                   onChange={(event) => setForm((currentForm) => ({ ...currentForm, specs: event.target.value }))}
-                  placeholder="Chất liệu, fit, hướng dẫn bảo quản, điểm nhấn bộ sưu tập..."
+                  placeholder="Chất liệu, form, điểm nhấn..."
                 />
               </div>
             </div>
@@ -750,7 +710,7 @@ export default function AdminProductAdd() {
                 rows={8}
                 value={form.description}
                 onChange={(event) => setForm((currentForm) => ({ ...currentForm, description: event.target.value }))}
-                placeholder="Mô tả đầy đủ về style, chất liệu, phối đồ và cách sử dụng sản phẩm trong bộ sưu tập."
+                placeholder="Mô tả chi tiết cho trang sản phẩm."
               />
             </div>
 
@@ -773,9 +733,9 @@ export default function AdminProductAdd() {
           <section id="media" className="builder-section-card">
             <div className="builder-section-header">
               <div>
-                <span className="builder-section-kicker">02. Media studio</span>
-                <h2>Cover image và gallery hiển thị</h2>
-                <p>Upload nhanh từ máy tính hoặc thêm URL. Chọn cover image để product card, hero preview và detail page đẹp ngay từ đầu.</p>
+                <span className="builder-section-kicker">02. Ảnh</span>
+                <h2>Ảnh sản phẩm</h2>
+                <p>Thêm ảnh cover và gallery để sản phẩm hiển thị rõ ràng.</p>
               </div>
             </div>
 
@@ -817,8 +777,8 @@ export default function AdminProductAdd() {
                       disabled={isUploading}
                     >
                       <AdminIcon name={isUploading ? 'fa-spinner fa-spin' : 'fa-image'} />
-                      <strong>{isUploading ? 'Dang xử lý hình ảnh...' : 'Chọn một hoặc nhiều ảnh sản phẩm'}</strong>
-                      <span>Gợi ý ảnh cover tỉ lệ 3:4 hoặc 1:1 để preview card đẹp và đồng đều.</span>
+                      <strong>{isUploading ? 'Đang xử lý hình ảnh...' : 'Chọn ảnh sản phẩm'}</strong>
+                      <span>Nên dùng ảnh cover tỉ lệ 3:4 hoặc 1:1.</span>
                     </button>
                   </div>
                 ) : (
@@ -842,7 +802,7 @@ export default function AdminProductAdd() {
                         <span>Thêm</span>
                       </button>
                     </div>
-                    <p className="builder-help-text">Dùng URL trực tiếp đến ảnh JPG, PNG hoặc WEBP để gallery load ổn định hơn.</p>
+                    <p className="builder-help-text">Hỗ trợ ảnh JPG, PNG hoặc WEBP.</p>
                   </div>
                 )}
 
@@ -855,10 +815,10 @@ export default function AdminProductAdd() {
                           {index !== 0 ? (
                             <button type="button" className="builder-gallery-action" onClick={() => handleSetPrimaryImage(index)}>
                               <AdminIcon name="fa-star" />
-                              <span>Dat lam cover</span>
+                              <span>Đặt làm cover</span>
                             </button>
                           ) : (
-                            <span className="builder-gallery-badge">Cover image</span>
+                            <span className="builder-gallery-badge">Cover</span>
                           )}
                           <button type="button" className="builder-gallery-remove" onClick={() => handleRemoveImage(index)}>
                             <AdminIcon name="fa-times" />
@@ -869,8 +829,8 @@ export default function AdminProductAdd() {
                   ) : (
                     <div className="builder-gallery-empty">
                       <AdminIcon name="fa-image" />
-                      <h3>Chưa có media nào</h3>
-                      <p>Thêm ảnh cover để product preview, listing và banner card hiển thị đúng chất.</p>
+                      <h3>Chưa có ảnh</h3>
+                      <p>Thêm ít nhất một ảnh cover.</p>
                     </div>
                   )}
                 </div>
@@ -883,17 +843,17 @@ export default function AdminProductAdd() {
                   ) : (
                     <div className="builder-cover-placeholder">
                       <AdminIcon name="fa-image" />
-                      <span>Cover preview</span>
+                      <span>Xem trước cover</span>
                     </div>
                   )}
                 </div>
 
                 <div className="builder-cover-meta">
-                  <strong>{coverImage ? 'Ảnh cover đã sẵn sàng' : 'Cần một cover image'}</strong>
+                  <strong>{coverImage ? 'Ảnh cover đã sẵn sàng' : 'Cần một ảnh cover'}</strong>
                   <p>
                     {coverImage
-                      ? 'Ảnh đầu tiên sẽ được dùng làm image chính trên listing, cart và trang chi tiết.'
-                      : 'Bạn có thể đặt bất kỳ ảnh nào làm cover để đảm bảo listing đồng đều hơn.'}
+                       ? 'Ảnh đầu tiên sẽ dùng làm ảnh chính.'
+                      : 'Có thể đặt ảnh bất kỳ làm cover.'}
                   </p>
                   <div className="builder-cover-stats">
                     <span>
@@ -902,7 +862,7 @@ export default function AdminProductAdd() {
                     </span>
                     <span>
                       <AdminIcon name="fa-layer-group" />
-                      {variantPairs.length > 0 ? `${variantPairs.length} variant` : 'đang dùng bộ default'}
+                      {variantPairs.length > 0 ? `${variantPairs.length} variant` : 'đang dùng mặc định'}
                     </span>
                   </div>
                 </div>
@@ -913,9 +873,9 @@ export default function AdminProductAdd() {
           <section id="pricing" className="builder-section-card">
             <div className="builder-section-header">
               <div>
-                <span className="builder-section-kicker">03. Pricing lab</span>
-                <h2>Giá bán, sale và merchandising flag</h2>
-                <p>Cần cân bằng giữa giá gốc, giá sale và badge marketing để card sản phẩm đọc nhanh nhưng vẫn premium.</p>
+                <span className="builder-section-kicker">03. Giá</span>
+                <h2>Giá bán</h2>
+                <p>Nhập giá gốc, giá sale nếu có và các nhãn hiển thị.</p>
               </div>
             </div>
 
@@ -957,8 +917,8 @@ export default function AdminProductAdd() {
                           ((form.price - form.salePrice) / form.price) * 100
                         )}% so với giá gốc.`
                       : invalidSalePrice
-                        ? 'Giá sale cần nhỏ hơn giá gốc để badge sale hiển thị đúng logic.'
-                        : 'Nếu không nhập giá sale, sản phẩm sẽ được tạo với giá gốc và không bật sale.'}
+                         ? 'Giá sale cần nhỏ hơn giá gốc.'
+                        : 'Không nhập giá sale thì sản phẩm dùng giá gốc.'}
                   </span>
                 </div>
               </div>
@@ -995,15 +955,15 @@ export default function AdminProductAdd() {
           <section id="variants" className="builder-section-card">
             <div className="builder-section-header">
               <div>
-                <span className="builder-section-kicker">04. Variant planner</span>
-                <h2>Size, màu và planning cho SKU</h2>
-                <p>Chọn tập size và bảng màu để builder tạo nhanh các tổ hợp variant. Số lượng tồn chi tiết có thể cập nhật sau tại kho.</p>
+                <span className="builder-section-kicker">04. Biến thể</span>
+                <h2>Size và màu</h2>
+                <p>Chọn size, màu cơ bản. Tồn kho chi tiết cập nhật ở trang Kho.</p>
               </div>
             </div>
 
             <div className="builder-variant-grid">
               <div className="builder-field-group">
-                <label className="builder-label">Size options</label>
+                <label className="builder-label">Size</label>
                 <div className="builder-size-grid">
                   {DEFAULT_SIZES.map((size) => (
                     <button
@@ -1042,11 +1002,11 @@ export default function AdminProductAdd() {
             <div className="builder-variant-summary">
               <div className="builder-variant-summary-head">
                 <div>
-                  <strong>{variantPairs.length > 0 ? `${variantPairs.length} to hop variant` : 'Chưa tạo bộ variant đầy đủ'}</strong>
+                  <strong>{variantPairs.length > 0 ? `${variantPairs.length} tổ hợp variant` : 'Chưa chọn đủ size và màu'}</strong>
                   <p>
                     {variantPairs.length > 0
-                      ? 'Preview này giúp bạn kiểm tra nhanh logic size x màu và SKU để xếp kho về sau.'
-                      : 'Hãy chọn ít nhất 1 size và 1 màu để sinh variant planner hoàn chỉnh hơn.'}
+                      ? 'Kiểm tra nhanh các tổ hợp sẽ được tạo.'
+                      : 'Chọn ít nhất 1 size và 1 màu nếu sản phẩm có biến thể.'}
                   </p>
                 </div>
                 <span className="builder-variant-counter">
@@ -1075,7 +1035,7 @@ export default function AdminProductAdd() {
               ) : (
                 <div className="builder-variant-empty">
                   <AdminIcon name="fa-info-circle" />
-                  <span>Nếu bỏ trống, sản phẩm vẫn được tạo với size M và màu Trắng để đảm bảo catalog không bị thiếu dữ liệu.</span>
+                  <span>Nếu bỏ trống, hệ thống dùng size M và màu Trắng mặc định.</span>
                 </div>
               )}
             </div>
@@ -1084,8 +1044,8 @@ export default function AdminProductAdd() {
         <aside className="builder-sidebar">
           <section id="publishing" className="builder-side-card">
             <div className="builder-side-header">
-              <span className="builder-section-kicker">05. Publish settings</span>
-              <h3>Trạng thái và taxonomy</h3>
+              <span className="builder-section-kicker">05. Phân loại</span>
+              <h3>Trạng thái & danh mục</h3>
             </div>
 
             <div className="builder-status-grid">
@@ -1150,7 +1110,7 @@ export default function AdminProductAdd() {
                   </optgroup>
                 ))}
               </select>
-              <p className="builder-help-text">Danh mục được đồng bộ theo taxonomy storefront, gồm cả các nhóm con như Áo thun, Áo sơ mi, Quần jeans...</p>
+              <p className="builder-help-text">Danh mục quyết định nơi sản phẩm hiển thị trên website.</p>
             </div>
 
             {activeStyleOptions.length > 0 && (
@@ -1169,7 +1129,7 @@ export default function AdminProductAdd() {
                     </option>
                   ))}
                 </select>
-                <p className="builder-help-text">Trường này giúp các link Phong cách trên storefront lọc đúng sản phẩm.</p>
+                <p className="builder-help-text">Dùng cho bộ lọc phong cách.</p>
               </div>
             )}
 
@@ -1189,7 +1149,7 @@ export default function AdminProductAdd() {
                     </option>
                   ))}
                 </select>
-                <p className="builder-help-text">Dùng cho menu Trẻ em để các link theo độ tuổi và campaign kids hoạt động đúng.</p>
+                <p className="builder-help-text">Dùng cho menu Trẻ em.</p>
               </div>
             )}
 
@@ -1207,14 +1167,6 @@ export default function AdminProductAdd() {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div className="builder-taxonomy-note">
-              <AdminIcon name="fa-diagram-project" />
-              <span>
-                Hệ thống sẽ giữ lại <code>subcategory</code> chi tiết cho storefront, đồng thời vẫn quy đổi về{' '}
-                <code>category</code> canonical để bộ lọc admin, campaign và quản trị kho vẫn ổn định.
-              </span>
             </div>
 
             <div className="builder-taxonomy-summary">
@@ -1245,8 +1197,8 @@ export default function AdminProductAdd() {
 
           <section className="builder-side-card">
             <div className="builder-side-header">
-              <span className="builder-section-kicker">06. Operations</span>
-              <h3>SKU và inventory handoff</h3>
+              <span className="builder-section-kicker">06. SKU</span>
+              <h3>Mã sản phẩm</h3>
             </div>
 
             <div className="builder-field-group">
@@ -1264,16 +1216,15 @@ export default function AdminProductAdd() {
                 onChange={(event) => setForm((currentForm) => ({ ...currentForm, sku: event.target.value }))}
                 placeholder={suggestedSku}
               />
-              <p className="builder-help-text">Nếu để trống, hệ thống sẽ tự sinh SKU dựa trên tên, menu và category.</p>
+              <p className="builder-help-text">Có thể để trống để hệ thống tự tạo SKU.</p>
             </div>
 
             <div className="builder-info-card">
               <AdminIcon name="fa-box-open" />
               <div>
-                <strong>Inventory được tach riêng</strong>
+                <strong>Tồn kho quản lý riêng</strong>
                 <p>
-                  Sau khi tạo sản phẩm, bạn có thể vào <Link to="/admin/inventory">Kho hàng</Link> để cập nhật tồn kho chi tiết
-                  cho tung SKU và theo dõi low-stock alert.
+                  Sau khi tạo sản phẩm, vào <Link to="/admin/inventory">Kho hàng</Link> để cập nhật số lượng.
                 </p>
               </div>
             </div>
@@ -1281,8 +1232,8 @@ export default function AdminProductAdd() {
 
           <section id="seo" className="builder-side-card">
             <div className="builder-side-header">
-              <span className="builder-section-kicker">07. SEO studio</span>
-              <h3>Slug, meta và search preview</h3>
+              <span className="builder-section-kicker">07. SEO</span>
+              <h3>Slug và meta</h3>
             </div>
 
             <div className="builder-field-group">
@@ -1290,7 +1241,7 @@ export default function AdminProductAdd() {
                 <label className="builder-label">URL slug</label>
                 <button type="button" className="builder-inline-link" onClick={() => regenerateField('slug')}>
                   <AdminIcon name="fa-refresh" />
-                  <span>De xuat lại</span>
+                  <span>Đề xuất lại</span>
                 </button>
               </div>
               <input
@@ -1356,8 +1307,8 @@ export default function AdminProductAdd() {
 
           <section className="builder-side-card">
             <div className="builder-side-header">
-              <span className="builder-section-kicker">Live preview</span>
-              <h3>Storefront card</h3>
+              <span className="builder-section-kicker">Preview</span>
+              <h3>Card sản phẩm</h3>
             </div>
 
             <article className="builder-preview-product">
@@ -1395,26 +1346,6 @@ export default function AdminProductAdd() {
             </article>
           </section>
 
-          <section className="builder-side-card">
-            <div className="builder-side-header">
-              <span className="builder-section-kicker">Launch checklist</span>
-              <h3>Nhung gi con thieu</h3>
-            </div>
-
-            <div className="builder-checklist-card">
-              {checklist.map((item) => (
-                <div key={item.key} className={`builder-checklist-item ${item.done ? 'done' : ''}`}>
-                  <span className="builder-checklist-icon">
-                    <AdminIcon name={item.done ? 'fa-check-circle' : 'fa-circle-exclamation'} />
-                  </span>
-                  <div>
-                    <strong>{item.label}</strong>
-                    <p>{item.description}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
         </aside>
       </div>
     </div>

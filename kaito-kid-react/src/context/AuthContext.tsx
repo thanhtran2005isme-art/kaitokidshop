@@ -1,19 +1,20 @@
 // AuthContext - thay thế auth-check.js
 // Quản lý trạng thái đăng nhập toàn app
+// Sử dụng API mới qua Gateway
 
 import { createContext, useState, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
-import { authService } from '../services/authService';
+import { authApi } from '../services/api';
 import type { User } from '../types';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => { success: boolean; error?: string };
-  register: (data: { name: string; email: string; phone: string; password: string }) => { success: boolean; error?: string };
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
-  refreshUser: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -24,31 +25,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Khôi phục session khi app load
   useEffect(() => {
-    authService.initDefaultAdmin();
-    if (authService.isLoggedIn()) {
-      setUser(authService.getCurrentUser());
-    }
-    setLoading(false);
+    const initAuth = async () => {
+      if (authApi.isLoggedIn()) {
+        // Lấy user từ localStorage trước
+        const storedUser = authApi.getStoredUser();
+        if (storedUser) {
+          setUser(storedUser);
+        }
+
+        // Sau đó fetch user mới nhất từ API
+        const result = await authApi.getCurrentUser();
+        if (result.success && result.user) {
+          setUser(result.user);
+        }
+      }
+      setLoading(false);
+    };
+
+    initAuth();
   }, []);
 
-  const login = (email: string, password: string) => {
-    const result = authService.login(email, password);
+  const login = async (email: string, password: string) => {
+    const result = await authApi.login(email, password);
     if (result.success && result.user) {
       setUser(result.user);
     }
     return result;
   };
 
-  const register = (data: { name: string; email: string; phone: string; password: string }) => {
-    return authService.register(data);
+  const register = async (data: { name: string; email: string; phone: string; password: string }) => {
+    return await authApi.register(data);
   };
 
-  const refreshUser = () => {
-    setUser(authService.getCurrentUser());
+  const refreshUser = async () => {
+    const result = await authApi.getCurrentUser();
+    if (result.success && result.user) {
+      setUser(result.user);
+    }
   };
 
   const logout = () => {
-    authService.logout();
+    authApi.logout();
     setUser(null);
   };
 

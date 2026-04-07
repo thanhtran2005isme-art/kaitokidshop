@@ -6,7 +6,9 @@ import { useAuth } from '../context/AuthContext';
 import { orderService } from '../services/orderService';
 import { formatCurrency, formatDate } from '../utils/format';
 import { readAdminSettings } from '../utils/adminSettingsConfig';
-import type { Order } from '../types';
+import { readStoredReviews, saveStoredReviews, type ReviewRecord } from '../utils/reviewConfig';
+import toast from 'react-hot-toast';
+import type { Order, CartItem } from '../types';
 
 const statusMap: Record<string, string> = {
   pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận',
@@ -18,6 +20,8 @@ export default function OrderTracking() {
   const adminSettings = readAdminSettings();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selected, setSelected] = useState<Order | null>(null);
+  const [reviewingItem, setReviewingItem] = useState<{ order: Order; item: CartItem } | null>(null);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
 
   useEffect(() => {
     if (user) {
@@ -26,6 +30,43 @@ export default function OrderTracking() {
       setOrders(userOrders);
     }
   }, [user]);
+
+  const hasReviewed = (orderId: string, productId: number): boolean => {
+    const reviews = readStoredReviews();
+    return reviews.some(r => r.orderId === orderId && r.productId === productId);
+  };
+
+  const handleSubmitReview = () => {
+    if (!reviewingItem || !user) return;
+
+    if (reviewForm.comment.trim().length < 10) {
+      toast.error('Vui lòng nhập ít nhất 10 ký tự cho đánh giá');
+      return;
+    }
+
+    const reviews = readStoredReviews();
+    const newReview: ReviewRecord = {
+      id: Date.now(),
+      orderId: reviewingItem.order.id,
+      productId: reviewingItem.item.id,
+      productName: reviewingItem.item.name,
+      customerName: user.name,
+      customerEmail: user.email,
+      rating: reviewForm.rating,
+      comment: reviewForm.comment.trim(),
+      createdAt: new Date().toISOString(),
+      status: 'pending',
+      adminReply: '',
+      isHidden: false,
+      isPinned: false,
+    };
+
+    saveStoredReviews([...reviews, newReview]);
+    toast.success('Cảm ơn bạn đã đánh giá! Đánh giá của bạn đang chờ duyệt.');
+    
+    setReviewingItem(null);
+    setReviewForm({ rating: 5, comment: '' });
+  };
 
   if (!user) {
     return (
@@ -145,6 +186,26 @@ export default function OrderTracking() {
                     <div className="order-item-name">{item.name}</div>
                     <div className="order-item-variant">{item.color} {item.size && `, ${item.size}`} × {item.quantity}</div>
                     <div className="order-item-price">{formatCurrency(item.price)}</div>
+                    
+                    {selected.status === 'completed' && (
+                      <div style={{ marginTop: '8px' }}>
+                        {hasReviewed(selected.id, item.id) ? (
+                          <span style={{ color: '#10b981', fontSize: '14px' }}>
+                            <i className="fa fa-check-circle"></i> Đã đánh giá
+                          </span>
+                        ) : (
+                          <button 
+                            className="btn-review"
+                            onClick={() => {
+                              setReviewingItem({ order: selected, item });
+                              setSelected(null);
+                            }}
+                          >
+                            <i className="fa fa-star"></i> Đánh giá
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -155,6 +216,69 @@ export default function OrderTracking() {
                 {selected.paymentFee ? <div className="summary-row"><span>Phụ phí thanh toán:</span><span>{formatCurrency(selected.paymentFee)}</span></div> : null}
                 {selected.discount > 0 && <div className="summary-row"><span>Giảm giá:</span><span>-{formatCurrency(selected.discount)}</span></div>}
                 <div className="summary-row total"><span>Tổng:</span><span>{formatCurrency(selected.total)}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal đánh giá sản phẩm */}
+      {reviewingItem && (
+        <div className="modal active" onClick={() => setReviewingItem(null)}>
+          <div className="modal-content review-modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Đánh giá sản phẩm</h3>
+              <button className="modal-close" onClick={() => setReviewingItem(null)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="review-product-info">
+                <img src={reviewingItem.item.image} alt={reviewingItem.item.name} />
+                <div>
+                  <div className="review-product-name">{reviewingItem.item.name}</div>
+                  <div className="review-product-variant">
+                    {reviewingItem.item.color} {reviewingItem.item.size && `, ${reviewingItem.item.size}`}
+                  </div>
+                </div>
+              </div>
+
+              <div className="review-rating-input">
+                <label>Đánh giá của bạn</label>
+                <div className="star-rating-input">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      className={star <= reviewForm.rating ? 'active' : ''}
+                      onClick={() => setReviewForm({ ...reviewForm, rating: star })}
+                    >
+                      <i className="fa fa-star"></i>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="review-comment-input">
+                <label>Nhận xét của bạn</label>
+                <textarea
+                  placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này (tối thiểu 10 ký tự)..."
+                  value={reviewForm.comment}
+                  onChange={e => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                  rows={5}
+                />
+                <div className="char-count">{reviewForm.comment.length} ký tự</div>
+              </div>
+
+              <div className="review-actions">
+                <button className="btn-cancel" onClick={() => setReviewingItem(null)}>
+                  Hủy
+                </button>
+                <button 
+                  className="btn-submit-review" 
+                  onClick={handleSubmitReview}
+                  disabled={reviewForm.comment.trim().length < 10}
+                >
+                  Gửi đánh giá
+                </button>
               </div>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { orderService } from '../services/orderService';
 import { formatCurrency, formatDate } from '../utils/format';
+import { readAdminSettings } from '../utils/adminSettingsConfig';
 import { readStoredReviews, saveStoredReviews, type ReviewRecord } from '../utils/reviewConfig';
 import toast from 'react-hot-toast';
 import type { Order, CartItem } from '../types';
@@ -16,6 +17,7 @@ const statusMap: Record<string, string> = {
 
 export default function OrderTracking() {
   const { user } = useAuth();
+  const adminSettings = readAdminSettings();
   const [orders, setOrders] = useState<Order[]>([]);
   const [selected, setSelected] = useState<Order | null>(null);
   const [reviewingItem, setReviewingItem] = useState<{ order: Order; item: CartItem } | null>(null);
@@ -79,6 +81,19 @@ export default function OrderTracking() {
     );
   }
 
+  if (!adminSettings.enableTracking) {
+    return (
+      <div className="order-tracking-page">
+        <div className="login-required-box">
+          <i className="fa fa-lock"></i>
+          <h3>Tracking tam thoi dang được khóa</h3>
+          <p>Vui lòng liên hệ {adminSettings.storeName} qua {adminSettings.storePhone || adminSettings.storeEmail} de được hỗ trợ đơn hàng.</p>
+          <Link to="/" className="btn-login"><i className="fa fa-phone"></i> Ve trang chu</Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="order-tracking-page">
       {/* User Info */}
@@ -88,6 +103,7 @@ export default function OrderTracking() {
           <div className="user-details">
             <h3>{user.name}</h3>
             <p>{user.email}</p>
+            <p>Du kien giao hang: {adminSettings.estimatedDelivery}</p>
           </div>
         </div>
       </div>
@@ -194,9 +210,10 @@ export default function OrderTracking() {
                 </div>
               ))}
 
-              <div style={{ marginTop: 16, paddingTop: 16, borderTop: '2px solid #eee' }}>
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '2px solid #eee' }}>
                 <div className="summary-row"><span>Tạm tính:</span><span>{formatCurrency(selected.subtotal)}</span></div>
                 <div className="summary-row"><span>Phí ship:</span><span>{selected.shippingFee === 0 ? 'Miễn phí' : formatCurrency(selected.shippingFee)}</span></div>
+                {selected.paymentFee ? <div className="summary-row"><span>Phụ phí thanh toán:</span><span>{formatCurrency(selected.paymentFee)}</span></div> : null}
                 {selected.discount > 0 && <div className="summary-row"><span>Giảm giá:</span><span>-{formatCurrency(selected.discount)}</span></div>}
                 <div className="summary-row total"><span>Tổng:</span><span>{formatCurrency(selected.total)}</span></div>
               </div>

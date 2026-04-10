@@ -1,4 +1,4 @@
-// Trang thanh toán - dùng class names từ checkout-page.css
+// Trang thanh toán - IVY moda style
 
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { orderService } from '../services/orderService';
 import { formatCurrency } from '../utils/format';
+import { calculateCouponDiscount, findAvailableCouponByCode, incrementCouponUsage } from '../utils/marketingConfig';
 
 export default function Checkout() {
   const { cart, subtotal, clearCart } = useCart();
@@ -14,25 +15,29 @@ export default function Checkout() {
 
   const [name, setName] = useState(user?.name || '');
   const [phone, setPhone] = useState(user?.phone || '');
-  const [email, setEmail] = useState(user?.email || '');
+  const [city, setCity] = useState('');
+  const [district, setDistrict] = useState('');
+  const [ward, setWard] = useState('');
   const [address, setAddress] = useState('');
-  const [note, setNote] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cod');
   const [promoCode, setPromoCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [promoTab, setPromoTab] = useState<'code' | 'mine'>('code');
+  const [staffCode, setStaffCode] = useState('');
+  const [showProducts, setShowProducts] = useState(false);
   const [error, setError] = useState('');
 
-  const shippingFee = subtotal >= 499000 ? 0 : 20000;
-  const total = subtotal - discount + shippingFee;
+  const shippingFee = 0;
+  const total = Math.max(0, subtotal - discount) + shippingFee;
 
   if (cart.length === 0) {
     return (
-      <div className="checkout-page">
-        <div className="empty-cart" style={{ textAlign: 'center', padding: 60 }}>
-          <h2>Giỏ hàng trống</h2>
+      <div className="ivy-checkout-page">
+        <div className="ivy-cart-empty">
+          <h3>Giỏ hàng trống</h3>
           <p>Vui lòng thêm sản phẩm trước khi thanh toán</p>
-          <Link to="/products" className="btn-primary">Mua sắm ngay</Link>
+          <Link to="/products" className="ivy-btn-continue">← Tiếp tục mua hàng</Link>
         </div>
       </div>
     );
@@ -41,124 +46,187 @@ export default function Checkout() {
   const applyCoupon = () => {
     const code = promoCode.trim().toUpperCase();
     if (!code) return;
-    const coupons = JSON.parse(localStorage.getItem('coupons') || '[]');
-    const coupon = coupons.find((c: any) => c.code === code);
-    if (!coupon) { setError('Mã giảm giá không tồn tại'); return; }
-    if (new Date(coupon.endDate) < new Date()) { setError('Mã đã hết hạn'); return; }
-    if (coupon.used >= coupon.quantity) { setError('Mã đã hết lượt'); return; }
-    if (coupon.minOrder > 0 && subtotal < coupon.minOrder) { setError(`Đơn tối thiểu ${formatCurrency(coupon.minOrder)}`); return; }
-    let disc = coupon.discountType === 'percent'
-      ? Math.min(subtotal * coupon.discountValue / 100, coupon.maxDiscount || Infinity)
-      : coupon.discountValue;
-    setDiscount(Math.min(disc, subtotal));
+    const { coupon, error: err } = findAvailableCouponByCode(code, subtotal);
+    if (!coupon) { setError(err || 'Mã không hợp lệ'); return; }
+    setDiscount(calculateCouponDiscount(coupon, subtotal));
     setAppliedCoupon(code);
     setError('');
   };
 
-  const removeCoupon = () => { setDiscount(0); setAppliedCoupon(null); setPromoCode(''); };
-
   const handlePlaceOrder = () => {
-    if (!name.trim()) { setError('Vui lòng nhập tên'); return; }
+    if (!name.trim()) { setError('Vui lòng nhập họ tên'); return; }
     if (!phone.trim()) { setError('Vui lòng nhập số điện thoại'); return; }
     if (!address.trim()) { setError('Vui lòng nhập địa chỉ'); return; }
     setError('');
+    const fullAddress = [address, ward, district, city].filter(Boolean).join(', ');
     const order = orderService.create({
-      customer: { name, phone, email, address }, items: cart,
-      total, subtotal, shippingFee, discount,
-      couponCode: appliedCoupon || undefined, paymentMethod, note: note || undefined,
+      customer: { name, phone, email: user?.email || '', address: fullAddress },
+      items: cart, total, subtotal, shippingFee, paymentFee: 0, discount,
+      couponCode: appliedCoupon || undefined, paymentMethod,
     });
-    if (appliedCoupon) {
-      const coupons = JSON.parse(localStorage.getItem('coupons') || '[]');
-      const idx = coupons.findIndex((c: any) => c.code === appliedCoupon);
-      if (idx !== -1) { coupons[idx].used = (coupons[idx].used || 0) + 1; localStorage.setItem('coupons', JSON.stringify(coupons)); }
-    }
+    if (appliedCoupon) incrementCouponUsage(appliedCoupon);
     clearCart();
-    alert(`🎉 Đặt hàng thành công!\n\nMã đơn: ${order.id}\nTổng: ${formatCurrency(total)}`);
+    alert(`Đặt hàng thành công!\nMã đơn: ${order.id}\nTổng: ${formatCurrency(total)}`);
     navigate('/orders');
   };
 
   return (
-    <div className="checkout-page">
-      <h1 style={{ marginBottom: 24, fontSize: 24, fontWeight: 700 }}>Thanh toán</h1>
-      <div className="checkout-container">
-        {/* Left - Form */}
-        <div>
-          <div className="checkout-section">
-            <h3><i className="fa fa-user"></i> Thông tin nhận hàng</h3>
-            {error && <div className="error-message show">{error}</div>}
-            <div className="form-group"><input value={name} onChange={e => setName(e.target.value)} placeholder="Họ tên *" /></div>
-            <div className="form-group">
-              <div className="input-prefix"><span>+84</span><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Số điện thoại *" /></div>
-            </div>
-            <div className="form-group"><input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" /></div>
-            <div className="form-group"><input value={address} onChange={e => setAddress(e.target.value)} placeholder="Địa chỉ giao hàng *" /></div>
-            <div className="form-group"><textarea value={note} onChange={e => setNote(e.target.value)} placeholder="Ghi chú đơn hàng" rows={3}></textarea></div>
-          </div>
-        </div>
+    <div className="ivy-checkout-page">
+      {/* Progress Steps */}
+      <div className="ivy-cart-steps">
+        <div className="ivy-step done"><div className="ivy-step-num">✓</div><span>Giỏ hàng</span></div>
+        <div className="ivy-step-line active"></div>
+        <div className="ivy-step active"><div className="ivy-step-num">2</div><span>Đặt hàng</span></div>
+        <div className="ivy-step-line"></div>
+        <div className="ivy-step"><div className="ivy-step-num">3</div><span>Thanh toán</span></div>
+        <div className="ivy-step-line"></div>
+        <div className="ivy-step"><div className="ivy-step-num">4</div><span>Hoàn thành đơn</span></div>
+      </div>
 
-        {/* Right - Summary */}
-        <div className="checkout-right">
-          {/* Promo */}
-          {appliedCoupon ? (
-            <div className="applied-promo">
-              <i className="fa fa-ticket"></i>
-              <div className="applied-promo-info">
-                <span className="applied-code">{appliedCoupon}</span>
-                <span className="applied-desc">Giảm {formatCurrency(discount)}</span>
+      <div className="ivy-checkout-layout">
+        {/* LEFT */}
+        <div className="ivy-checkout-left">
+          {/* Địa chỉ giao hàng */}
+          <div className="ivy-checkout-section">
+            <h3 className="ivy-section-title">Địa chỉ giao hàng</h3>
+            {!user && (
+              <>
+                <div className="ivy-auth-btns">
+                  <Link to="/login" className="ivy-auth-btn dark">ĐĂNG NHẬP</Link>
+                  <Link to="/login" className="ivy-auth-btn outline">ĐĂNG KÝ</Link>
+                </div>
+                <p className="ivy-auth-note">Đăng nhập/Đăng ký tài khoản để được hưởng ưu đãi và nhận thêm nhiều ưu đãi.</p>
+              </>
+            )}
+            {error && <div className="ivy-error">{error}</div>}
+            <div className="ivy-form-row">
+              <div className="ivy-form-group"><input value={name} onChange={e => setName(e.target.value)} placeholder="Họ tên" /></div>
+              <div className="ivy-form-group"><input value={phone} onChange={e => setPhone(e.target.value)} placeholder="Số điện thoại" /></div>
+            </div>
+            <div className="ivy-form-row">
+              <div className="ivy-form-group">
+                <select value={city} onChange={e => setCity(e.target.value)}>
+                  <option value="">Tỉnh/Thành phố</option>
+                  <option value="Hà Nội">Hà Nội</option>
+                  <option value="TP.HCM">TP. Hồ Chí Minh</option>
+                  <option value="Đà Nẵng">Đà Nẵng</option>
+                </select>
               </div>
-              <button className="btn-remove-coupon" onClick={removeCoupon}><i className="fa fa-times"></i></button>
-            </div>
-          ) : (
-            <div className="checkout-section" style={{ padding: 16 }}>
-              <div className="promo-input-group">
-                <input value={promoCode} onChange={e => setPromoCode(e.target.value)} placeholder="Nhập mã giảm giá" style={{ textTransform: 'uppercase' }} />
-                <button className="btn-apply-promo" onClick={applyCoupon}>Áp dụng</button>
+              <div className="ivy-form-group">
+                <select value={district} onChange={e => setDistrict(e.target.value)}>
+                  <option value="">Quận/Huyện</option>
+                </select>
               </div>
             </div>
-          )}
-
-          {/* Payment */}
-          <div className="checkout-section">
-            <h3><i className="fa fa-credit-card"></i> Thanh toán</h3>
-            <label className={`payment-option ${paymentMethod === 'cod' ? 'active' : ''}`} onClick={() => setPaymentMethod('cod')}>
-              <input type="radio" name="payment" checked={paymentMethod === 'cod'} readOnly />
-              <i className="fa fa-money-bill-wave"></i>
-              <span>(COD) Thanh toán khi nhận hàng</span>
-            </label>
-            <label className={`payment-option ${paymentMethod === 'bank' ? 'active' : ''}`} onClick={() => setPaymentMethod('bank')}>
-              <input type="radio" name="payment" checked={paymentMethod === 'bank'} readOnly />
-              <i className="fa fa-university"></i>
-              <span>Chuyển khoản ngân hàng</span>
-            </label>
+            <div className="ivy-form-group full">
+              <select value={ward} onChange={e => setWard(e.target.value)}>
+                <option value="">Phường/xã</option>
+              </select>
+            </div>
+            <div className="ivy-form-group full"><input value={address} onChange={e => setAddress(e.target.value)} placeholder="Địa chỉ" /></div>
           </div>
 
-          {/* Order Summary */}
-          <div className="order-summary">
-            <h4>Đơn hàng ({cart.length} sản phẩm)</h4>
-            <div className="order-items" style={{ maxHeight: 250, overflowY: 'auto', marginBottom: 16 }}>
+          {/* Phương thức giao hàng + VAT */}
+          <div className="ivy-checkout-row">
+            <div className="ivy-checkout-section ivy-half">
+              <h3 className="ivy-section-title">Phương thức giao hàng</h3>
+              <label className="ivy-radio-option active">
+                <input type="radio" name="shipping" checked readOnly />
+                <span>Chuyển phát nhanh</span>
+              </label>
+            </div>
+            <div className="ivy-checkout-section ivy-half">
+              <p className="ivy-vat-question">Bạn có muốn nhận hoá đơn VAT không? <input type="checkbox" /></p>
+            </div>
+          </div>
+
+          {/* Phương thức thanh toán */}
+          <div className="ivy-checkout-section">
+            <h3 className="ivy-section-title">Phương thức thanh toán</h3>
+            <div className="ivy-payment-box">
+              <p className="ivy-payment-note">Mọi giao dịch đều được bảo mật và mã hoá. Thông tin thẻ tín dụng sẽ không bao giờ được lưu lại.</p>
+              <label className="ivy-radio-option" onClick={() => setPaymentMethod('visa')}>
+                <input type="radio" name="payment" checked={paymentMethod === 'visa'} readOnly />
+                <span>Thanh toán bằng thẻ tín dụng <strong>VISA</strong> <img src="https://upload.wikimedia.org/wikipedia/commons/0/04/Mastercard-logo.png" alt="MC" style={{height: 16, verticalAlign: 'middle', marginLeft: 4}} /></span>
+              </label>
+              <label className="ivy-radio-option" onClick={() => setPaymentMethod('atm')}>
+                <input type="radio" name="payment" checked={paymentMethod === 'atm'} readOnly />
+                <span>Thanh toán bằng thẻ ATM</span>
+                <small>Hỗ trợ thanh toán online hơn 38 ngân hàng cho bạn Việt Nam</small>
+              </label>
+              <label className="ivy-radio-option" onClick={() => setPaymentMethod('momo')}>
+                <input type="radio" name="payment" checked={paymentMethod === 'momo'} readOnly />
+                <span>Thanh toán bằng Momo</span>
+              </label>
+              <label className="ivy-radio-option" onClick={() => setPaymentMethod('cod')}>
+                <input type="radio" name="payment" checked={paymentMethod === 'cod'} readOnly />
+                <span>Thanh toán khi giao hàng</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Show products toggle */}
+          <button className="ivy-btn-show-products" onClick={() => setShowProducts(!showProducts)}>
+            HIỂN THỊ SẢN PHẨM
+          </button>
+          {showProducts && (
+            <div className="ivy-order-products">
               {cart.map((item, i) => (
-                <div key={i} className="order-item">
+                <div key={i} className="ivy-order-product-item">
                   <img src={item.image} alt={item.name} />
-                  <div className="order-item-info">
-                    <h4>{item.name}</h4>
-                    <p>{item.color} {item.size && `, ${item.size}`} × {item.quantity}</p>
-                    <p style={{ fontWeight: 600, color: '#1f2937' }}>{formatCurrency(item.price * item.quantity)}</p>
+                  <div>
+                    <p className="ivy-op-name">{item.name}</p>
+                    <p className="ivy-op-variant">{item.color} {item.size && `/ ${item.size}`} x{item.quantity}</p>
+                    <p className="ivy-op-price">{formatCurrency(item.price * item.quantity)}</p>
                   </div>
                 </div>
               ))}
             </div>
-            <div className="summary-row"><span>Tạm tính</span><span>{formatCurrency(subtotal)}</span></div>
-            {discount > 0 && <div className="summary-row discount"><span>Giảm giá</span><span>-{formatCurrency(discount)}</span></div>}
-            <div className="summary-row"><span>Phí vận chuyển</span><span>{shippingFee === 0 ? 'Miễn phí' : formatCurrency(shippingFee)}</span></div>
-            <div className="summary-row total"><span>Tổng cộng</span><span>{formatCurrency(total)}</span></div>
-            {shippingFee > 0 && (
-              <div className="free-shipping-note"><i className="fa fa-truck"></i> Mua thêm {formatCurrency(499000 - subtotal)} để được freeship</div>
+          )}
+        </div>
+
+        {/* RIGHT: Summary */}
+        <div className="ivy-checkout-right">
+          <div className="ivy-summary-box">
+            <h3>Tóm tắt đơn hàng</h3>
+            <div className="ivy-summary-row"><span>Tổng tiền hàng</span><span>{formatCurrency(subtotal)}</span></div>
+            <div className="ivy-summary-row"><span>Tạm tính</span><span>{formatCurrency(subtotal)}</span></div>
+            <div className="ivy-summary-row"><span>Phí vận chuyển</span><span>{shippingFee === 0 ? '0đ' : formatCurrency(shippingFee)}</span></div>
+            {discount > 0 && <div className="ivy-summary-row"><span>Giảm giá</span><span>-{formatCurrency(discount)}</span></div>}
+            <div className="ivy-summary-row ivy-summary-bold">
+              <span>Tiền thanh toán</span>
+              <span className="ivy-price-red">{formatCurrency(total)}</span>
+            </div>
+          </div>
+
+          {/* Promo code */}
+          <div className="ivy-promo-box">
+            <div className="ivy-promo-tabs">
+              <button className={promoTab === 'code' ? 'active' : ''} onClick={() => setPromoTab('code')}>Mã phiếu giảm giá</button>
+              <button className={promoTab === 'mine' ? 'active' : ''} onClick={() => setPromoTab('mine')}>Mã của tôi</button>
+            </div>
+            <div className="ivy-promo-input">
+              <input
+                value={promoCode}
+                onChange={e => setPromoCode(e.target.value)}
+                placeholder="Mã giảm giá"
+                style={{ textTransform: 'uppercase' }}
+              />
+              <button onClick={applyCoupon}>ÁP DỤNG</button>
+            </div>
+            {appliedCoupon && (
+              <p className="ivy-promo-applied">Đã áp dụng: <strong>{appliedCoupon}</strong> (-{formatCurrency(discount)})</p>
             )}
           </div>
 
-          <button className="btn-place-order" onClick={handlePlaceOrder}>
-            <i className="fa fa-lock"></i> Đặt hàng - {formatCurrency(total)}
-          </button>
+          {/* Staff code */}
+          <div className="ivy-staff-box">
+            <select value={staffCode} onChange={e => setStaffCode(e.target.value)}>
+              <option value="">Mã nhân viên hỗ trợ</option>
+            </select>
+          </div>
+
+          <button className="ivy-btn-complete" onClick={handlePlaceOrder}>HOÀN THÀNH</button>
         </div>
       </div>
     </div>

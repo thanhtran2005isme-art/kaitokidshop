@@ -1,10 +1,11 @@
-// ProductCard - thay thế hàm createProductCard() trong products-loader.js
-// Component dùng lại ở: Home, Products, Search, Wishlist...
+// ProductCard - IVY moda style: clean, minimal
 
+import { useState, useCallback } from 'react';
+import { PiHeartStraight, PiHeartStraightFill, PiShoppingBagOpenFill } from 'react-icons/pi';
 import { Link } from 'react-router-dom';
-import { FaHeart, FaStar } from 'react-icons/fa';
 import type { Product } from '../../types';
 import { formatCurrency } from '../../utils/format';
+import { useCart } from '../../context/CartContext';
 
 interface ProductCardProps {
   product: Product;
@@ -12,55 +13,93 @@ interface ProductCardProps {
   isWishlisted?: boolean;
 }
 
+function getWishlist(): number[] {
+  try { return JSON.parse(localStorage.getItem('wishlist') || '[]'); }
+  catch { return []; }
+}
+
+function toggleWishlistInStorage(id: number): boolean {
+  const list = getWishlist();
+  const idx = list.indexOf(id);
+  if (idx >= 0) list.splice(idx, 1); else list.push(id);
+  localStorage.setItem('wishlist', JSON.stringify(list));
+  return idx < 0;
+}
+
 export default function ProductCard({ product, onToggleWishlist, isWishlisted }: ProductCardProps) {
+  const [wishlisted, setWishlisted] = useState(() => isWishlisted ?? getWishlist().includes(product.id));
+  const { addItem } = useCart();
+
+  const handleWishlist = useCallback(() => {
+    if (onToggleWishlist) {
+      onToggleWishlist(product.id);
+      setWishlisted(prev => !prev);
+    } else {
+      setWishlisted(toggleWishlistInStorage(product.id));
+    }
+  }, [onToggleWishlist, product.id]);
+
+  const handleAddToCart = () => {
+    addItem(product, product.sizes?.[0] || 'M', product.colors?.[0] || '', 1);
+  };
+
   return (
-    <div className="product-card">
-      <div className="product-image">
+    <div className="ivy-product-card">
+      {/* Image */}
+      <div className="ivy-card-image">
         <Link to={`/product/${product.id}`}>
           <img src={product.image} alt={product.name} loading="lazy" />
         </Link>
-
-        {/* Badges */}
-        <div className="product-badges">
-          {product.isNew && <span className="badge badge-new">NEW</span>}
-          {product.isSale && product.oldPrice && (
-            <span className="badge badge-sale">
-              -{Math.round((1 - product.price / product.oldPrice) * 100)}%
-            </span>
-          )}
-          {product.isBestSeller && <span className="badge badge-hot">HOT</span>}
-        </div>
-
-        {/* Wishlist button */}
-        {onToggleWishlist && (
-          <button
-            className={`wishlist-btn ${isWishlisted ? 'active' : ''}`}
-            onClick={() => onToggleWishlist(product.id)}
-            aria-label="Thêm vào yêu thích"
-          >
-            <FaHeart />
-          </button>
-        )}
+        {/* Badge */}
+        {product.isNew && <span className="ivy-badge ivy-badge-new">NEW</span>}
+        {product.isSale && !product.isNew && <span className="ivy-badge ivy-badge-sale">SALE</span>}
+        {product.isBestSeller && !product.isNew && !product.isSale && <span className="ivy-badge ivy-badge-hot">HOT</span>}
       </div>
 
-      <div className="product-info">
-        <Link to={`/product/${product.id}`} className="product-name">
-          {product.name}
-        </Link>
-
-        <div className="product-rating">
-          <FaStar className="star" />
-          <span>{product.rating}</span>
-          <span className="sold-count">Đã bán {product.soldCount}</span>
-        </div>
-
-        <div className="product-price">
-          <span className="current-price">{formatCurrency(product.price)}</span>
-          {product.oldPrice && (
-            <span className="old-price">{formatCurrency(product.oldPrice)}</span>
+      {/* Color dot + Wishlist row */}
+      <div className="ivy-card-actions">
+        <div className="ivy-color-dots">
+          {product.colors && product.colors.length > 0 ? (
+            product.colors.slice(0, 3).map((color, i) => (
+              <span key={i} className="ivy-color-dot" style={{ background: mapColor(color) }} title={color}></span>
+            ))
+          ) : (
+            <span className="ivy-color-dot" style={{ background: '#e8d44d' }}></span>
           )}
         </div>
+        <button
+          className={`ivy-wishlist-btn ${wishlisted ? 'active' : ''}`}
+          onClick={handleWishlist}
+          type="button"
+          aria-label={wishlisted ? 'Bỏ yêu thích' : 'Thêm vào yêu thích'}
+        >
+          {wishlisted ? <PiHeartStraightFill aria-hidden="true" /> : <PiHeartStraight aria-hidden="true" />}
+        </button>
+      </div>
+
+      {/* Name */}
+      <Link to={`/product/${product.id}`} className="ivy-card-name">{product.name}</Link>
+
+      {/* Price + Cart */}
+      <div className="ivy-card-bottom">
+        <div className="ivy-card-price">
+          <span className="ivy-price-current">{formatCurrency(product.price)}</span>
+          {product.oldPrice && <span className="ivy-price-old">{formatCurrency(product.oldPrice)}</span>}
+        </div>
+        <button className="ivy-cart-btn" onClick={handleAddToCart} type="button" aria-label="Thêm vào giỏ">
+          <PiShoppingBagOpenFill aria-hidden="true" />
+        </button>
       </div>
     </div>
   );
+}
+
+function mapColor(color: string): string {
+  const map: Record<string, string> = {
+    'Đen': '#1a1a1a', 'Trắng': '#f5f5f5', 'Đỏ': '#d32f2f', 'Xanh': '#1976d2',
+    'Xanh dương': '#1976d2', 'Xanh lá': '#388e3c', 'Vàng': '#e8d44d',
+    'Hồng': '#e91e8f', 'Tím': '#7b1fa2', 'Cam': '#f57c00', 'Nâu': '#5d4037',
+    'Xám': '#9e9e9e', 'Be': '#d4b896', 'Kem': '#f5e6ca', 'Navy': '#1a237e',
+  };
+  return map[color] || '#ccc';
 }

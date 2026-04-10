@@ -3,6 +3,7 @@
 // Sau này thay bằng API chỉ cần sửa file này
 
 import type { Product } from '../types';
+import { matchesProductGender } from '../utils/productTaxonomy';
 
 export const productService = {
   getAll(): Product[] {
@@ -47,7 +48,7 @@ export const productService = {
 
   // Lọc theo giới tính (thay cho sanphamnu/nam/treem.html)
   getByGender(gender: string): Product[] {
-    return this.getAll().filter(p => p.gender === gender && p.status === 'active');
+    return this.getAll().filter((product) => matchesProductGender(product.gender, gender) && product.status === 'active');
   },
 
   // Lọc active

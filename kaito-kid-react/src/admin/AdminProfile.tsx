@@ -1,331 +1,712 @@
-// Hồ sơ Admin - match admin structure
+import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { productService } from '../services/productService';
+import { orderService } from '../services/orderService';
+import { formatDate } from '../utils/format';
+import {
+  pushSecurityActivity,
+  readAdminSettings,
+  readSecurityActivities,
+  saveAdminSettings,
+} from '../utils/adminSettingsConfig';
+import {
+  readAdminProfile,
+  saveAdminProfile,
+  syncAdminProfileToSession,
+  type AdminProfileRecord,
+} from '../utils/adminProfileConfig';
+import { readStoredReviews } from '../utils/reviewConfig';
+import AdminIcon from '../components/admin/AdminIcon';
 
-import { useState } from 'react';
+
+type ProfileTab = 'overview' | 'security';
+type EditableSection = 'basic' | 'work' | null;
+
+interface FlashMessage {
+  type: 'success' | 'error';
+  text: string;
+}
+
+interface PasswordFormState {
+  currentPassword: string;
+  nextPassword: string;
+  confirmPassword: string;
+}
+
+function formatDateTime(value?: string) {
+  if (!value) {
+    return 'Chưa có dữ liệu';
+  }
+
+  try {
+    return new Intl.DateTimeFormat('vi-VN', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date(value));
+  } catch {
+    return formatDate(value);
+  }
+}
+
+function buildProfileMetrics() {
+  const orders = orderService.getAll();
+  const products = productService.getAll();
+  const reviews = readStoredReviews();
+  const securityActivities = readSecurityActivities();
+
+  return [
+    {
+      label: 'Don cần theo dõi',
+      value: String(
+        orders.filter((order) => order.status === 'pending' || order.status === 'confirmed' || order.status === 'shipping').length,
+      ),
+      detail: `${orders.length} tong đơn hàng`,
+    },
+    {
+      label: 'Sản phẩm đang bán',
+      value: String(products.filter((product) => product.status === 'active').length),
+      detail: `${products.length} sản phẩm trong hệ thống`,
+    },
+    {
+      label: 'Review đã duyệt',
+      value: String(reviews.filter((review) => review.status === 'approved').length),
+      detail: `${reviews.filter((review) => review.status !== 'pending').length} review da moderation`,
+    },
+    {
+      label: 'Lan đăng nhập admin',
+      value: String(securityActivities.filter((activity) => activity.type === 'admin-login').length),
+      detail: securityActivities[0] ? `Gan nhat ${formatDateTime(securityActivities[0].createdAt)}` : 'Chưa có audit log',
+    },
+  ];
+}
 
 export default function AdminProfile() {
-  const [activeTab, setActiveTab] = useState('info');
-  const [editingSection, setEditingSection] = useState<string | null>(null);
-
-  const [basicInfo, setBasicInfo] = useState({
-    fullName: 'Admin',
-    displayName: 'Admin',
-    email: 'admin@kaitokid.vn',
-    phone: '0123 456 789',
-    birthday: '1990-01-01',
-    gender: 'male'
+  const { user, refreshUser } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const initialProfile = readAdminProfile();
+  const initialSettings = readAdminSettings();
+  const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
+  const [editingSection, setEditingSection] = useState<EditableSection>(null);
+  const [savedProfile, setSavedProfile] = useState<AdminProfileRecord>(initialProfile);
+  const [profile, setProfile] = useState<AdminProfileRecord>(initialProfile);
+  const [message, setMessage] = useState<FlashMessage | null>(null);
+  const [metrics, setMetrics] = useState(() => buildProfileMetrics());
+  const [securityActivities, setSecurityActivities] = useState(() => readSecurityActivities().slice(0, 6));
+  const [securityOptions, setSecurityOptions] = useState({
+    enable2FA: initialSettings.enable2FA,
+    loginNotification: initialSettings.loginNotification,
+  });
+  const [passwordForm, setPasswordForm] = useState<PasswordFormState>({
+    currentPassword: '',
+    nextPassword: '',
+    confirmPassword: '',
   });
 
-  const [workInfo, setWorkInfo] = useState({
-    position: 'Administrator',
-    department: 'Quản trị',
-    jobDescription: 'Quản lý toàn bộ hoạt động của website bán hàng KAITO KID.'
-  });
+  const adminName = user?.name || profile.basic.displayName || profile.basic.fullName;
+  const profilePosition = profile.work.position || 'Administrator';
+  const avatarFallback = adminName.charAt(0).toUpperCase();
 
-  const enableEditing = (section: string) => {
-    setEditingSection(section);
+  const showMessage = (type: FlashMessage['type'], text: string) => {
+    setMessage({ type, text });
+    window.setTimeout(() => setMessage(null), 3200);
   };
 
-  const cancelEditing = () => {
+  const refreshDerivedState = () => {
+    setMetrics(buildProfileMetrics());
+    setSecurityActivities(readSecurityActivities().slice(0, 6));
+    const latestSettings = readAdminSettings();
+    setSecurityOptions({
+      enable2FA: latestSettings.enable2FA,
+      loginNotification: latestSettings.loginNotification,
+    });
+  };
+
+  const persistProfile = (nextProfile: AdminProfileRecord, successText: string) => {
+    const saved = saveAdminProfile(nextProfile);
+    syncAdminProfileToSession(saved);
+    setSavedProfile(saved);
+    setProfile(saved);
+    refreshUser();
+    refreshDerivedState();
+    showMessage('success', successText);
+  };
+
+  const handleCancelEdit = (section: EditableSection) => {
+    if (!section) {
+      return;
+    }
+
+    setProfile((currentProfile) => ({
+      ...currentProfile,
+      [section]: savedProfile[section],
+    }));
     setEditingSection(null);
   };
 
-  const handleBasicInfoSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    localStorage.setItem('adminBasicInfo', JSON.stringify(basicInfo));
+  const handleSaveBasic = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!/\S+@\S+\.\S+/.test(profile.basic.email)) {
+      showMessage('error', 'Email admin không hợp lệ.');
+      return;
+    }
+
+    persistProfile(profile, 'Đã lưu thông tin ca nhan admin.');
     setEditingSection(null);
-    alert('Đã lưu thông tin cá nhân');
   };
 
-  const handleWorkInfoSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    localStorage.setItem('adminWorkInfo', JSON.stringify(workInfo));
+  const handleSaveWork = (event: React.FormEvent) => {
+    event.preventDefault();
+    persistProfile(profile, 'Đã lưu thông tin cong viec admin.');
     setEditingSection(null);
-    alert('Đã lưu thông tin công việc');
   };
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert('Đã đổi mật khẩu thành công');
+  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      showMessage('error', 'Vui lòng chọn file anh hợp lệ.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const avatar = typeof reader.result === 'string' ? reader.result : '';
+      const nextProfile = {
+        ...profile,
+        basic: {
+          ...profile.basic,
+          avatar,
+        },
+      };
+
+      persistProfile(nextProfile, 'Đã cập nhật avatar admin.');
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+  };
+
+  const handleSaveSecurityOptions = () => {
+    const currentSettings = readAdminSettings();
+    saveAdminSettings({
+      ...currentSettings,
+      enable2FA: securityOptions.enable2FA,
+      loginNotification: securityOptions.loginNotification,
+    });
+    refreshDerivedState();
+    showMessage('success', 'Da động bo tùy chọn bảo mật voi Admin Settings.');
+  };
+
+  const handlePasswordSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    const adminCredentials = JSON.parse(localStorage.getItem('adminCredentials') || '{}');
+
+    if (passwordForm.currentPassword !== adminCredentials.password) {
+      showMessage('error', 'Mật khẩu hien tai không dung.');
+      return;
+    }
+
+    if (passwordForm.nextPassword.length < 6) {
+      showMessage('error', 'Mật khẩu mới cần ít nhất 6 ky tu.');
+      return;
+    }
+
+    if (passwordForm.nextPassword !== passwordForm.confirmPassword) {
+      showMessage('error', 'Mật khẩu xac nhan không khop.');
+      return;
+    }
+
+    localStorage.setItem(
+      'adminCredentials',
+      JSON.stringify({
+        ...adminCredentials,
+        password: passwordForm.nextPassword,
+        email: profile.basic.email,
+      }),
+    );
+
+    pushSecurityActivity({
+      type: 'password-change',
+      title: 'Mật khẩu admin da được thay đổi',
+      detail: 'Cập nhật tu trang Hồ sơ Admin.',
+    });
+
+    setPasswordForm({
+      currentPassword: '',
+      nextPassword: '',
+      confirmPassword: '',
+    });
+    refreshDerivedState();
+    showMessage('success', 'Da doi mật khẩu admin thành công.');
   };
 
   return (
-    <>
-      {/* Profile Header */}
-      <div className="card" style={{ marginBottom: 24, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: 0, overflow: 'hidden' }}>
-        <div style={{ padding: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            <div style={{ 
-              width: 100, 
-              height: 100, 
-              borderRadius: '50%', 
-              background: 'rgba(255,255,255,0.2)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              fontSize: 40,
-              border: '4px solid rgba(255,255,255,0.3)'
-            }}>
-              <i className="fa fa-user"></i>
+    <div className="admin-profile-page">
+      {message && (
+        <div className={`alert alert-${message.type === 'error' ? 'danger' : 'success'}`}>
+          <AdminIcon name={message.type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} />
+          <span>{message.text}</span>
+        </div>
+      )}
+
+      <section className="admin-profile-hero">
+        <div className="admin-profile-cover"></div>
+        <div className="admin-profile-hero-content">
+          <div className="admin-profile-avatar-wrap">
+            <div className="admin-profile-avatar">
+              {profile.basic.avatar ? (
+                <img src={profile.basic.avatar} alt={adminName} />
+              ) : (
+                <span>{avatarFallback}</span>
+              )}
             </div>
-            <div style={{ flex: 1 }}>
-              <h1 style={{ margin: 0, marginBottom: 8, fontSize: 32 }}>{basicInfo.displayName}</h1>
-              <p style={{ margin: 0, opacity: 0.9, fontSize: 16 }}>
-                <i className="fa fa-shield-alt"></i> {workInfo.position}
-              </p>
-              <p style={{ margin: 0, marginTop: 8, opacity: 0.8, fontSize: 14 }}>
-                <i className="fa fa-calendar-alt"></i> Tham gia từ 01/01/2024
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 32 }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 600 }}>0</div>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>Đơn xử lý</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 600 }}>0</div>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>SP cập nhật</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 28, fontWeight: 600 }}>0</div>
-                <div style={{ fontSize: 13, opacity: 0.9 }}>Đánh giá duyệt</div>
-              </div>
-            </div>
+            <button type="button" className="admin-profile-avatar-btn" onClick={() => fileInputRef.current?.click()}>
+              <AdminIcon name="fa fa-camera" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="admin-profile-file-input"
+              onChange={handleAvatarUpload}
+            />
+          </div>
+
+          <div className="admin-profile-identity">
+            <h1>{adminName}</h1>
+            <p className="admin-profile-role">
+              <AdminIcon name="fa fa-shield-alt" /> {profilePosition}
+            </p>
+            <p className="admin-profile-meta">
+              <AdminIcon name="fa fa-envelope" /> {profile.basic.email}
+            </p>
+            <p className="admin-profile-meta">
+              <AdminIcon name="fa fa-calendar-alt" /> Tham gia tu {formatDate(profile.work.joinedAt)}
+            </p>
+          </div>
+
+          <div className="admin-profile-hero-actions">
+            <Link to="/admin/settings" className="btn btn-outline btn-sm">
+              <AdminIcon name="fa fa-cog" /> Động bo voi Settings
+            </Link>
           </div>
         </div>
-      </div>
 
-      {/* Tabs */}
-      <div className="card" style={{ marginBottom: 24, padding: 0 }}>
-        <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <button 
-            className={`profile-tab ${activeTab === 'info' ? 'active' : ''}`}
-            onClick={() => setActiveTab('info')}
-            style={{ 
-              flex: 1, 
-              padding: '16px 24px', 
-              background: activeTab === 'info' ? 'rgba(102, 126, 234, 0.1)' : 'transparent',
-              border: 'none',
-              borderBottom: activeTab === 'info' ? '2px solid #667eea' : '2px solid transparent',
-              color: activeTab === 'info' ? '#667eea' : '#888',
-              cursor: 'pointer',
-              fontSize: 15,
-              fontWeight: 500
-            }}
-          >
-            <i className="fa fa-user"></i> Thông tin cá nhân
-          </button>
-          <button 
-            className={`profile-tab ${activeTab === 'security' ? 'active' : ''}`}
-            onClick={() => setActiveTab('security')}
-            style={{ 
-              flex: 1, 
-              padding: '16px 24px', 
-              background: activeTab === 'security' ? 'rgba(102, 126, 234, 0.1)' : 'transparent',
-              border: 'none',
-              borderBottom: activeTab === 'security' ? '2px solid #667eea' : '2px solid transparent',
-              color: activeTab === 'security' ? '#667eea' : '#888',
-              cursor: 'pointer',
-              fontSize: 15,
-              fontWeight: 500
-            }}
-          >
-            <i className="fa fa-lock"></i> Bảo mật
-          </button>
+        <div className="admin-profile-metrics">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="admin-profile-metric-card">
+              <strong>{metric.value}</strong>
+              <span>{metric.label}</span>
+              <small>{metric.detail}</small>
+            </div>
+          ))}
         </div>
+      </section>
+
+      <div className="admin-profile-tabs">
+        <button
+          type="button"
+          className={`admin-profile-tab ${activeTab === 'overview' ? 'active' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          <AdminIcon name="fa fa-user" /> Tổng quan
+        </button>
+        <button
+          type="button"
+          className={`admin-profile-tab ${activeTab === 'security' ? 'active' : ''}`}
+          onClick={() => setActiveTab('security')}
+        >
+          <AdminIcon name="fa fa-lock" /> Bảo mật
+        </button>
       </div>
 
-      {/* Info Tab */}
-      {activeTab === 'info' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
-          {/* Basic Info */}
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <h3 style={{ margin: 0 }}><i className="fa fa-user"></i> Thông tin cơ bản</h3>
-              <button className="btn btn-sm btn-secondary" onClick={() => enableEditing('basic')}>
-                <i className="fa fa-edit"></i> Chỉnh sửa
+      {activeTab === 'overview' && (
+        <div className="admin-profile-grid">
+          <section className="admin-profile-card">
+            <div className="admin-profile-card-header">
+              <div>
+                <h3><AdminIcon name="fa fa-id-card" /> Thông tin ca nhan</h3>
+                <p>Dữ liệu này được sync sang thanh admin và session đăng nhập hien tai.</p>
+              </div>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSection('basic')}>
+                <AdminIcon name="fa fa-edit" /> Chinh sửa
               </button>
             </div>
-            <form onSubmit={handleBasicInfoSubmit}>
-              <div className="form-grid">
+
+            <form onSubmit={handleSaveBasic}>
+              <div className="admin-profile-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Họ và tên</label>
-                  <input 
-                    className="form-control" 
-                    value={basicInfo.fullName}
-                    onChange={e => setBasicInfo({ ...basicInfo, fullName: e.target.value })}
+                  <label className="form-label">Ho và ten</label>
+                  <input
+                    className="form-control"
+                    value={profile.basic.fullName}
+                    onChange={(event) =>
+                      setProfile((currentProfile) => ({
+                        ...currentProfile,
+                        basic: { ...currentProfile.basic, fullName: event.target.value },
+                      }))
+                    }
                     disabled={editingSection !== 'basic'}
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Tên hiển thị</label>
-                  <input 
-                    className="form-control" 
-                    value={basicInfo.displayName}
-                    onChange={e => setBasicInfo({ ...basicInfo, displayName: e.target.value })}
+                  <label className="form-label">Ten hiển thị</label>
+                  <input
+                    className="form-control"
+                    value={profile.basic.displayName}
+                    onChange={(event) =>
+                      setProfile((currentProfile) => ({
+                        ...currentProfile,
+                        basic: { ...currentProfile.basic, displayName: event.target.value },
+                      }))
+                    }
                     disabled={editingSection !== 'basic'}
                   />
                 </div>
               </div>
-              <div className="form-grid">
+
+              <div className="admin-profile-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Email</label>
-                  <input 
-                    className="form-control" 
+                  <label className="form-label">Email admin</label>
+                  <input
+                    className="form-control"
                     type="email"
-                    value={basicInfo.email}
-                    onChange={e => setBasicInfo({ ...basicInfo, email: e.target.value })}
+                    value={profile.basic.email}
+                    onChange={(event) =>
+                      setProfile((currentProfile) => ({
+                        ...currentProfile,
+                        basic: { ...currentProfile.basic, email: event.target.value },
+                      }))
+                    }
                     disabled={editingSection !== 'basic'}
                   />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Số điện thoại</label>
-                  <input 
-                    className="form-control" 
-                    value={basicInfo.phone}
-                    onChange={e => setBasicInfo({ ...basicInfo, phone: e.target.value })}
+                  <input
+                    className="form-control"
+                    value={profile.basic.phone}
+                    onChange={(event) =>
+                      setProfile((currentProfile) => ({
+                        ...currentProfile,
+                        basic: { ...currentProfile.basic, phone: event.target.value },
+                      }))
+                    }
                     disabled={editingSection !== 'basic'}
                   />
                 </div>
               </div>
-              <div className="form-grid">
+
+              <div className="admin-profile-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Ngày sinh</label>
-                  <input 
-                    className="form-control" 
+                  <label className="form-label">Ngay sinh</label>
+                  <input
+                    className="form-control"
                     type="date"
-                    value={basicInfo.birthday}
-                    onChange={e => setBasicInfo({ ...basicInfo, birthday: e.target.value })}
+                    value={profile.basic.birthday}
+                    onChange={(event) =>
+                      setProfile((currentProfile) => ({
+                        ...currentProfile,
+                        basic: { ...currentProfile.basic, birthday: event.target.value },
+                      }))
+                    }
                     disabled={editingSection !== 'basic'}
                   />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Giới tính</label>
-                  <select 
+                  <select
                     className="form-control"
-                    value={basicInfo.gender}
-                    onChange={e => setBasicInfo({ ...basicInfo, gender: e.target.value })}
+                    value={profile.basic.gender}
+                    onChange={(event) =>
+                      setProfile((currentProfile) => ({
+                        ...currentProfile,
+                        basic: {
+                          ...currentProfile.basic,
+                          gender: event.target.value as AdminProfileRecord['basic']['gender'],
+                        },
+                      }))
+                    }
                     disabled={editingSection !== 'basic'}
                   >
                     <option value="male">Nam</option>
-                    <option value="female">Nữ</option>
+                    <option value="female">Nu</option>
                     <option value="other">Khác</option>
                   </select>
                 </div>
               </div>
+
               {editingSection === 'basic' && (
-                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-                  <button type="button" className="btn btn-secondary" onClick={cancelEditing}>Hủy</button>
-                  <button type="submit" className="btn btn-primary">
-                    <i className="fa fa-save"></i> Lưu thay đổi
+                <div className="admin-profile-actions">
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => handleCancelEdit('basic')}>
+                    Huy
+                  </button>
+                  <button type="submit" className="btn btn-primary btn-sm">
+                    <AdminIcon name="fa fa-save" /> Lưu thông tin
                   </button>
                 </div>
               )}
             </form>
-          </div>
+          </section>
 
-          {/* Work Info */}
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-              <h3 style={{ margin: 0 }}><i className="fa fa-briefcase"></i> Thông tin công việc</h3>
-              <button className="btn btn-sm btn-secondary" onClick={() => enableEditing('work')}>
-                <i className="fa fa-edit"></i> Chỉnh sửa
+          <section className="admin-profile-card">
+            <div className="admin-profile-card-header">
+              <div>
+                <h3><AdminIcon name="fa fa-briefcase" /> Thông tin cong viec</h3>
+                <p>Hiển thị xuyen suot trong sidebar, dropdown admin và cac log van hanh.</p>
+              </div>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSection('work')}>
+                <AdminIcon name="fa fa-edit" /> Chinh sửa
               </button>
             </div>
-            <form onSubmit={handleWorkInfoSubmit}>
-              <div className="form-grid">
+
+            <form onSubmit={handleSaveWork}>
+              <div className="admin-profile-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Vị trí</label>
-                  <input 
-                    className="form-control" 
-                    value={workInfo.position}
-                    onChange={e => setWorkInfo({ ...workInfo, position: e.target.value })}
+                  <label className="form-label">Vi tri</label>
+                  <input
+                    className="form-control"
+                    value={profile.work.position}
+                    onChange={(event) =>
+                      setProfile((currentProfile) => ({
+                        ...currentProfile,
+                        work: { ...currentProfile.work, position: event.target.value },
+                      }))
+                    }
                     disabled={editingSection !== 'work'}
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Phòng ban</label>
-                  <input 
-                    className="form-control" 
-                    value={workInfo.department}
-                    onChange={e => setWorkInfo({ ...workInfo, department: e.target.value })}
+                  <label className="form-label">Phong ban</label>
+                  <input
+                    className="form-control"
+                    value={profile.work.department}
+                    onChange={(event) =>
+                      setProfile((currentProfile) => ({
+                        ...currentProfile,
+                        work: { ...currentProfile.work, department: event.target.value },
+                      }))
+                    }
                     disabled={editingSection !== 'work'}
                   />
                 </div>
               </div>
+
               <div className="form-group">
-                <label className="form-label">Mô tả công việc</label>
-                <textarea 
-                  className="form-control" 
-                  rows={3}
-                  value={workInfo.jobDescription}
-                  onChange={e => setWorkInfo({ ...workInfo, jobDescription: e.target.value })}
+                <label className="form-label">Mô tả cong viec</label>
+                <textarea
+                  className="form-control"
+                  rows={4}
+                  value={profile.work.jobDescription}
+                  onChange={(event) =>
+                    setProfile((currentProfile) => ({
+                      ...currentProfile,
+                      work: { ...currentProfile.work, jobDescription: event.target.value },
+                    }))
+                  }
                   disabled={editingSection !== 'work'}
                 />
               </div>
+
+              <div className="form-group">
+                <label className="form-label">Ngay tham gia</label>
+                <input
+                  className="form-control"
+                  type="date"
+                  value={profile.work.joinedAt.slice(0, 10)}
+                  onChange={(event) =>
+                    setProfile((currentProfile) => ({
+                      ...currentProfile,
+                      work: { ...currentProfile.work, joinedAt: new Date(event.target.value).toISOString() },
+                    }))
+                  }
+                  disabled={editingSection !== 'work'}
+                />
+              </div>
+
               {editingSection === 'work' && (
-                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-                  <button type="button" className="btn btn-secondary" onClick={cancelEditing}>Hủy</button>
-                  <button type="submit" className="btn btn-primary">
-                    <i className="fa fa-save"></i> Lưu thay đổi
+                <div className="admin-profile-actions">
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => handleCancelEdit('work')}>
+                    Huy
+                  </button>
+                  <button type="submit" className="btn btn-primary btn-sm">
+                    <AdminIcon name="fa fa-save" /> Lưu cong viec
                   </button>
                 </div>
               )}
             </form>
-          </div>
+          </section>
+
+          <section className="admin-profile-card admin-profile-card-wide">
+            <div className="admin-profile-card-header">
+              <div>
+                <h3><AdminIcon name="fa fa-wave-square" /> Hoạt động gần đây</h3>
+                <p>Lấy từ audit log và dữ liệu van hanh that trong hệ thống.</p>
+              </div>
+            </div>
+
+            <div className="admin-profile-activity-list">
+              {securityActivities.length > 0 ? (
+                securityActivities.map((activity) => (
+                  <div key={activity.id} className="admin-profile-activity-item">
+                    <div className="admin-profile-activity-icon">
+                      <AdminIcon name={activity.type === 'password-change' ? 'fa-key' : 'fa-user-shield'} />
+                    </div>
+                    <div className="admin-profile-activity-copy">
+                      <strong>{activity.title}</strong>
+                      <span>{activity.detail}</span>
+                      <small>{formatDateTime(activity.createdAt)}</small>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="admin-profile-empty-state">
+                  <AdminIcon name="fa fa-inbox" />
+                  <p>Chưa có hoạt động admin nào được ghi nhan.</p>
+                </div>
+              )}
+            </div>
+          </section>
         </div>
       )}
 
-      {/* Security Tab */}
       {activeTab === 'security' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 24 }}>
-          {/* Change Password */}
-          <div className="card">
-            <h3 style={{ marginBottom: 24 }}><i className="fa fa-key"></i> Đổi mật khẩu</h3>
+        <div className="admin-profile-grid">
+          <section className="admin-profile-card">
+            <div className="admin-profile-card-header">
+              <div>
+                <h3><AdminIcon name="fa fa-key" /> Doi mật khẩu</h3>
+                <p>Cập nhật truc tiep vào adminCredentials và ghi audit log.</p>
+              </div>
+            </div>
+
             <form onSubmit={handlePasswordSubmit}>
               <div className="form-group">
-                <label className="form-label">Mật khẩu hiện tại</label>
-                <input className="form-control" type="password" required />
+                <label className="form-label">Mật khẩu hien tai</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(event) => setPasswordForm((currentForm) => ({ ...currentForm, currentPassword: event.target.value }))}
+                />
               </div>
               <div className="form-group">
                 <label className="form-label">Mật khẩu mới</label>
-                <input className="form-control" type="password" required />
+                <input
+                  className="form-control"
+                  type="password"
+                  value={passwordForm.nextPassword}
+                  onChange={(event) => setPasswordForm((currentForm) => ({ ...currentForm, nextPassword: event.target.value }))}
+                />
               </div>
               <div className="form-group">
-                <label className="form-label">Xác nhận mật khẩu mới</label>
-                <input className="form-control" type="password" required />
+                <label className="form-label">Xac nhan mật khẩu mới</label>
+                <input
+                  className="form-control"
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(event) => setPasswordForm((currentForm) => ({ ...currentForm, confirmPassword: event.target.value }))}
+                />
               </div>
-              <button type="submit" className="btn btn-primary">
-                <i className="fa fa-lock"></i> Đổi mật khẩu
-              </button>
+              <div className="admin-profile-actions">
+                <button type="submit" className="btn btn-primary btn-sm">
+                  <AdminIcon name="fa fa-lock" /> Doi mật khẩu
+                </button>
+              </div>
             </form>
-          </div>
+          </section>
 
-          {/* Security Options */}
-          <div className="card">
-            <h3 style={{ marginBottom: 24 }}><i className="fa fa-shield-alt"></i> Bảo mật tài khoản</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
-                <div>
-                  <h4 style={{ margin: 0, marginBottom: 4 }}>Xác thực 2 bước</h4>
-                  <p style={{ margin: 0, fontSize: 13, color: '#888' }}>Bảo vệ tài khoản bằng mã xác thực gửi qua SMS</p>
-                </div>
-                <label className="form-check">
-                  <input className="form-check-input" type="checkbox" />
-                </label>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 16, background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
-                <div>
-                  <h4 style={{ margin: 0, marginBottom: 4 }}>Thông báo đăng nhập</h4>
-                  <p style={{ margin: 0, fontSize: 13, color: '#888' }}>Gửi email thông báo khi có đăng nhập mới</p>
-                </div>
-                <label className="form-check">
-                  <input className="form-check-input" type="checkbox" defaultChecked />
-                </label>
+          <section className="admin-profile-card">
+            <div className="admin-profile-card-header">
+              <div>
+                <h3><AdminIcon name="fa fa-shield-alt" /> Tùy chọn bảo mật</h3>
+                <p>Động bo truc tiep voi Admin Settings de dung cung một policy.</p>
               </div>
             </div>
-          </div>
+
+            <div className="admin-profile-toggle-list">
+              <label className="admin-profile-toggle-row">
+                <div>
+                  <strong>Chinh sach 2FA</strong>
+                  <span>Danh dau policy cho tai khoan admin o cac man quản trị.</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={securityOptions.enable2FA}
+                  onChange={(event) =>
+                    setSecurityOptions((currentOptions) => ({
+                      ...currentOptions,
+                      enable2FA: event.target.checked,
+                    }))
+                  }
+                />
+              </label>
+
+              <label className="admin-profile-toggle-row">
+                <div>
+                  <strong>Audit login</strong>
+                  <span>Tu động ghi lại mới lan admin đăng nhập thành công.</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={securityOptions.loginNotification}
+                  onChange={(event) =>
+                    setSecurityOptions((currentOptions) => ({
+                      ...currentOptions,
+                      loginNotification: event.target.checked,
+                    }))
+                  }
+                />
+              </label>
+            </div>
+
+            <div className="admin-profile-actions">
+              <button type="button" className="btn btn-primary btn-sm" onClick={handleSaveSecurityOptions}>
+                <AdminIcon name="fa fa-save" /> Lưu tùy chọn
+              </button>
+              <Link to="/admin/settings" className="btn btn-outline btn-sm">
+                <AdminIcon name="fa fa-cog" /> Mo Settings
+              </Link>
+            </div>
+          </section>
+
+          <section className="admin-profile-card admin-profile-card-wide">
+            <div className="admin-profile-card-header">
+              <div>
+                <h3><AdminIcon name="fa fa-history" /> Audit timeline</h3>
+                <p>Thông tin này được dung chung voi trang Admin Settings.</p>
+              </div>
+            </div>
+
+            <div className="admin-profile-activity-list">
+              {securityActivities.length > 0 ? (
+                securityActivities.map((activity) => (
+                  <div key={activity.id} className="admin-profile-activity-item">
+                    <div className="admin-profile-activity-icon">
+                      <AdminIcon name={activity.type === 'password-change' ? 'fa-key' : 'fa-user-shield'} />
+                    </div>
+                    <div className="admin-profile-activity-copy">
+                      <strong>{activity.title}</strong>
+                      <span>{activity.detail}</span>
+                      <small>{formatDateTime(activity.createdAt)}</small>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="admin-profile-empty-state">
+                  <AdminIcon name="fa fa-shield-alt" />
+                  <p>Chưa có audit log nào.</p>
+                </div>
+              )}
+            </div>
+          </section>
         </div>
       )}
-    </>
+    </div>
   );
 }

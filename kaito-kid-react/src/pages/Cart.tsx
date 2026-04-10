@@ -1,4 +1,4 @@
-// Trang giỏ hàng - thay thế GioHang.html + cart-page.js
+// Trang giỏ hàng - IVY moda style
 
 import { Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
@@ -9,84 +9,126 @@ export default function Cart() {
 
   if (cart.length === 0) {
     return (
-      <div className="cart-page">
-        <div className="cart-container">
-          <div className="empty-cart">
-            <i className="fa fa-shopping-bag"></i>
-            <h3>Giỏ hàng trống</h3>
-            <p>Bạn chưa có sản phẩm nào trong giỏ hàng</p>
-            <Link to="/products" className="btn-continue-shopping">Tiếp tục mua sắm</Link>
-          </div>
+      <div className="ivy-cart-page">
+        <div className="ivy-cart-empty">
+          <i className="fa fa-shopping-bag"></i>
+          <h3>Giỏ hàng trống</h3>
+          <p>Bạn chưa có sản phẩm nào trong giỏ hàng</p>
+          <Link to="/products" className="ivy-btn-continue">← Tiếp tục mua hàng</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="cart-page">
-      <div className="cart-container">
-        <h1 className="cart-title"><i className="fa fa-shopping-bag"></i> Giỏ hàng ({totalItems} sản phẩm)</h1>
-        <div className="cart-content">
-          <div className="cart-items-section">
-            <table className="cart-table">
-              <thead>
-                <tr>
-                  <th>Sản phẩm</th>
-                  <th>Đơn giá</th>
-                  <th>Số lượng</th>
-                  <th>Thành tiền</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {cart.map((item, index) => (
-                  <tr key={`${item.id}_${item.size}_${item.color}`}>
-                    <td>
-                      <div className="product-cell">
-                        <img src={item.image} alt={item.name} />
-                        <div className="product-info">
-                          <h4>{item.name}</h4>
-                          {item.size && <p>Size: {item.size}</p>}
-                          {item.color && <p>Màu: {item.color}</p>}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="price-cell">{formatCurrency(item.price)}</td>
-                    <td>
-                      <div className="quantity-cell">
-                        <button className="qty-btn" onClick={() => updateQuantity(index, item.quantity - 1)}>−</button>
-                        <input className="qty-input" value={item.quantity} readOnly />
-                        <button className="qty-btn" onClick={() => updateQuantity(index, item.quantity + 1)}>+</button>
-                      </div>
-                    </td>
-                    <td className="total-cell">{formatCurrency(item.price * item.quantity)}</td>
-                    <td>
-                      <button className="remove-btn" onClick={() => removeItem(index)}><i className="fa fa-trash"></i></button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <div className="ivy-cart-page">
+      {/* Progress Steps */}
+      <div className="ivy-cart-steps">
+        <div className="ivy-step active">
+          <div className="ivy-step-num">1</div>
+          <span>Giỏ hàng</span>
+        </div>
+        <div className="ivy-step-line"></div>
+        <div className="ivy-step">
+          <div className="ivy-step-num">2</div>
+          <span>Đặt hàng</span>
+        </div>
+        <div className="ivy-step-line"></div>
+        <div className="ivy-step">
+          <div className="ivy-step-num">3</div>
+          <span>Thanh toán</span>
+        </div>
+        <div className="ivy-step-line"></div>
+        <div className="ivy-step">
+          <div className="ivy-step-num">4</div>
+          <span>Hoàn thành đơn</span>
+        </div>
+      </div>
+
+      <div className="ivy-cart-layout">
+        {/* Left: Cart items */}
+        <div className="ivy-cart-left">
+          <h2 className="ivy-cart-title">
+            Giỏ hàng của bạn <strong>{totalItems} Sản Phẩm</strong>
+          </h2>
+
+          {/* Table header */}
+          <div className="ivy-cart-header">
+            <span className="ivy-col-product">TÊN SẢN PHẨM</span>
+            <span className="ivy-col-discount">CHIẾT KHẤU</span>
+            <span className="ivy-col-qty">SỐ LƯỢNG</span>
+            <span className="ivy-col-total">TỔNG TIỀN</span>
           </div>
 
-          <div className="cart-summary">
-            <h3>Tóm tắt đơn hàng</h3>
-            <div className="summary-row">
-              <span>Tạm tính:</span>
+          {/* Cart items */}
+          {cart.map((item, index) => (
+            <div className="ivy-cart-item" key={`${item.id}_${item.size}_${item.color}`}>
+              <div className="ivy-col-product">
+                <div className="ivy-item-info">
+                  <Link to={`/product/${item.id}`} className="ivy-item-img">
+                    <img src={item.image} alt={item.name} />
+                  </Link>
+                  <div className="ivy-item-details">
+                    <Link to={`/product/${item.id}`} className="ivy-item-name">{item.name}</Link>
+                    <p className="ivy-item-variant">
+                      {item.color && <>Màu sắc: {item.color}</>}
+                      {item.color && item.size && <>&nbsp;&nbsp;</>}
+                      {item.size && <>Size: {item.size}</>}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="ivy-col-discount">
+                <span className="ivy-discount-text">—</span>
+              </div>
+              <div className="ivy-col-qty">
+                <div className="ivy-qty-control">
+                  <button onClick={() => updateQuantity(index, item.quantity - 1)}>−</button>
+                  <input value={item.quantity} readOnly />
+                  <button onClick={() => updateQuantity(index, item.quantity + 1)}>+</button>
+                </div>
+              </div>
+              <div className="ivy-col-total">
+                <span className="ivy-item-total">{formatCurrency(item.price * item.quantity)}</span>
+                <button className="ivy-remove-btn" onClick={() => removeItem(index)} aria-label="Xóa">
+                  <i className="fa fa-trash-alt"></i>
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <div className="ivy-cart-continue">
+            <Link to="/products" className="ivy-btn-continue">← Tiếp tục mua hàng</Link>
+          </div>
+        </div>
+
+        {/* Right: Summary */}
+        <div className="ivy-cart-right">
+          <div className="ivy-summary-box">
+            <h3>Tổng tiền giỏ hàng</h3>
+            <div className="ivy-summary-row">
+              <span>Tổng sản phẩm</span>
+              <span>{totalItems}</span>
+            </div>
+            <div className="ivy-summary-row">
+              <span>Tổng tiền hàng</span>
               <span>{formatCurrency(subtotal)}</span>
             </div>
-            <div className="summary-row">
-              <span>Phí vận chuyển:</span>
-              <span>Tính khi thanh toán</span>
+            <div className="ivy-summary-row ivy-summary-bold">
+              <span>Thành tiền</span>
+              <span className="ivy-price-red">{formatCurrency(subtotal)}</span>
             </div>
-            <div className="summary-row total">
-              <span>Tổng cộng:</span>
-              <span>{formatCurrency(subtotal)}</span>
+            <div className="ivy-summary-row ivy-summary-bold">
+              <span>Tạm tính</span>
+              <span className="ivy-price-red">{formatCurrency(subtotal)}</span>
             </div>
-            <div className="cart-actions">
-              <Link to="/checkout" className="btn-checkout">Tiến hành thanh toán</Link>
-              <Link to="/products" className="btn-clear" style={{ textAlign: 'center', textDecoration: 'none' }}>Tiếp tục mua sắm</Link>
+
+            <div className="ivy-summary-notes">
+              <p><i className="fa fa-info-circle"></i> Sản phẩm nằm trong chương trình KM giảm giá trên 50% không hỗ trợ đổi trả.</p>
+              <p><i className="fa fa-info-circle"></i> Không thanh toán cho Shipper khi chưa nhận hàng !</p>
             </div>
+
+            <Link to="/checkout" className="ivy-btn-order">ĐẶT HÀNG</Link>
           </div>
         </div>
       </div>

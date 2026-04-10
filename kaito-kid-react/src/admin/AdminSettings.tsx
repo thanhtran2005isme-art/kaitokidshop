@@ -1,598 +1,616 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { formatCurrency, formatDate } from '../utils/format';
+import {
+  defaultAdminSettings,
+  pushEmailActivity,
+  pushSecurityActivity,
+  readAdminSettings,
+  readEmailActivities,
+  readSecurityActivities,
+  saveAdminSettings,
+  type AdminSettingsConfig,
+  type BankAccountConfig,
+  type EmailActivityRecord,
+  type SecurityActivityRecord,
+} from '../utils/adminSettingsConfig';
+import AdminIcon from '../components/admin/AdminIcon';
 
 type TabType = 'general' | 'payment' | 'shipping' | 'email' | 'notifications' | 'security';
 
-interface Settings {
-  storeName: string;
-  storeSlogan: string;
-  storeEmail: string;
-  storePhone: string;
-  storeAddress: string;
-  codEnabled: boolean;
-  codFee: number;
-  bankEnabled: boolean;
-  defaultShippingFee: number;
-  freeShippingFrom: number;
-  estimatedDelivery: string;
-  enableTracking: boolean;
-  smtpHost: string;
-  smtpPort: number;
-  smtpEmail: string;
-  emailOrderConfirm: boolean;
-  emailShipping: boolean;
-  emailDelivered: boolean;
-  notifyNewOrder: boolean;
-  notifyCancelOrder: boolean;
-  notifyLowStock: boolean;
-  notifyOutOfStock: boolean;
-  notifyNewReview: boolean;
-  notifyNewCustomer: boolean;
-  enable2FA: boolean;
-  loginNotification: boolean;
+interface FlashMessage {
+  type: 'success' | 'error' | 'info';
+  text: string;
 }
 
-const defaultSettings: Settings = {
-  storeName: 'KAITO KID Fashion',
-  storeSlogan: 'Thời trang hiện đại - Phong cách trẻ trung',
-  storeEmail: 'contact@kaitokid.com',
-  storePhone: '1900 1234',
-  storeAddress: '123 Đường ABC, Quận XYZ, TP. Hồ Chí Minh',
-  codEnabled: true,
-  codFee: 0,
-  bankEnabled: true,
-  defaultShippingFee: 30000,
-  freeShippingFrom: 500000,
-  estimatedDelivery: '2-3 ngày',
-  enableTracking: true,
-  smtpHost: 'smtp.gmail.com',
-  smtpPort: 587,
-  smtpEmail: 'noreply@kaitokid.com',
-  emailOrderConfirm: true,
-  emailShipping: true,
-  emailDelivered: true,
-  notifyNewOrder: true,
-  notifyCancelOrder: true,
-  notifyLowStock: true,
-  notifyOutOfStock: true,
-  notifyNewReview: true,
-  notifyNewCustomer: false,
-  enable2FA: false,
-  loginNotification: true,
+interface PasswordFormState {
+  currentPassword: string;
+  nextPassword: string;
+  confirmPassword: string;
+}
+
+const tabs: Array<{ id: TabType; icon: string; label: string; hint: string; eyebrow: string }> = [
+  { id: 'general', icon: 'fa-store', label: 'Thông tin cửa hàng', hint: 'Dữ liệu thương hiệu và liên hệ xuất hiện toàn hệ thống.', eyebrow: 'Brand core' },
+  { id: 'payment', icon: 'fa-credit-card', label: 'Thanh toán', hint: 'Điều khiển COD, chuyển khoản và trạng thái checkout.', eyebrow: 'Checkout finance' },
+  { id: 'shipping', icon: 'fa-truck', label: 'Vận chuyển', hint: 'Phí ship, freeship, ETA và quyền truy cập tracking.', eyebrow: 'Delivery policy' },
+  { id: 'email', icon: 'fa-envelope', label: 'Email', hint: 'SMTP, email tự động và lịch sử kiểm tra cấu hình.', eyebrow: 'Messaging hub' },
+  { id: 'notifications', icon: 'fa-bell', label: 'Thông báo', hint: 'Bật tắt các cảnh báo dashboard theo nghiệp vụ.', eyebrow: 'Ops alerts' },
+  { id: 'security', icon: 'fa-shield-alt', label: 'Bảo mật', hint: 'Mật khẩu admin, audit log và chính sách xác thực.', eyebrow: 'Access control' },
+];
+
+const emptyPasswordForm: PasswordFormState = {
+  currentPassword: '',
+  nextPassword: '',
+  confirmPassword: '',
 };
+
+function formatDateTime(value?: string) {
+  if (!value) {
+    return 'Chưa có dữ liệu';
+  }
+
+  try {
+    return new Intl.DateTimeFormat('vi-VN', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date(value));
+  } catch {
+    return formatDate(value);
+  }
+}
+
+function getEmailTypeLabel(type: EmailActivityRecord['type']) {
+  switch (type) {
+    case 'order-confirmation':
+      return 'Xác nhận đơn hàng';
+    case 'shipping-update':
+      return 'Thông báo đang giao';
+    case 'delivery-confirmation':
+      return 'Xác nhận đã giao';
+    default:
+      return 'Email test';
+  }
+}
+
+function getSecurityTypeLabel(type: SecurityActivityRecord['type']) {
+  return type === 'password-change' ? 'Đổi mật khẩu' : 'Đăng nhập admin';
+}
+
+function isValidEmail(value: string) {
+  return /\S+@\S+\.\S+/.test(value);
+}
+
+function getFlashIcon(type: FlashMessage['type']) {
+  if (type === 'success') {
+    return 'fa-check-circle';
+  }
+  if (type === 'error') {
+    return 'fa-exclamation-circle';
+  }
+  return 'fa-info-circle';
+}
 
 export default function AdminSettings() {
   const [activeTab, setActiveTab] = useState<TabType>('general');
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [msg, setMsg] = useState('');
+  const [settings, setSettings] = useState<AdminSettingsConfig>(() => readAdminSettings());
+  const [message, setMessage] = useState<FlashMessage | null>(null);
+  const [passwordForm, setPasswordForm] = useState<PasswordFormState>(emptyPasswordForm);
+  const [emailActivities, setEmailActivities] = useState<EmailActivityRecord[]>(() => readEmailActivities().slice(0, 6));
+  const [securityActivities, setSecurityActivities] = useState<SecurityActivityRecord[]>(() => readSecurityActivities().slice(0, 6));
 
-  useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('adminSettings') || '{}');
-    setSettings({ ...defaultSettings, ...saved });
-  }, []);
+  const enabledPaymentMethods = Number(settings.codEnabled) + Number(settings.bankEnabled);
+  const enabledNotificationCount =
+    Number(settings.notifyNewOrder) +
+    Number(settings.notifyCancelOrder) +
+    Number(settings.notifyLowStock) +
+    Number(settings.notifyOutOfStock) +
+    Number(settings.notifyNewReview) +
+    Number(settings.notifyNewCustomer);
 
-  const handleSave = (section: string) => {
-    localStorage.setItem('adminSettings', JSON.stringify(settings));
-    setMsg(`Đã lưu cài đặt ${section}!`);
-    setTimeout(() => setMsg(''), 3000);
+  const profileCompleteness = useMemo(() => {
+    const checks = [
+      settings.storeName.trim().length > 0,
+      settings.storeEmail.trim().length > 0,
+      settings.storePhone.trim().length > 0,
+      settings.storeAddress.trim().length > 0,
+      settings.smtpHost.trim().length > 0,
+      settings.testRecipient.trim().length > 0,
+      settings.estimatedDelivery.trim().length > 0,
+      settings.bankAccounts.some((bankAccount) => bankAccount.bankName && bankAccount.accountNumber && bankAccount.accountHolder),
+    ];
+
+    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  }, [settings]);
+
+  const summaryCards = useMemo(
+    () => [
+      {
+        icon: 'fa-credit-card',
+        label: 'Checkout',
+        value: `${enabledPaymentMethods}/2 phương thức`,
+        meta: enabledPaymentMethods > 0 ? 'Sẵn sàng nhận thanh toán' : 'Cần bật ít nhất một phương thức',
+        tone: enabledPaymentMethods > 0 ? 'positive' : 'warning',
+      },
+      {
+        icon: 'fa-truck',
+        label: 'Vận chuyển',
+        value: `${formatCurrency(settings.defaultShippingFee)} / ${formatCurrency(settings.freeShippingFrom)}`,
+        meta: settings.enableTracking ? 'Tracking đang bật' : 'Tracking đang tắt',
+        tone: settings.enableTracking ? 'info' : 'muted',
+      },
+      {
+        icon: 'fa-envelope',
+        label: 'Email',
+        value: settings.lastEmailTestAt ? formatDateTime(settings.lastEmailTestAt) : 'Chưa test',
+        meta: settings.lastEmailTestMessage || 'Chưa có bản ghi test SMTP',
+        tone: settings.lastEmailTestStatus === 'error' ? 'warning' : settings.lastEmailTestStatus === 'success' ? 'positive' : 'muted',
+      },
+      {
+        icon: 'fa-bell',
+        label: 'Cảnh báo',
+        value: `${enabledNotificationCount}/6 tín hiệu`,
+        meta: enabledNotificationCount >= 4 ? 'Dashboard hiển thị khá đầy đủ' : 'Một số cảnh báo đang tắt',
+        tone: enabledNotificationCount >= 4 ? 'positive' : 'info',
+      },
+    ],
+    [enabledNotificationCount, enabledPaymentMethods, settings],
+  );
+
+  const activeTabMeta = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+
+  const refreshMetaPanels = () => {
+    setEmailActivities(readEmailActivities().slice(0, 6));
+    setSecurityActivities(readSecurityActivities().slice(0, 6));
   };
 
-  const tabs = [
-    { id: 'general' as const, icon: 'fa-store', label: 'Thông tin cửa hàng' },
-    { id: 'payment' as const, icon: 'fa-credit-card', label: 'Thanh toán' },
-    { id: 'shipping' as const, icon: 'fa-truck', label: 'Vận chuyển' },
-    { id: 'email' as const, icon: 'fa-envelope', label: 'Email' },
-    { id: 'notifications' as const, icon: 'fa-bell', label: 'Thông báo' },
-    { id: 'security' as const, icon: 'fa-shield-alt', label: 'Bảo mật' },
-  ];
+  const showMessage = (type: FlashMessage['type'], text: string) => {
+    setMessage({ type, text });
+    window.setTimeout(() => setMessage(null), 3500);
+  };
 
-  return (
-    <div className="content-wrapper">
-      {msg && (
-        <div className="alert alert-success" style={{ marginBottom: 20 }}>
-          <i className="fa fa-check-circle"></i> {msg}
+  const persistSettings = (nextSettings: AdminSettingsConfig, successText: string) => {
+    const savedSettings = saveAdminSettings(nextSettings);
+    setSettings(savedSettings);
+    showMessage('success', successText);
+    return savedSettings;
+  };
+
+  const updateField = <Key extends keyof AdminSettingsConfig>(field: Key, value: AdminSettingsConfig[Key]) => {
+    setSettings((currentSettings) => ({ ...currentSettings, [field]: value }));
+  };
+
+  const updateBankAccount = (bankId: number, field: keyof BankAccountConfig, value: string | number) => {
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      bankAccounts: currentSettings.bankAccounts.map((bankAccount) =>
+        bankAccount.id === bankId ? { ...bankAccount, [field]: value } : bankAccount,
+      ),
+    }));
+  };
+
+  const addBankAccount = () => {
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      bankAccounts: [
+        ...currentSettings.bankAccounts,
+        {
+          id: Date.now(),
+          bankName: 'Vietcombank',
+          accountNumber: '',
+          accountHolder: currentSettings.storeName || defaultAdminSettings.storeName,
+          branch: '',
+        },
+      ],
+    }));
+  };
+
+  const removeBankAccount = (bankId: number) => {
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      bankAccounts:
+        currentSettings.bankAccounts.length > 1
+          ? currentSettings.bankAccounts.filter((bankAccount) => bankAccount.id !== bankId)
+          : currentSettings.bankAccounts,
+    }));
+  };
+
+  const handleSaveSection = (sectionLabel: string) => {
+    persistSettings(settings, `Đã lưu cài đặt ${sectionLabel}.`);
+  };
+
+  const handleTestEmail = () => {
+    const smtpReady =
+      settings.smtpHost &&
+      settings.smtpPort > 0 &&
+      isValidEmail(settings.smtpEmail) &&
+      isValidEmail(settings.testRecipient) &&
+      settings.smtpPassword.trim().length >= 6;
+
+    const now = new Date().toISOString();
+    const status = smtpReady ? 'success' : 'error';
+    const detail = smtpReady
+      ? `Đã ghi nhận cấu hình SMTP ${settings.smtpHost}:${settings.smtpPort} và tạo email test mô phỏng nội bộ.`
+      : 'Thiếu SMTP host, port, email gửi, email nhận test hoặc mật khẩu SMTP chưa hợp lệ.';
+
+    pushEmailActivity({
+      type: 'test',
+      recipient: settings.testRecipient || settings.smtpEmail,
+      subject: `Email test - ${settings.storeName}`,
+      status,
+      detail,
+      createdAt: now,
+    });
+
+    persistSettings(
+      {
+        ...settings,
+        lastEmailTestAt: now,
+        lastEmailTestStatus: status,
+        lastEmailTestMessage: detail,
+      },
+      status === 'success'
+        ? 'Đã chạy email test và lưu kết quả kiểm tra.'
+        : 'Đã ghi nhận lỗi cấu hình email. Kiểm tra lại SMTP để tiếp tục.',
+    );
+
+    refreshMetaPanels();
+  };
+
+  const handleChangePassword = () => {
+    const adminCredentials = JSON.parse(localStorage.getItem('adminCredentials') || '{}');
+
+    if (!passwordForm.currentPassword || !passwordForm.nextPassword || !passwordForm.confirmPassword) {
+      showMessage('error', 'Vui lòng nhập đầy đủ thông tin mật khẩu.');
+      return;
+    }
+
+    if (passwordForm.currentPassword !== adminCredentials.password) {
+      showMessage('error', 'Mật khẩu hiện tại không đúng.');
+      return;
+    }
+
+    if (passwordForm.nextPassword.length < 6) {
+      showMessage('error', 'Mật khẩu mới cần ít nhất 6 ký tự.');
+      return;
+    }
+
+    if (passwordForm.nextPassword !== passwordForm.confirmPassword) {
+      showMessage('error', 'Mật khẩu xác nhận không khớp.');
+      return;
+    }
+
+    localStorage.setItem(
+      'adminCredentials',
+      JSON.stringify({
+        ...adminCredentials,
+        password: passwordForm.nextPassword,
+      }),
+    );
+
+    pushSecurityActivity({
+      type: 'password-change',
+      title: 'Mật khẩu admin đã được cập nhật',
+      detail: 'Thay đổi được thực hiện trực tiếp từ trang Admin Settings.',
+    });
+
+    setPasswordForm(emptyPasswordForm);
+    refreshMetaPanels();
+    showMessage('success', 'Đã đổi mật khẩu admin thành công.');
+  };
+
+  const latestEmailEvent = emailActivities[0];
+  const latestSecurityEvent = securityActivities[0];
+
+  const renderActivityList = (
+    items: EmailActivityRecord[] | SecurityActivityRecord[],
+    emptyIcon: string,
+    emptyText: string,
+    variant: 'email' | 'security',
+  ) => (
+    <div className="settings-activity-stack">
+      {items.length > 0 ? (
+        items.map((activity) => (
+          <article key={activity.id} className="settings-activity-card">
+            <div
+              className={`settings-activity-badge ${
+                variant === 'email'
+                  ? `is-${(activity as EmailActivityRecord).status}`
+                  : 'is-neutral'
+              }`}
+            >
+              <AdminIcon
+                name={
+                  variant === 'email'
+                    ? (activity as EmailActivityRecord).status === 'success'
+                      ? 'fa-check-circle'
+                      : 'fa-exclamation-circle'
+                    : activity.type === 'password-change'
+                      ? 'fa-key'
+                      : 'fa-user-shield'
+                }
+              />
+            </div>
+            <div className="settings-activity-copy">
+              <strong>
+                {variant === 'email'
+                  ? getEmailTypeLabel((activity as EmailActivityRecord).type)
+                  : (activity as SecurityActivityRecord).title}
+              </strong>
+              <span>
+                {variant === 'email'
+                  ? (activity as EmailActivityRecord).subject
+                  : getSecurityTypeLabel((activity as SecurityActivityRecord).type)}
+              </span>
+              <small>
+                {variant === 'email'
+                  ? `${(activity as EmailActivityRecord).recipient} • ${formatDateTime(activity.createdAt)}`
+                  : formatDateTime(activity.createdAt)}
+              </small>
+              <p>{activity.detail}</p>
+            </div>
+          </article>
+        ))
+      ) : (
+        <div className="settings-empty-box">
+          <AdminIcon name={emptyIcon} />
+          <p>{emptyText}</p>
         </div>
       )}
+    </div>
+  );
 
-      {/* Settings Tabs */}
-      <div className="settings-tabs">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            <i className={`fa ${tab.icon}`}></i>
-            <span>{tab.label}</span>
-          </button>
-        ))}
-      </div>
+  return (
+    <div className="settings-admin-page settings-studio-page">
+      <div className="settings-studio-shell">
+        <aside className="settings-studio-rail">
+          <div className="settings-brand-block">
+            <span className="settings-overline">Settings atelier</span>
+            <h1>Admin Settings</h1>
+            <p>Trạm cấu hình trung tâm cho checkout, email, vận hành và bảo mật với một bố cục mới hoàn toàn.</p>
+          </div>
 
-      {/* Tab Contents */}
-      <div className="settings-content">
-        {/* General Settings */}
-        {activeTab === 'general' && (
-          <div className="settings-panel active">
-            <div className="settings-card">
-              <h3 className="settings-card-title">Thông tin cửa hàng</h3>
-
-              <div className="form-group">
-                <label>Tên cửa hàng</label>
-                <input
-                  type="text"
-                  value={settings.storeName}
-                  onChange={e => setSettings({ ...settings, storeName: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Slogan</label>
-                <input
-                  type="text"
-                  value={settings.storeSlogan}
-                  onChange={e => setSettings({ ...settings, storeSlogan: e.target.value })}
-                />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Email liên hệ</label>
-                  <input
-                    type="email"
-                    value={settings.storeEmail}
-                    onChange={e => setSettings({ ...settings, storeEmail: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Số điện thoại</label>
-                  <input
-                    type="tel"
-                    value={settings.storePhone}
-                    onChange={e => setSettings({ ...settings, storePhone: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Địa chỉ</label>
-                <textarea
-                  rows={3}
-                  value={settings.storeAddress}
-                  onChange={e => setSettings({ ...settings, storeAddress: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Logo cửa hàng</label>
-                <div className="logo-upload">
-                  <img src="/images/logokaitokid.png" alt="Logo" className="logo-preview" />
-                  <button type="button" className="btn-upload">
-                    <i className="fa fa-upload"></i> Tải logo lên
-                  </button>
-                </div>
-              </div>
-
-              <div className="form-actions">
-                <button className="btn-primary" onClick={() => handleSave('thông tin cửa hàng')}>
-                  <i className="fa fa-save"></i> Lưu thay đổi
-                </button>
-              </div>
+          <div className="settings-rail-progress">
+            <div>
+              <span className="settings-overline">Health score</span>
+              <strong>{profileCompleteness}%</strong>
+              <p>Mức sẵn sàng tổng quát của toàn bộ cấu hình.</p>
+            </div>
+            <div className="settings-rail-badges">
+              <span>{enabledPaymentMethods} payment live</span>
+              <span>{enabledNotificationCount} alerts on</span>
             </div>
           </div>
-        )}
 
-        {/* Payment Settings */}
-        {activeTab === 'payment' && (
-          <div className="settings-panel active">
-            <div className="settings-card">
-              <h3 className="settings-card-title">Phương thức thanh toán</h3>
+          <nav className="settings-rail-nav">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className={`settings-rail-tab ${activeTab === tab.id ? 'is-active' : ''}`}
+                onClick={() => setActiveTab(tab.id)}
+              >
+                <div className="settings-rail-tab-icon">
+                  <AdminIcon name={tab.icon} />
+                </div>
+                <div className="settings-rail-tab-copy">
+                  <span>{tab.eyebrow}</span>
+                  <strong>{tab.label}</strong>
+                  <small>{tab.hint}</small>
+                </div>
+              </button>
+            ))}
+          </nav>
 
-              {/* COD Payment */}
-              <div className="payment-method">
-                <div className="payment-method-header">
-                  <div className="payment-method-info">
-                    <i className="fa fa-money-bill-wave"></i>
-                    <div>
-                      <h4>Thanh toán khi nhận hàng (COD)</h4>
-                      <p>Khách hàng thanh toán tiền mặt khi nhận hàng</p>
-                    </div>
+          <div className="settings-rail-footer">
+            <Link to="/checkout" className="settings-hero-link">
+              <AdminIcon name="fa-shopping-bag" />
+              <span>Mở checkout</span>
+            </Link>
+            <Link to="/orders" className="settings-hero-link settings-hero-link-secondary">
+              <AdminIcon name="fa-box" />
+              <span>Xem tracking đơn</span>
+            </Link>
+          </div>
+        </aside>
+
+        <main className="settings-studio-stage">
+          <section className="settings-command-deck">
+            <div className="settings-command-copy">
+              <span className="settings-overline">{activeTabMeta.eyebrow}</span>
+              <h2>{activeTabMeta.label}</h2>
+              <p>{activeTabMeta.hint}</p>
+            </div>
+            <div className="settings-signal-grid">
+              {summaryCards.map((card) => (
+                <article key={card.label} className={`settings-signal-card is-${card.tone}`}>
+                  <div className="settings-signal-icon">
+                    <AdminIcon name={card.icon} />
                   </div>
-                  <label className="switch">
-                    <input
-                      type="checkbox"
-                      checked={settings.codEnabled}
-                      onChange={e => setSettings({ ...settings, codEnabled: e.target.checked })}
-                    />
-                    <span className="slider"></span>
-                  </label>
-                </div>
-                {settings.codEnabled && (
-                  <div className="payment-method-details">
-                    <div className="form-group">
-                      <label>Phí COD (%)</label>
-                      <input
-                        type="number"
-                        value={settings.codFee}
-                        onChange={e => setSettings({ ...settings, codFee: Number(e.target.value) })}
-                        min="0"
-                        max="100"
-                        step="0.5"
-                      />
-                      <span className="help-text">
-                        Phí thu thêm cho thanh toán COD (% trên tổng đơn hàng)
-                      </span>
-                    </div>
+                  <div className="settings-signal-copy">
+                    <span>{card.label}</span>
+                    <strong>{card.value}</strong>
+                    <small>{card.meta}</small>
                   </div>
-                )}
-              </div>
+                </article>
+              ))}
+            </div>
+          </section>
 
-              {/* Bank Transfer */}
-              <div className="payment-method">
-                <div className="payment-method-header">
-                  <div className="payment-method-info">
-                    <i className="fa fa-university"></i>
-                    <div>
-                      <h4>Chuyển khoản ngân hàng</h4>
-                      <p>Khách hàng chuyển khoản trước khi giao hàng</p>
-                    </div>
+          {message && (
+            <div className={`settings-flash is-${message.type}`}>
+              <AdminIcon name={getFlashIcon(message.type)} />
+              <span>{message.text}</span>
+            </div>
+          )}
+
+          <section className="settings-status-ribbon">
+            <div className="settings-status-pill">
+              <span>Email gần nhất</span>
+              <strong>{latestEmailEvent ? getEmailTypeLabel(latestEmailEvent.type) : 'Chưa có log'}</strong>
+            </div>
+            <div className="settings-status-pill">
+              <span>Bảo mật gần nhất</span>
+              <strong>{latestSecurityEvent ? latestSecurityEvent.title : 'Chưa có audit log'}</strong>
+            </div>
+            <div className="settings-status-pill">
+              <span>Cập nhật gần nhất</span>
+              <strong>{settings.updatedAt ? formatDateTime(settings.updatedAt) : 'Chưa lưu phiên này'}</strong>
+            </div>
+          </section>
+
+          {activeTab === 'general' && (
+            <div className="settings-workspace-grid">
+              <section className="settings-editor-panel">
+                <div className="settings-panel-head">
+                  <div>
+                    <span className="settings-overline">Brand dossier</span>
+                    <h3>Thông tin thương hiệu & liên hệ</h3>
                   </div>
-                  <label className="switch">
-                    <input
-                      type="checkbox"
-                      checked={settings.bankEnabled}
-                      onChange={e => setSettings({ ...settings, bankEnabled: e.target.checked })}
-                    />
-                    <span className="slider"></span>
-                  </label>
+                  <p>Phần này cấp dữ liệu cho checkout, hỗ trợ khách hàng và các thông điệp hệ thống.</p>
                 </div>
-                {settings.bankEnabled && (
-                  <div className="payment-method-details">
-                    <div className="bank-accounts-list">
-                      <div className="bank-account-item">
-                        <div className="form-group">
-                          <label>Tên ngân hàng</label>
-                          <select className="bank-name">
-                            <option value="Vietcombank">Vietcombank</option>
-                            <option value="VietinBank">VietinBank</option>
-                            <option value="BIDV">BIDV</option>
-                            <option value="Agribank">Agribank</option>
-                            <option value="Techcombank">Techcombank</option>
-                            <option value="MB Bank">MB Bank</option>
-                            <option value="ACB">ACB</option>
-                          </select>
-                        </div>
-                        <div className="form-row">
-                          <div className="form-group">
-                            <label>Số tài khoản</label>
-                            <input type="text" className="bank-account" defaultValue="1234567890" />
-                          </div>
-                          <div className="form-group">
-                            <label>Chủ tài khoản</label>
-                            <input type="text" className="bank-owner" defaultValue="Trần Ngọc Thanh" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="form-actions">
-                <button className="btn-primary" onClick={() => handleSave('thanh toán')}>
-                  <i className="fa fa-save"></i> Lưu thay đổi
-                </button>
-              </div>
+                <div className="settings-form-grid">
+                  <label className="settings-field settings-span-2"><span>Tên cửa hàng</span><input type="text" value={settings.storeName} onChange={(event) => updateField('storeName', event.target.value)} /></label>
+                  <label className="settings-field settings-span-2"><span>Slogan</span><input type="text" value={settings.storeSlogan} onChange={(event) => updateField('storeSlogan', event.target.value)} /></label>
+                  <label className="settings-field"><span>Email liên hệ</span><input type="email" value={settings.storeEmail} onChange={(event) => updateField('storeEmail', event.target.value)} /></label>
+                  <label className="settings-field"><span>Số điện thoại</span><input type="text" value={settings.storePhone} onChange={(event) => updateField('storePhone', event.target.value)} /></label>
+                  <label className="settings-field settings-span-2"><span>Địa chỉ cửa hàng</span><textarea rows={4} value={settings.storeAddress} onChange={(event) => updateField('storeAddress', event.target.value)} /></label>
+                </div>
+                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('thông tin cửa hàng')}><AdminIcon name="fa-save" /><span>Lưu thông tin</span></button></div>
+              </section>
+              <aside className="settings-insight-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Live impact</span><h3>Nơi dữ liệu đang được dùng</h3></div></div>
+                <div className="settings-note-list">
+                  <article className="settings-note-item"><div className="settings-note-icon"><AdminIcon name="fa-shopping-bag" /></div><div><strong>Checkout support box</strong><p>Hiển thị {settings.storeName || 'Tên cửa hàng'}, {settings.storePhone || 'Số điện thoại'} và {settings.storeEmail || 'Email liên hệ'}.</p></div></article>
+                  <article className="settings-note-item"><div className="settings-note-icon"><AdminIcon name="fa-envelope" /></div><div><strong>Subject email</strong><p>Tên cửa hàng được đưa vào email test và các bản ghi email tự động.</p></div></article>
+                  <article className="settings-note-item"><div className="settings-note-icon"><AdminIcon name="fa-clock" /></div><div><strong>Cập nhật gần nhất</strong><p>{settings.updatedAt ? formatDateTime(settings.updatedAt) : 'Bạn chưa lưu thay đổi nào trong phiên này.'}</p></div></article>
+                </div>
+              </aside>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Shipping Settings */}
-        {activeTab === 'shipping' && (
-          <div className="settings-panel active">
-            <div className="settings-card">
-              <h3 className="settings-card-title">Cài đặt vận chuyển</h3>
-
-              <div className="form-group">
-                <label>Phí vận chuyển mặc định</label>
-                <input
-                  type="number"
-                  value={settings.defaultShippingFee}
-                  onChange={e =>
-                    setSettings({ ...settings, defaultShippingFee: Number(e.target.value) })
-                  }
-                  min="0"
-                />
-                <span className="help-text">Phí ship áp dụng cho tất cả đơn hàng</span>
-              </div>
-
-              <div className="form-group">
-                <label>Miễn phí ship cho đơn từ</label>
-                <input
-                  type="number"
-                  value={settings.freeShippingFrom}
-                  onChange={e =>
-                    setSettings({ ...settings, freeShippingFrom: Number(e.target.value) })
-                  }
-                  min="0"
-                />
-                <span className="help-text">Đơn hàng từ giá trị này sẽ được freeship</span>
-              </div>
-
-              <div className="form-group">
-                <label>Thời gian giao hàng dự kiến</label>
-                <input
-                  type="text"
-                  value={settings.estimatedDelivery}
-                  onChange={e => setSettings({ ...settings, estimatedDelivery: e.target.value })}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={settings.enableTracking}
-                    onChange={e => setSettings({ ...settings, enableTracking: e.target.checked })}
-                  />
-                  <span>Cho phép khách hàng tra cứu đơn hàng</span>
-                </label>
-              </div>
-
-              <div className="form-actions">
-                <button className="btn-primary" onClick={() => handleSave('vận chuyển')}>
-                  <i className="fa fa-save"></i> Lưu thay đổi
-                </button>
-              </div>
+          {activeTab === 'payment' && (
+            <div className="settings-workspace-grid">
+              <section className="settings-editor-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Checkout finance</span><h3>Cấu hình phương thức thanh toán</h3></div><p>Checkout chỉ hiển thị những phương thức đang bật ở đây.</p></div>
+                <article className="settings-toggle-card">
+                  <div className="settings-toggle-head"><div><h4>COD</h4><p>Thanh toán khi nhận hàng, có thể cộng phụ phí theo phần trăm tổng đơn.</p></div><label className="settings-switch"><input type="checkbox" checked={settings.codEnabled} onChange={(event) => updateField('codEnabled', event.target.checked)} /><span className="settings-switch-track"></span></label></div>
+                  {settings.codEnabled && <label className="settings-field"><span>Phụ phí COD (%)</span><input type="number" min="0" max="100" step="0.5" value={settings.codFee} onChange={(event) => updateField('codFee', Number(event.target.value))} /><small>Phí này sẽ được cộng thêm khi khách chọn COD.</small></label>}
+                </article>
+                <article className="settings-toggle-card">
+                  <div className="settings-toggle-head"><div><h4>Chuyển khoản ngân hàng</h4><p>Khi bật, checkout sẽ hiển thị danh sách tài khoản bên dưới.</p></div><label className="settings-switch"><input type="checkbox" checked={settings.bankEnabled} onChange={(event) => updateField('bankEnabled', event.target.checked)} /><span className="settings-switch-track"></span></label></div>
+                  {settings.bankEnabled && <div className="settings-bank-stack">{settings.bankAccounts.map((bankAccount, index) => <article key={bankAccount.id} className="settings-bank-card"><div className="settings-bank-head"><div><span className="settings-overline">Bank slot {index + 1}</span><h5>Tài khoản nhận tiền</h5></div>{settings.bankAccounts.length > 1 && <button type="button" className="settings-ghost-danger" onClick={() => removeBankAccount(bankAccount.id)}><AdminIcon name="fa-trash" /><span>Xóa</span></button>}</div><div className="settings-form-grid"><label className="settings-field"><span>Tên ngân hàng</span><input type="text" value={bankAccount.bankName} onChange={(event) => updateBankAccount(bankAccount.id, 'bankName', event.target.value)} /></label><label className="settings-field"><span>Chi nhánh</span><input type="text" value={bankAccount.branch} onChange={(event) => updateBankAccount(bankAccount.id, 'branch', event.target.value)} /></label><label className="settings-field"><span>Số tài khoản</span><input type="text" value={bankAccount.accountNumber} onChange={(event) => updateBankAccount(bankAccount.id, 'accountNumber', event.target.value)} /></label><label className="settings-field"><span>Chủ tài khoản</span><input type="text" value={bankAccount.accountHolder} onChange={(event) => updateBankAccount(bankAccount.id, 'accountHolder', event.target.value)} /></label></div></article>)}
+                    <button type="button" className="settings-secondary-btn" onClick={addBankAccount}><AdminIcon name="fa-plus" /><span>Thêm tài khoản</span></button></div>}
+                </article>
+                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('thanh toán')}><AdminIcon name="fa-save" /><span>Lưu thanh toán</span></button></div>
+              </section>
+              <aside className="settings-insight-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Checkout preview</span><h3>Tình trạng hiển thị ở checkout</h3></div></div>
+                <div className="settings-preview-stack">
+                  <div className="settings-preview-row"><span>Phương thức đang mở</span><strong>{enabledPaymentMethods > 0 ? `${enabledPaymentMethods} phương thức` : 'Chưa có'}</strong></div>
+                  <div className="settings-preview-row"><span>Phụ phí COD</span><strong>{settings.codEnabled ? `${settings.codFee}%` : 'Đang tắt'}</strong></div>
+                  <div className="settings-preview-row"><span>Tài khoản ngân hàng</span><strong>{settings.bankEnabled ? `${settings.bankAccounts.length} tài khoản` : 'Đang tắt'}</strong></div>
+                </div>
+              </aside>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Email Settings */}
-        {activeTab === 'email' && (
-          <div className="settings-panel active">
-            <div className="settings-card">
-              <h3 className="settings-card-title">Cấu hình Email</h3>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>SMTP Host</label>
-                  <input
-                    type="text"
-                    value={settings.smtpHost}
-                    onChange={e => setSettings({ ...settings, smtpHost: e.target.value })}
-                  />
+          {activeTab === 'shipping' && (
+            <div className="settings-workspace-grid">
+              <section className="settings-editor-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Delivery policy</span><h3>Thiết lập vận chuyển & tracking</h3></div><p>Những con số này ảnh hưởng trực tiếp tới phí ship và thông báo freeship.</p></div>
+                <div className="settings-form-grid">
+                  <label className="settings-field"><span>Phí vận chuyển mặc định</span><input type="number" min="0" value={settings.defaultShippingFee} onChange={(event) => updateField('defaultShippingFee', Number(event.target.value))} /><small>Áp dụng cho đơn chưa đạt freeship.</small></label>
+                  <label className="settings-field"><span>Ngưỡng freeship</span><input type="number" min="0" value={settings.freeShippingFrom} onChange={(event) => updateField('freeShippingFrom', Number(event.target.value))} /><small>Checkout dùng đúng mốc này để hiển thị ưu đãi.</small></label>
+                  <label className="settings-field settings-span-2"><span>Thời gian giao dự kiến</span><input type="text" value={settings.estimatedDelivery} onChange={(event) => updateField('estimatedDelivery', event.target.value)} /></label>
                 </div>
-                <div className="form-group">
-                  <label>SMTP Port</label>
-                  <input
-                    type="number"
-                    value={settings.smtpPort}
-                    onChange={e => setSettings({ ...settings, smtpPort: Number(e.target.value) })}
-                  />
+                <article className="settings-toggle-card"><div className="settings-toggle-head"><div><h4>Bật trang theo dõi đơn</h4><p>Cho phép khách chủ động kiểm tra trạng thái giao hàng.</p></div><label className="settings-switch"><input type="checkbox" checked={settings.enableTracking} onChange={(event) => updateField('enableTracking', event.target.checked)} /><span className="settings-switch-track"></span></label></div></article>
+                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('vận chuyển')}><AdminIcon name="fa-save" /><span>Lưu vận chuyển</span></button></div>
+              </section>
+              <aside className="settings-insight-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Policy board</span><h3>Ảnh hưởng ở frontend</h3></div></div>
+                <div className="settings-preview-stack">
+                  <div className="settings-preview-row"><span>Phí ship hiện tại</span><strong>{formatCurrency(settings.defaultShippingFee)}</strong></div>
+                  <div className="settings-preview-row"><span>Ngưỡng freeship</span><strong>{formatCurrency(settings.freeShippingFrom)}</strong></div>
+                  <div className="settings-preview-row"><span>Tracking</span><strong>{settings.enableTracking ? 'Đang mở' : 'Đang khóa'}</strong></div>
+                  <div className="settings-preview-row"><span>ETA hiển thị</span><strong>{settings.estimatedDelivery || 'Chưa cài đặt'}</strong></div>
                 </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Email gửi</label>
-                  <input
-                    type="email"
-                    value={settings.smtpEmail}
-                    onChange={e => setSettings({ ...settings, smtpEmail: e.target.value })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Mật khẩu</label>
-                  <input type="password" defaultValue="********" />
-                </div>
-              </div>
-
-              <div className="email-templates">
-                <h4>Mẫu email tự động</h4>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.emailOrderConfirm}
-                      onChange={e =>
-                        setSettings({ ...settings, emailOrderConfirm: e.target.checked })
-                      }
-                    />
-                    <span>Gửi email xác nhận đơn hàng</span>
-                  </label>
-                </div>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.emailShipping}
-                      onChange={e => setSettings({ ...settings, emailShipping: e.target.checked })}
-                    />
-                    <span>Gửi email thông báo giao hàng</span>
-                  </label>
-                </div>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.emailDelivered}
-                      onChange={e => setSettings({ ...settings, emailDelivered: e.target.checked })}
-                    />
-                    <span>Gửi email xác nhận đã giao</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="form-actions">
-                <button className="btn-secondary">
-                  <i className="fa fa-paper-plane"></i> Gửi email test
-                </button>
-                <button className="btn-primary" onClick={() => handleSave('email')}>
-                  <i className="fa fa-save"></i> Lưu thay đổi
-                </button>
-              </div>
+              </aside>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Notifications Settings */}
-        {activeTab === 'notifications' && (
-          <div className="settings-panel active">
-            <div className="settings-card">
-              <h3 className="settings-card-title">Cài đặt thông báo</h3>
-
-              <div className="notification-group">
-                <h4>Thông báo đơn hàng</h4>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifyNewOrder}
-                      onChange={e => setSettings({ ...settings, notifyNewOrder: e.target.checked })}
-                    />
-                    <span>Đơn hàng mới</span>
-                  </label>
+          {activeTab === 'email' && (
+            <div className="settings-workspace-grid">
+              <section className="settings-editor-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Messaging hub</span><h3>SMTP & email tự động</h3></div><p>Hệ thống sẽ kiểm tra dữ liệu SMTP, lưu kết quả test và ghi lại lịch sử email.</p></div>
+                <div className="settings-form-grid">
+                  <label className="settings-field"><span>SMTP Host</span><input type="text" value={settings.smtpHost} onChange={(event) => updateField('smtpHost', event.target.value)} /></label>
+                  <label className="settings-field"><span>SMTP Port</span><input type="number" value={settings.smtpPort} onChange={(event) => updateField('smtpPort', Number(event.target.value))} /></label>
+                  <label className="settings-field"><span>Email gửi</span><input type="email" value={settings.smtpEmail} onChange={(event) => updateField('smtpEmail', event.target.value)} /></label>
+                  <label className="settings-field"><span>Mật khẩu SMTP</span><input type="password" value={settings.smtpPassword} onChange={(event) => updateField('smtpPassword', event.target.value)} /></label>
+                  <label className="settings-field settings-span-2"><span>Email nhận test</span><input type="email" value={settings.testRecipient} onChange={(event) => updateField('testRecipient', event.target.value)} /></label>
                 </div>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifyCancelOrder}
-                      onChange={e =>
-                        setSettings({ ...settings, notifyCancelOrder: e.target.checked })
-                      }
-                    />
-                    <span>Đơn hàng bị hủy</span>
-                  </label>
+                <div className="settings-check-grid">
+                  <label className="settings-check-tile"><div className="settings-check-meta"><strong>Gửi xác nhận đơn mới</strong><p>Kích hoạt ngay sau khi checkout tạo đơn thành công.</p></div><input type="checkbox" checked={settings.emailOrderConfirm} onChange={(event) => updateField('emailOrderConfirm', event.target.checked)} /></label>
+                  <label className="settings-check-tile"><div className="settings-check-meta"><strong>Gửi thông báo đang giao</strong><p>Phù hợp khi đội vận hành cập nhật trạng thái giao hàng.</p></div><input type="checkbox" checked={settings.emailShipping} onChange={(event) => updateField('emailShipping', event.target.checked)} /></label>
+                  <label className="settings-check-tile"><div className="settings-check-meta"><strong>Gửi xác nhận đã giao</strong><p>Khép vòng trải nghiệm sau khi khách nhận hàng.</p></div><input type="checkbox" checked={settings.emailDelivered} onChange={(event) => updateField('emailDelivered', event.target.checked)} /></label>
                 </div>
-              </div>
-
-              <div className="notification-group">
-                <h4>Thông báo sản phẩm</h4>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifyLowStock}
-                      onChange={e => setSettings({ ...settings, notifyLowStock: e.target.checked })}
-                    />
-                    <span>Sản phẩm sắp hết hàng</span>
-                  </label>
-                </div>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifyOutOfStock}
-                      onChange={e =>
-                        setSettings({ ...settings, notifyOutOfStock: e.target.checked })
-                      }
-                    />
-                    <span>Sản phẩm hết hàng</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="notification-group">
-                <h4>Thông báo khác</h4>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifyNewReview}
-                      onChange={e =>
-                        setSettings({ ...settings, notifyNewReview: e.target.checked })
-                      }
-                    />
-                    <span>Đánh giá mới</span>
-                  </label>
-                </div>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.notifyNewCustomer}
-                      onChange={e =>
-                        setSettings({ ...settings, notifyNewCustomer: e.target.checked })
-                      }
-                    />
-                    <span>Khách hàng mới đăng ký</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="form-actions">
-                <button className="btn-primary" onClick={() => handleSave('thông báo')}>
-                  <i className="fa fa-save"></i> Lưu thay đổi
-                </button>
-              </div>
+                <div className="settings-form-actions"><button type="button" className="settings-secondary-btn" onClick={handleTestEmail}><AdminIcon name="fa-paper-plane" /><span>Chạy email test</span></button><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('email')}><AdminIcon name="fa-save" /><span>Lưu email</span></button></div>
+              </section>
+              <aside className="settings-insight-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Mail timeline</span><h3>Lịch sử gửi & kiểm tra email</h3></div></div>
+                {renderActivityList(emailActivities, 'fa-inbox', 'Chưa có log email nào được ghi nhận.', 'email')}
+              </aside>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Security Settings */}
-        {activeTab === 'security' && (
-          <div className="settings-panel active">
-            <div className="settings-card">
-              <h3 className="settings-card-title">Bảo mật</h3>
-
-              <div className="form-group">
-                <label>Đổi mật khẩu</label>
-                <input type="password" placeholder="Mật khẩu hiện tại" />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Mật khẩu mới</label>
-                  <input type="password" placeholder="Mật khẩu mới" />
+          {activeTab === 'notifications' && (
+            <div className="settings-workspace-grid">
+              <section className="settings-editor-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Ops alerts</span><h3>Điều phối tín hiệu dashboard</h3></div><p>Mỗi toggle quyết định card cảnh báo nào được hiển thị trên dashboard quản trị.</p></div>
+                <div className="settings-switch-stack">
+                  <label className="settings-switch-card"><div><strong>Đơn chờ xác nhận</strong><p>Hiển thị cảnh báo khi có đơn mới cần xử lý.</p></div><input type="checkbox" checked={settings.notifyNewOrder} onChange={(event) => updateField('notifyNewOrder', event.target.checked)} /></label>
+                  <label className="settings-switch-card"><div><strong>Đơn bị hủy</strong><p>Giúp đội vận hành bắt được các đơn có vấn đề hoặc hoàn hủy.</p></div><input type="checkbox" checked={settings.notifyCancelOrder} onChange={(event) => updateField('notifyCancelOrder', event.target.checked)} /></label>
+                  <label className="settings-switch-card"><div><strong>Cảnh báo sắp hết hàng</strong><p>Phù hợp để chủ động kế hoạch nhập kho.</p></div><input type="checkbox" checked={settings.notifyLowStock} onChange={(event) => updateField('notifyLowStock', event.target.checked)} /></label>
+                  <label className="settings-switch-card"><div><strong>Cảnh báo hết hàng</strong><p>Tín hiệu khẩn hơn cho tồn kho đang chạm đáy.</p></div><input type="checkbox" checked={settings.notifyOutOfStock} onChange={(event) => updateField('notifyOutOfStock', event.target.checked)} /></label>
+                  <label className="settings-switch-card"><div><strong>Đánh giá mới</strong><p>Phù hợp với đội nội dung hoặc CSKH theo dõi phản hồi.</p></div><input type="checkbox" checked={settings.notifyNewReview} onChange={(event) => updateField('notifyNewReview', event.target.checked)} /></label>
+                  <label className="settings-switch-card"><div><strong>Khách hàng mới</strong><p>Phản ánh trực tiếp tốc độ tăng trưởng tệp khách.</p></div><input type="checkbox" checked={settings.notifyNewCustomer} onChange={(event) => updateField('notifyNewCustomer', event.target.checked)} /></label>
                 </div>
-                <div className="form-group">
-                  <label>Xác nhận mật khẩu</label>
-                  <input type="password" placeholder="Nhập lại mật khẩu" />
+                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('thông báo')}><AdminIcon name="fa-save" /><span>Lưu thông báo</span></button></div>
+              </section>
+              <aside className="settings-insight-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Signal density</span><h3>Tổng quan độ dày cảnh báo</h3></div></div>
+                <div className="settings-preview-stack">
+                  <div className="settings-preview-row"><span>Tổng tín hiệu đang bật</span><strong>{enabledNotificationCount}/6</strong></div>
+                  <div className="settings-preview-row"><span>Đơn hàng</span><strong>{settings.notifyNewOrder || settings.notifyCancelOrder ? 'Đang theo dõi' : 'Đang tắt'}</strong></div>
+                  <div className="settings-preview-row"><span>Tồn kho</span><strong>{settings.notifyLowStock || settings.notifyOutOfStock ? 'Đang theo dõi' : 'Đang tắt'}</strong></div>
+                  <div className="settings-preview-row"><span>Khách hàng</span><strong>{settings.notifyNewCustomer ? 'Đang theo dõi' : 'Đang tắt'}</strong></div>
                 </div>
-              </div>
-
-              <div className="form-group">
-                <button className="btn-primary">
-                  <i className="fa fa-key"></i> Đổi mật khẩu
-                </button>
-              </div>
-
-              <hr style={{ margin: '32px 0', border: 'none', borderTop: '1px solid #e5e7eb' }} />
-
-              <div className="security-options">
-                <h4>Tùy chọn bảo mật</h4>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.enable2FA}
-                      onChange={e => setSettings({ ...settings, enable2FA: e.target.checked })}
-                    />
-                    <span>Bật xác thực 2 bước (2FA)</span>
-                  </label>
-                </div>
-                <div className="form-group">
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={settings.loginNotification}
-                      onChange={e =>
-                        setSettings({ ...settings, loginNotification: e.target.checked })
-                      }
-                    />
-                    <span>Thông báo khi đăng nhập từ thiết bị mới</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="form-actions">
-                <button className="btn-primary" onClick={() => handleSave('bảo mật')}>
-                  <i className="fa fa-save"></i> Lưu thay đổi
-                </button>
-              </div>
+              </aside>
             </div>
-          </div>
-        )}
+          )}
+
+          {activeTab === 'security' && (
+            <div className="settings-workspace-grid">
+              <section className="settings-editor-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Access control</span><h3>Bảo mật tài khoản quản trị</h3></div><p>Đổi mật khẩu thật, lưu vết hành động và chuẩn bị chính sách cho lớp 2FA.</p></div>
+                <div className="settings-form-grid">
+                  <label className="settings-field settings-span-2"><span>Mật khẩu hiện tại</span><input type="password" value={passwordForm.currentPassword} onChange={(event) => setPasswordForm((currentForm) => ({ ...currentForm, currentPassword: event.target.value }))} /></label>
+                  <label className="settings-field"><span>Mật khẩu mới</span><input type="password" value={passwordForm.nextPassword} onChange={(event) => setPasswordForm((currentForm) => ({ ...currentForm, nextPassword: event.target.value }))} /></label>
+                  <label className="settings-field"><span>Xác nhận mật khẩu</span><input type="password" value={passwordForm.confirmPassword} onChange={(event) => setPasswordForm((currentForm) => ({ ...currentForm, confirmPassword: event.target.value }))} /></label>
+                </div>
+                <div className="settings-switch-stack">
+                  <label className="settings-switch-card"><div><strong>Ghi nhận chính sách 2FA</strong><p>Đánh dấu hệ thống sẵn sàng cho lớp xác thực nâng cao.</p></div><input type="checkbox" checked={settings.enable2FA} onChange={(event) => updateField('enable2FA', event.target.checked)} /></label>
+                  <label className="settings-switch-card"><div><strong>Lưu log đăng nhập admin</strong><p>Giữ lại audit timeline mỗi khi admin đăng nhập hoặc đổi mật khẩu.</p></div><input type="checkbox" checked={settings.loginNotification} onChange={(event) => updateField('loginNotification', event.target.checked)} /></label>
+                </div>
+                <div className="settings-form-actions"><button type="button" className="settings-secondary-btn" onClick={handleChangePassword}><AdminIcon name="fa-key" /><span>Đổi mật khẩu</span></button><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('bảo mật')}><AdminIcon name="fa-save" /><span>Lưu bảo mật</span></button></div>
+              </section>
+              <aside className="settings-insight-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Audit trail</span><h3>Lịch sử truy cập & thay đổi</h3></div></div>
+                {renderActivityList(securityActivities, 'fa-shield-alt', 'Chưa có dữ liệu bảo mật nào được ghi nhận.', 'security')}
+              </aside>
+            </div>
+          )}
+        </main>
       </div>
     </div>
   );

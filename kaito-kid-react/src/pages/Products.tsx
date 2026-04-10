@@ -1,26 +1,37 @@
-// Trang danh sach san pham - thay the 7 file HTML cu
+// Trang danh sách sản phẩm - thay the 7 file HTML cu
 
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { productService } from '../services/productService';
 import type { Product } from '../types';
 import ProductCard from '../components/product/ProductCard';
+import { matchesProductListingCategory, matchesTaxonomyValue, toCanonicalGender } from '../utils/productTaxonomy';
 
 export default function Products() {
   const [searchParams] = useSearchParams();
   const [filtered, setFiltered] = useState<Product[]>([]);
 
   const gender = searchParams.get('gender');
+  const category = searchParams.get('category');
+  const style = searchParams.get('style');
+  const age = searchParams.get('age');
+  const collection = searchParams.get('collection');
   const filter = searchParams.get('filter');
+  const canonicalGender = toCanonicalGender(gender);
 
   const getTitle = () => {
-    if (gender === 'Nu') return 'Thoi trang nu';
-    if (gender === 'Nam') return 'Thoi trang nam';
-    if (gender === 'Tre em') return 'Thoi trang tre em';
-    if (filter === 'bestseller') return 'San pham ban chay';
-    if (filter === 'sale') return 'San pham dang giam gia';
-    if (filter === 'new') return 'San pham moi';
-    return 'Tat ca san pham';
+    if (collection) return collection.replace(/-/g, ' ');
+    if (category) return category;
+    if (style) return style;
+    if (age) return `Độ tuổi ${age}`;
+    if (canonicalGender === 'Nu') return 'Thoi trang nu';
+    if (canonicalGender === 'Nam') return 'Thoi trang nam';
+    if (canonicalGender === 'Tre em') return 'Thoi trang tre em';
+    if (canonicalGender === 'Unisex') return 'Thoi trang unisex';
+    if (filter === 'bestseller') return 'Sản phẩm bán chạy';
+    if (filter === 'sale') return 'Sản phẩm đang giảm giá';
+    if (filter === 'new') return 'Sản phẩm mới';
+    return 'Tất cả sản phẩm';
   };
 
   const isSalePage = filter === 'sale';
@@ -38,14 +49,31 @@ export default function Products() {
     } else {
       result = productService.getActive();
     }
+
+    if (category) {
+      result = result.filter((product) => matchesProductListingCategory(product, category));
+    }
+
+    if (style) {
+      result = result.filter((product) => matchesTaxonomyValue(product.style, style));
+    }
+
+    if (age) {
+      result = result.filter((product) => matchesTaxonomyValue(product.ageGroup, age));
+    }
+
+    if (collection) {
+      result = result.filter((product) => (product.collection || '').trim() === collection);
+    }
+
     setFiltered(result);
-  }, [gender, filter]);
+  }, [age, category, collection, gender, filter, style]);
 
   return (
     <>
       <div className={`page-banner ${isSalePage ? 'sale-banner' : ''}`}>
         <h1>{getTitle()}</h1>
-        <p>{filtered.length} san pham</p>
+        <p>{filtered.length} sản phẩm</p>
       </div>
       <div className="allsanpham">
         <div className="product-area full-width">
@@ -57,7 +85,7 @@ export default function Products() {
             </div>
           ) : (
             <div className="no-products">
-              <p>Chua co san pham nao</p>
+              <p>Chưa có sản phẩm nào</p>
             </div>
           )}
         </div>

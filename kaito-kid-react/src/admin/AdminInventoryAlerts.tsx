@@ -1,285 +1,417 @@
-// Cảnh báo Hết hàng - match admin structure
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { productService } from '../services/productService';
+import {
+  INVENTORY_UPDATED_EVENT,
+  inventoryService,
+  type InventoryAlertProduct,
+  type InventoryAlertSettings,
+} from '../services/inventoryService';
+import AdminIcon from '../components/admin/AdminIcon';
 
-import { useState, useEffect } from 'react';
+interface ToastState {
+  type: 'success' | 'error';
+  message: string;
+}
 
-interface AlertProduct {
-  id: number;
-  name: string;
-  sku: string;
-  image: string;
-  stock: number;
-  minStock: number;
-  alertLevel: 'critical' | 'warning' | 'low';
+function formatDateTime(value?: string): string {
+  if (!value) return 'Chưa cập nhật';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Chưa cập nhật';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function getSectionTitle(level: InventoryAlertProduct['alertLevel'], settings: InventoryAlertSettings) {
+  switch (level) {
+    case 'critical':
+      return 'Hết hàng - cần nhập ngay';
+    case 'warning':
+      return `Sắp hết hàng (≤ ${settings.criticalThreshold})`;
+    case 'low':
+      return `Tồn kho thấp (≤ ${settings.watchThreshold})`;
+    default:
+      return '';
+  }
 }
 
 export default function AdminInventoryAlerts() {
-  const [products, setProducts] = useState<AlertProduct[]>([]);
+  const [products, setProducts] = useState<InventoryAlertProduct[]>([]);
+  const [search, setSearch] = useState('');
   const [showSettings, setShowSettings] = useState(false);
-  const [warningThreshold, setWarningThreshold] = useState(10);
-  const [lowThreshold, setLowThreshold] = useState(20);
+  const [showRestockModal, setShowRestockModal] = useState(false);
+  const [activeProduct, setActiveProduct] = useState<InventoryAlertProduct | null>(null);
+  const [restockQuantity, setRestockQuantity] = useState(10);
+  const [restockNote, setRestockNote] = useState('');
+  const [settings, setSettings] = useState<InventoryAlertSettings>(inventoryService.getAlertSettings());
+  const [toast, setToast] = useState<ToastState | null>(null);
 
-  useEffect(() => {
-    // Load products from localStorage and filter by stock levels
-    const allProducts = JSON.parse(localStorage.getItem('products') || '[]');
-    const alertProducts: AlertProduct[] = allProducts
-      .filter((p: any) => p.stock <= 20)
-      .map((p: any) => ({
-        id: p.id,
-        name: p.name,
-        sku: p.sku || `SKU${p.id}`,
-        image: p.image,
-        stock: p.stock,
-        minStock: 10,
-        alertLevel: p.stock === 0 ? 'critical' : p.stock <= 10 ? 'warning' : 'low'
-      }));
-    setProducts(alertProducts);
-  }, []);
-
-  const criticalProducts = products.filter(p => p.alertLevel === 'critical');
-  const warningProducts = products.filter(p => p.alertLevel === 'warning');
-  const lowProducts = products.filter(p => p.alertLevel === 'low');
-
-  const handleSaveSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    localStorage.setItem('alertSettings', JSON.stringify({ warningThreshold, lowThreshold }));
-    setShowSettings(false);
-    alert('Đã lưu cài đặt cảnh báo');
+  const loadAlerts = () => {
+    const latestSettings = inventoryService.getAlertSettings();
+    setSettings(latestSettings);
+    setProducts(inventoryService.getAlertProducts(productService.getAll(), latestSettings));
   };
 
+  useEffect(() => {
+    loadAlerts();
+
+    const handleInventoryUpdated = () => loadAlerts();
+    window.addEventListener(INVENTORY_UPDATED_EVENT, handleInventoryUpdated);
+
+    return () => {
+      window.removeEventListener(INVENTORY_UPDATED_EVENT, handleInventoryUpdated);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+
+    const timeoutId = window.setTimeout(() => setToast(null), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [toast]);
+
+  const filteredProducts = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return products;
+
+    return products.filter((product) =>
+      [product.name, product.sku]
+        .filter(Boolean)
+        .some((field) => field.toLowerCase().includes(keyword)),
+    );
+  }, [products, search]);
+
+  const stockProfiles = useMemo(
+    () =>
+      new Map(
+        filteredProducts.map((product) => [product.id, inventoryService.getStockControlProfile(product)]),
+      ),
+    [filteredProducts],
+  );
+
+  const criticalProducts = filteredProducts.filter((product) => product.alertLevel === 'critical');
+  const warningProducts = filteredProducts.filter((product) => product.alertLevel === 'warning');
+  const lowProducts = filteredProducts.filter((product) => product.alertLevel === 'low');
+
+  const openRestockModal = (product: InventoryAlertProduct) => {
+    const stockProfile = inventoryService.getStockControlProfile(product);
+
+    if (!stockProfile.canManageDirectly) {
+      setToast({
+        type: 'error',
+        message: stockProfile.note,
+      });
+      return;
+    }
+
+    setActiveProduct(product);
+    setRestockQuantity(product.suggestedRestock);
+    setRestockNote(`Phiếu nhập từ trang cảnh báo cho ${product.name}`);
+    setShowRestockModal(true);
+  };
+
+  const closeRestockModal = () => {
+    setActiveProduct(null);
+    setRestockQuantity(10);
+    setRestockNote('');
+    setShowRestockModal(false);
+  };
+
+  const handleRestockSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!activeProduct || restockQuantity <= 0) {
+      setToast({
+        type: 'error',
+        message: 'Số lượng nhập phải lớn hơn 0.',
+      });
+      return;
+    }
+
+    const stockProfile = inventoryService.getStockControlProfile(activeProduct);
+    if (!stockProfile.canManageDirectly) {
+      setToast({
+        type: 'error',
+        message: stockProfile.note,
+      });
+      return;
+    }
+
+    const result = inventoryService.restockProduct(
+      activeProduct.id,
+      restockQuantity,
+      restockNote.trim() || `Phiếu nhập từ trang cảnh báo cho ${activeProduct.name}`,
+    );
+
+    if (!result) {
+      setToast({
+        type: 'error',
+        message: stockProfile.note,
+      });
+      return;
+    }
+
+    setToast({
+      type: 'success',
+      message: `Đã ghi nhận nhập ${result.quantity} sản phẩm cho ${activeProduct.name}.`,
+    });
+    closeRestockModal();
+  };
+
+  const handleSaveSettings = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = inventoryService.saveAlertSettings(settings);
+    setSettings(normalized);
+    setToast({
+      type: 'success',
+      message: 'Đã lưu ngưỡng cảnh báo tồn kho.',
+    });
+    setShowSettings(false);
+  };
+
+  const sections = [
+    { level: 'critical' as const, icon: 'fa-times-circle', products: criticalProducts, cardClass: 'critical' },
+    { level: 'warning' as const, icon: 'fa-exclamation-triangle', products: warningProducts, cardClass: 'warning' },
+    { level: 'low' as const, icon: 'fa-info-circle', products: lowProducts, cardClass: 'info' },
+  ];
+
   return (
-    <>
-      {/* Page Header */}
+    <div className="inventory-shell">
       <div className="page-header">
-        <h1>Cảnh báo Hết hàng</h1>
+        <h1>Cảnh báo tồn kho</h1>
         <div className="page-actions">
-          <button className="btn btn-secondary" onClick={() => window.history.back()}>
-            <i className="fa fa-arrow-left"></i> Quay lại
-          </button>
+          <Link to="/admin/inventory" className="btn btn-outline">
+            <AdminIcon name="fa fa-warehouse" /> Quay lại tồn kho
+          </Link>
+          <Link to="/admin/inventory/history" className="btn btn-secondary">
+            <AdminIcon name="fa fa-history" /> Xem lịch sử
+          </Link>
           <button className="btn btn-primary" onClick={() => setShowSettings(true)}>
-            <i className="fa fa-cog"></i> Cài đặt cảnh báo
+            <AdminIcon name="fa fa-cog" /> Cài đặt ngưỡng
           </button>
         </div>
       </div>
 
-      {/* Alert Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, marginBottom: 24 }}>
-        <div className="card" style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', color: 'white' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ fontSize: 48 }}><i className="fa fa-times-circle"></i></div>
-            <div>
-              <h3 style={{ fontSize: 32, margin: 0 }}>{criticalProducts.length}</h3>
-              <p style={{ margin: 0, opacity: 0.9 }}>Hết hàng</p>
-            </div>
-          </div>
-        </div>
-        <div className="card" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: 'white' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ fontSize: 48 }}><i className="fa fa-exclamation-triangle"></i></div>
-            <div>
-              <h3 style={{ fontSize: 32, margin: 0 }}>{warningProducts.length}</h3>
-              <p style={{ margin: 0, opacity: 0.9 }}>Sắp hết</p>
-            </div>
-          </div>
-        </div>
-        <div className="card" style={{ background: 'linear-gradient(135deg, #3b82f6, #2563eb)', color: 'white' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <div style={{ fontSize: 48 }}><i className="fa fa-info-circle"></i></div>
-            <div>
-              <h3 style={{ fontSize: 32, margin: 0 }}>{lowProducts.length}</h3>
-              <p style={{ margin: 0, opacity: 0.9 }}>Tồn kho thấp</p>
-            </div>
+      <div className="card inventory-alert-toolbar">
+        <div className="filters-bar inventory-toolbar">
+          <input
+            className="search-input inventory-search-input"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Tìm theo tên sản phẩm hoặc SKU..."
+          />
+          <div className="inventory-threshold-summary">
+            <span className="alert-threshold-chip warning">Sắp hết ≤ {settings.criticalThreshold}</span>
+            <span className="alert-threshold-chip info">Tồn thấp ≤ {settings.watchThreshold}</span>
           </div>
         </div>
       </div>
 
-      {/* Critical Alerts */}
-      {criticalProducts.length > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(239, 68, 68, 0.1)' }}>
-            <h3 style={{ margin: 0, color: '#ef4444' }}>
-              <i className="fa fa-times-circle"></i> Hết hàng (Cần nhập ngay)
-            </h3>
+      <div className="alert-summary">
+        <div className="alert-summary-card critical">
+          <div className="alert-summary-icon">
+            <AdminIcon name="fa fa-times-circle" />
           </div>
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Sản phẩm</th>
-                  <th>SKU</th>
-                  <th>Tồn kho</th>
-                  <th>Trạng thái</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {criticalProducts.map(p => (
-                  <tr key={p.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <img src={p.image} alt={p.name} style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 8 }} />
-                        <span className="product-name-cell">{p.name}</span>
+          <div className="alert-summary-content">
+            <h3>{criticalProducts.length}</h3>
+            <p>Hết hàng</p>
+          </div>
+        </div>
+        <div className="alert-summary-card warning">
+          <div className="alert-summary-icon">
+            <AdminIcon name="fa fa-exclamation-triangle" />
+          </div>
+          <div className="alert-summary-content">
+            <h3>{warningProducts.length}</h3>
+            <p>Sắp hết</p>
+          </div>
+        </div>
+        <div className="alert-summary-card info">
+          <div className="alert-summary-icon">
+            <AdminIcon name="fa fa-info-circle" />
+          </div>
+          <div className="alert-summary-content">
+            <h3>{lowProducts.length}</h3>
+            <p>Tồn kho thấp</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="alerts-container">
+        {sections.map((section) => {
+          if (section.products.length === 0) return null;
+
+          return (
+            <div key={section.level} className="alert-section">
+              <div className={`alert-section-header ${section.cardClass}`}>
+                <AdminIcon name={section.icon} />
+                <h3>{getSectionTitle(section.level, settings)}</h3>
+              </div>
+              <div className="alert-items">
+                {section.products.map((product) => {
+                  const stockProfile = stockProfiles.get(product.id) || inventoryService.getStockControlProfile(product);
+
+                  return (
+                    <div key={product.id} className="alert-item">
+                      <img src={product.image} alt={product.name} className="alert-item-image" />
+                      <div className="alert-item-content">
+                        <div className="alert-item-header">
+                          <div>
+                            <h4 className="alert-item-name">{product.name}</h4>
+                            <span className="alert-item-sku">{product.sku}</span>
+                          </div>
+                          <div className="alert-item-stock">
+                            <span className={`stock-number-large ${product.alertLevel === 'low' ? 'low' : product.alertLevel}`}>
+                              {product.stock}
+                            </span>
+                            <span className="stock-label">sản phẩm</span>
+                          </div>
+                        </div>
+                        <div className="alert-item-meta">
+                          <span className="alert-meta-item">
+                            <AdminIcon name="fa fa-bell" />
+                            Mức tối thiểu nên giữ: {product.minStock}
+                          </span>
+                          <span className="alert-meta-item">
+                            <AdminIcon name="fa fa-truck-loading" />
+                            {stockProfile.canManageDirectly ? `Gợi ý nhập: +${product.suggestedRestock}` : stockProfile.detail}
+                          </span>
+                          <span className="alert-meta-item">
+                            <AdminIcon name="fa fa-cubes" />
+                            Mô hình kho: {stockProfile.label}
+                          </span>
+                          <span className="alert-meta-item">
+                            <AdminIcon name="fa fa-clock" />
+                            Cập nhật: {formatDateTime(product.updatedAt || product.createdAt)}
+                          </span>
+                        </div>
                       </div>
-                    </td>
-                    <td><span className="product-sku">{p.sku}</span></td>
-                    <td><span style={{ color: '#ef4444', fontWeight: 600, fontSize: 16 }}>{p.stock}</span></td>
-                    <td><span className="badge badge-danger">Hết hàng</span></td>
-                    <td>
-                      <button className="btn btn-sm btn-primary">
-                        <i className="fa fa-plus"></i> Nhập hàng
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Warning Alerts */}
-      {warningProducts.length > 0 && (
-        <div className="card" style={{ marginBottom: 24 }}>
-          <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(245, 158, 11, 0.1)' }}>
-            <h3 style={{ margin: 0, color: '#f59e0b' }}>
-              <i className="fa fa-exclamation-triangle"></i> Sắp hết hàng (≤ {warningThreshold} sản phẩm)
-            </h3>
-          </div>
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Sản phẩm</th>
-                  <th>SKU</th>
-                  <th>Tồn kho</th>
-                  <th>Trạng thái</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {warningProducts.map(p => (
-                  <tr key={p.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <img src={p.image} alt={p.name} style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 8 }} />
-                        <span className="product-name-cell">{p.name}</span>
+                      <div className="alert-item-actions">
+                        {stockProfile.canManageDirectly ? (
+                          <button
+                            type="button"
+                            className="btn-quick-action primary"
+                            onClick={() => openRestockModal(product)}
+                          >
+                            <AdminIcon name="fa fa-plus" /> Nhập hàng
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="btn-quick-action secondary"
+                            onClick={() =>
+                              setToast({
+                                type: 'error',
+                                message: stockProfile.note,
+                              })
+                            }
+                          >
+                            <AdminIcon name="fa fa-layer-group" /> Cần tách màu / size
+                          </button>
+                        )}
+                        <Link to="/admin/inventory" className="btn-quick-action secondary">
+                          <AdminIcon name="fa fa-arrow-right" /> Xem kho
+                        </Link>
                       </div>
-                    </td>
-                    <td><span className="product-sku">{p.sku}</span></td>
-                    <td><span style={{ color: '#f59e0b', fontWeight: 600, fontSize: 16 }}>{p.stock}</span></td>
-                    <td><span className="badge badge-warning">Sắp hết</span></td>
-                    <td>
-                      <button className="btn btn-sm btn-primary">
-                        <i className="fa fa-plus"></i> Nhập hàng
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
 
-      {/* Low Stock Alerts */}
-      {lowProducts.length > 0 && (
-        <div className="card">
-          <div style={{ padding: 16, borderBottom: '1px solid rgba(255,255,255,0.1)', background: 'rgba(59, 130, 246, 0.1)' }}>
-            <h3 style={{ margin: 0, color: '#3b82f6' }}>
-              <i className="fa fa-info-circle"></i> Tồn kho thấp (≤ {lowThreshold} sản phẩm)
-            </h3>
+        {filteredProducts.length === 0 && (
+          <div className="card alert-empty-state">
+            <AdminIcon name="fa fa-check-circle" />
+            <h3>Kho hàng đang an toàn</h3>
+            <p>Không có sản phẩm nào rơi vào vùng cảnh báo theo ngưỡng hiện tại.</p>
           </div>
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Sản phẩm</th>
-                  <th>SKU</th>
-                  <th>Tồn kho</th>
-                  <th>Trạng thái</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {lowProducts.map(p => (
-                  <tr key={p.id}>
-                    <td>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <img src={p.image} alt={p.name} style={{ width: 50, height: 50, objectFit: 'cover', borderRadius: 8 }} />
-                        <span className="product-name-cell">{p.name}</span>
-                      </div>
-                    </td>
-                    <td><span className="product-sku">{p.sku}</span></td>
-                    <td><span style={{ color: '#3b82f6', fontWeight: 600, fontSize: 16 }}>{p.stock}</span></td>
-                    <td><span className="badge badge-info">Tồn kho thấp</span></td>
-                    <td>
-                      <button className="btn btn-sm btn-primary">
-                        <i className="fa fa-plus"></i> Nhập hàng
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {products.length === 0 && (
-        <div className="card" style={{ textAlign: 'center', padding: 48 }}>
-          <i className="fa fa-check-circle" style={{ fontSize: 64, color: '#10b981', marginBottom: 16 }}></i>
-          <h3 style={{ marginBottom: 8 }}>Tất cả sản phẩm đều đủ hàng</h3>
-          <p style={{ color: '#888' }}>Không có cảnh báo nào</p>
-        </div>
-      )}
-
-      {/* Settings Modal */}
       {showSettings && (
         <div className="modal active" onClick={() => setShowSettings(false)}>
-          <div className="modal-dialog" style={{ maxWidth: 500 }} onClick={e => e.stopPropagation()}>
+          <div className="modal-dialog alert-settings-dialog" onClick={(event) => event.stopPropagation()}>
             <div className="modal-content">
               <div className="modal-header">
-                <h3>Cài đặt Cảnh báo</h3>
-                <button className="modal-close" onClick={() => setShowSettings(false)}>×</button>
+                <h3>Cài đặt ngưỡng cảnh báo</h3>
+                <button type="button" className="modal-close" onClick={() => setShowSettings(false)}>×</button>
               </div>
               <form onSubmit={handleSaveSettings} className="modal-body">
                 <div className="form-group">
-                  <label className="form-label">Ngưỡng cảnh báo "Sắp hết"</label>
-                  <input 
-                    className="form-control" 
-                    type="number" 
+                  <label className="form-label">Ngưỡng "Sắp hết hàng"</label>
+                  <input
+                    className="form-control"
+                    type="number"
                     min="1"
-                    value={warningThreshold}
-                    onChange={e => setWarningThreshold(Number(e.target.value))}
+                    value={settings.criticalThreshold}
+                    onChange={(event) =>
+                      setSettings((current) => ({
+                        ...current,
+                        criticalThreshold: Number(event.target.value),
+                      }))
+                    }
                   />
-                  <small style={{ color: '#888', fontSize: 12 }}>Cảnh báo khi tồn kho ≤ giá trị này</small>
+                  <small className="help-text">Sản phẩm có tồn nhỏ hơn hoặc bằng ngưỡng này sẽ lên mức cảnh báo vàng.</small>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Ngưỡng cảnh báo "Tồn kho thấp"</label>
-                  <input 
-                    className="form-control" 
-                    type="number" 
+                  <label className="form-label">Ngưỡng "Tồn kho thấp"</label>
+                  <input
+                    className="form-control"
+                    type="number"
                     min="1"
-                    value={lowThreshold}
-                    onChange={e => setLowThreshold(Number(e.target.value))}
+                    value={settings.watchThreshold}
+                    onChange={(event) =>
+                      setSettings((current) => ({
+                        ...current,
+                        watchThreshold: Number(event.target.value),
+                      }))
+                    }
                   />
-                  <small style={{ color: '#888', fontSize: 12 }}>Cảnh báo khi tồn kho ≤ giá trị này</small>
+                  <small className="help-text">Ngưỡng này nên lớn hơn mức "Sắp hết hàng".</small>
                 </div>
 
-                <label className="form-check">
-                  <input className="form-check-input" type="checkbox" defaultChecked />
-                  <span className="form-check-label">Gửi email thông báo</span>
+                <label className="inventory-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={settings.emailNotifications}
+                    onChange={(event) =>
+                      setSettings((current) => ({
+                        ...current,
+                        emailNotifications: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Gửi email cảnh báo cho quản trị viên</span>
                 </label>
 
-                <label className="form-check">
-                  <input className="form-check-input" type="checkbox" defaultChecked />
-                  <span className="form-check-label">Hiển thị thông báo trên hệ thống</span>
+                <label className="inventory-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={settings.inAppNotifications}
+                    onChange={(event) =>
+                      setSettings((current) => ({
+                        ...current,
+                        inAppNotifications: event.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Hiển thị cảnh báo ngay trong trang quản trị</span>
                 </label>
 
                 <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowSettings(false)}>Hủy</button>
+                  <button type="button" className="btn btn-outline" onClick={() => setShowSettings(false)}>
+                    Hủy
+                  </button>
                   <button type="submit" className="btn btn-primary">
-                    <i className="fa fa-save"></i> Lưu cài đặt
+                    <AdminIcon name="fa fa-save" /> Lưu cài đặt
                   </button>
                 </div>
               </form>
@@ -287,6 +419,82 @@ export default function AdminInventoryAlerts() {
           </div>
         </div>
       )}
-    </>
+
+      {showRestockModal && activeProduct && (
+        <div className="modal active" onClick={closeRestockModal}>
+          <div className="modal-dialog" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-content">
+              <div className="modal-header">
+                <h3>Nhập hàng từ cảnh báo</h3>
+                <button type="button" className="modal-close" onClick={closeRestockModal}>×</button>
+              </div>
+              <form onSubmit={handleRestockSubmit} className="modal-body">
+                <div className="product-info-display">
+                  <div className="product-info-header">
+                    <img src={activeProduct.image} alt={activeProduct.name} />
+                    <div className="product-info-text">
+                      <h4>{activeProduct.name}</h4>
+                      <span className="product-sku">{activeProduct.sku}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Số lượng nhập thêm</label>
+                  <input
+                    className="form-control"
+                    type="number"
+                    min="1"
+                    value={restockQuantity}
+                    onChange={(event) => setRestockQuantity(Number(event.target.value))}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Ghi chú / mã phiếu</label>
+                  <textarea
+                    className="form-control"
+                    rows={4}
+                    value={restockNote}
+                    onChange={(event) => setRestockNote(event.target.value)}
+                    placeholder="Ví dụ: PN-ALERT-2603 / nhập bổ sung cho mã đang chạm ngưỡng"
+                  />
+                </div>
+
+                <div className="stock-preview">
+                  <div className="preview-item">
+                    <span>Tồn hiện tại</span>
+                    <strong>{activeProduct.stock}</strong>
+                  </div>
+                  <div className="preview-arrow">
+                    <AdminIcon name="fa fa-arrow-right" />
+                  </div>
+                  <div className="preview-item">
+                    <span>Sau khi nhập</span>
+                    <strong className="text-primary">{activeProduct.stock + Math.max(restockQuantity, 0)}</strong>
+                  </div>
+                </div>
+
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline" onClick={closeRestockModal}>
+                    Hủy
+                  </button>
+                  <button type="submit" className="btn btn-primary">
+                    <AdminIcon name="fa fa-save" /> Lưu nhập hàng
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`notification-toast show ${toast.type}`}>
+          <AdminIcon name={toast.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} />
+          <span>{toast.message}</span>
+        </div>
+      )}
+    </div>
   );
 }

@@ -1,3 +1,15 @@
+// ============================================================
+// KIỂU DỮ LIỆU DÙNG CHUNG CHO TOÀN BỘ PROJECT
+// Map từ cấu trúc localStorage của project cũ
+// ============================================================
+
+// Sản phẩm - từ admin-products.js getSampleProducts()
+export interface ProductVariant {
+  size: string;
+  color: string;
+  sku: string;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -33,13 +45,7 @@ export interface Product {
   updatedAt?: string;
 }
 
-export interface ProductVariant {
-  key?: string;
-  size: string;
-  color: string;
-  sku: string;
-}
-
+// User - từ login.js handleRegister()
 export interface User {
   id?: number;
   name: string;
@@ -51,9 +57,9 @@ export interface User {
   createdAt?: string;
 }
 
+// Item trong giỏ hàng - từ cart-page.js
 export interface CartItem {
   id: number;
-  productId?: number;
   name: string;
   price: number;
   image: string;
@@ -62,9 +68,9 @@ export interface CartItem {
   quantity: number;
 }
 
+// Đơn hàng - từ checkout-page.js placeOrder()
 export interface Order {
   id: string;
-  orderCode?: string;
   customer: {
     name: string;
     phone: string;

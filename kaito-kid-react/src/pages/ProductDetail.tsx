@@ -1,4 +1,4 @@
-// Trang chi tiet san pham - thay the chitietsanpham.html + product-detail.js
+// Trang chi tiết sản phẩm - thay the chitietsanpham.html + product-detail.js
 
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { productService } from '../services/productService';
 import { useCart } from '../context/CartContext';
 import type { Product } from '../types';
 import { formatCurrency } from '../utils/format';
+import { getProductDisplayCategory, normalizeTaxonomyValue } from '../utils/productTaxonomy';
 import ProductCard from '../components/product/ProductCard';
 
 export default function ProductDetail() {
@@ -23,8 +24,14 @@ export default function ProductDetail() {
       const p = productService.getById(Number(id));
       setProduct(p || null);
       if (p) {
+        const currentCategory = normalizeTaxonomyValue(getProductDisplayCategory(p));
         const related = productService.getAll()
-          .filter(r => r.category === p.category && r.id !== p.id && r.status === 'active')
+          .filter(
+            (relatedProduct) =>
+              normalizeTaxonomyValue(getProductDisplayCategory(relatedProduct)) === currentCategory &&
+              relatedProduct.id !== p.id &&
+              relatedProduct.status === 'active'
+          )
           .slice(0, 4);
         setRelatedProducts(related);
       }
@@ -34,8 +41,8 @@ export default function ProductDetail() {
   if (!product) {
     return (
       <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-        <h2>Khong tim thay san pham</h2>
-        <Link to="/products" className="btn-continue-shopping">Quay lai</Link>
+        <h2>Không tìm thấy sản phẩm</h2>
+        <Link to="/products" className="btn-continue-shopping">Quay lại</Link>
       </div>
     );
   }
@@ -69,7 +76,7 @@ export default function ProductDetail() {
           {/* Color Options */}
           {product.colors && product.colors.length > 0 && (
             <div className="option-group">
-              <label>Mau sac: <span>{selectedColor}</span></label>
+              <label>Màu sắc: <span>{selectedColor}</span></label>
               <div className="color-options">
                 {product.colors.map(color => (
                   <button key={color} className={`size-btn ${selectedColor === color ? 'active' : ''}`} onClick={() => setSelectedColor(color)}>
@@ -102,20 +109,20 @@ export default function ProductDetail() {
               <button className="qty-btn" onClick={() => setQuantity(quantity + 1)}>+</button>
             </div>
             <button className="btn-add-cart" onClick={handleAddToCart}>
-              <i className="fa fa-shopping-cart"></i> {added ? 'Da them vao gio!' : 'Them vao gio hang'}
+              <i className="fa fa-shopping-cart"></i> {added ? 'Đã thêm vào giỏ!' : 'Thêm vào giỏ hàng'}
             </button>
           </div>
 
           {/* Stock Status */}
           <div className={`stock-status ${product.stock > 0 ? (product.stock < 10 ? 'low-stock' : 'in-stock') : 'out-of-stock'}`}>
             <i className={`fa ${product.stock > 0 ? 'fa-check-circle' : 'fa-times-circle'}`}></i>
-            {product.stock > 0 ? (product.stock < 10 ? `Chi con ${product.stock} san pham` : 'Con hang') : 'Het hang'}
+            {product.stock > 0 ? (product.stock < 10 ? `Chỉ còn ${product.stock} sản phẩm` : 'Còn hàng') : 'Hết hàng'}
           </div>
 
           {/* Description */}
           {product.description && (
             <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #e5e7eb' }}>
-              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Mo ta san pham</h3>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Mô tả sản phẩm</h3>
               <p style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.6 }}>{product.description}</p>
             </div>
           )}
@@ -125,7 +132,7 @@ export default function ProductDetail() {
       {/* Related Products */}
       {relatedProducts.length > 0 && (
         <div className="related-products">
-          <h2>San pham lien quan</h2>
+          <h2>Sản phẩm liên quan</h2>
           <div className="related-grid">
             {relatedProducts.map(p => (
               <ProductCard key={p.id} product={p} />

@@ -395,8 +395,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-size: 18px;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.search-bar button svg {
+  width: 18px;
+  height: 18px;
 }
 
 .search-bar button:hover {
@@ -418,8 +424,17 @@ body {
   color: #1a1a1a;
   font-size: 20px;
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
   transition: color 0.3s;
   text-decoration: none;
+}
+
+.icon-link svg {
+  width: 1em;
+  height: 1em;
 }
 
 .icon-link:hover {
@@ -445,6 +460,11 @@ body {
   font-size: 24px;
   cursor: pointer;
   color: #1a1a1a;
+}
+
+.mobile-menu-btn svg {
+  width: 1em;
+  height: 1em;
 }
 
 /* Account Dropdown */
@@ -559,6 +579,11 @@ body {
   font-size: 28px;
 }
 
+.account-avatar svg {
+  width: 1em;
+  height: 1em;
+}
+
 .account-details h4 {
   font-size: 15px;
   font-weight: 600;
@@ -592,10 +617,11 @@ body {
   background: #f8f8f8;
 }
 
-.account-menu-item i {
+.account-menu-item svg {
   width: 20px;
-  font-size: 16px;
+  height: 20px;
   color: #666;
+  flex-shrink: 0;
 }
 
 .account-menu-item.admin-item {
@@ -604,7 +630,7 @@ body {
   margin: 5px 0;
 }
 
-.account-menu-item.admin-item i {
+.account-menu-item.admin-item svg {
   color: #ffffff;
 }
 
@@ -623,7 +649,7 @@ body {
   color: #ff4444;
 }
 
-.account-menu-item.logout-item i {
+.account-menu-item.logout-item svg {
   color: #ff4444;
 }
 
@@ -1033,6 +1059,11 @@ body {
   transform: scale(0.95);
 }
 
+.hero-arrow svg {
+  width: 1em;
+  height: 1em;
+}
+
 .hero-dots {
   position: absolute;
   bottom: 30px;
@@ -1161,11 +1192,18 @@ body {
   font-size: 14px;
   font-weight: 400;
   transition: transform 0.3s;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .category-tile:hover .category-overlay span {
   transform: translateX(5px);
+}
+
+.category-overlay-cta svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* Section Header */
@@ -1181,6 +1219,16 @@ body {
   margin-bottom: 10px;
   text-transform: uppercase;
  color: #11998e;
+}
+
+.section-title-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.section-title-with-icon svg {
+  flex-shrink: 0;
 }
 
 .section-header p {
@@ -1935,6 +1983,14 @@ body {
   margin-top: 2px;
 }
 
+.brand-values li svg {
+  color: #1a1a1a;
+  width: 20px;
+  height: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
 .btn-brand {
   display: inline-block;
   padding: 12px 30px;
@@ -2011,11 +2067,15 @@ body {
 
 .review-rating {
   margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
-.review-rating i {
+.review-rating svg {
   color: #ffc107;
-  font-size: 14px;
+  width: 14px;
+  height: 14px;
 }
 
 .review-text {
@@ -2075,7 +2135,16 @@ body {
   text-transform: uppercase;
   letter-spacing: 1px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   transition: all 0.3s;
+}
+
+.newsletter-form button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .newsletter-form button:hover {
@@ -2140,8 +2209,9 @@ body {
   opacity: 1;
 }
 
-.social-overlay i {
-  font-size: 32px;
+.social-overlay svg {
+  width: 32px;
+  height: 32px;
   color: #ffffff;
 }
 

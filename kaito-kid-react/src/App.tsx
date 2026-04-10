@@ -1,13 +1,14 @@
 // App.tsx - Router chính
 // Gom tất cả 20+ file HTML thành routes
 
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 
 // Layouts
 import MainLayout from './components/layout/MainLayout';
 import AdminLayout from './components/admin/AdminLayout';
+import { AdminUiProvider } from './components/admin/AdminUiProvider';
 import ProtectedRoute from './components/ProtectedRoute';
 
 // Customer Pages
@@ -24,6 +25,12 @@ import Address from './pages/Address';
 import Search from './pages/Search';
 import Collections from './pages/Collections';
 import Lookbook from './pages/Lookbook';
+import BestSeller from './pages/BestSeller';
+import NewIn from './pages/NewIn';
+import Sale from './pages/Sale';
+import WomenProducts from './pages/WomenProducts';
+import MenProducts from './pages/MenProducts';
+import KidsProducts from './pages/KidsProducts';
 
 // Admin Pages
 import Dashboard from './admin/Dashboard';
@@ -68,6 +75,12 @@ function App() {
               <Route path="/search" element={<Search />} />
               <Route path="/collections" element={<Collections />} />
               <Route path="/lookbook" element={<Lookbook />} />
+              <Route path="/bestseller" element={<BestSeller />} />
+              <Route path="/new-in" element={<NewIn />} />
+              <Route path="/sale" element={<Sale />} />
+              <Route path="/women" element={<WomenProducts />} />
+              <Route path="/men" element={<MenProducts />} />
+              <Route path="/kids" element={<KidsProducts />} />
 
               {/* Trang cần đăng nhập */}
               <Route element={<ProtectedRoute />}>
@@ -81,7 +94,8 @@ function App() {
 
             {/* Trang Admin - dùng Sidebar riêng */}
             <Route element={<ProtectedRoute requireAdmin />}>
-              <Route path="/admin" element={<AdminLayout />}>
+              <Route path="/admin" element={<AdminUiProvider><AdminLayout /></AdminUiProvider>}>
+                <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="products" element={<AdminProducts />} />
                 <Route path="products/add" element={<AdminProductAdd />} />
@@ -115,3 +129,4 @@ function App() {
 }
 
 export default App;
+// Router config updated

@@ -1,85 +1,115 @@
-// Footer - thiết kế mới với background đen và Google Maps
+// Footer - IVY moda style: 5 columns, clean, minimal
 
+import { useState } from 'react';
+import {
+  PiFacebookLogoFill,
+  PiInstagramLogoFill,
+  PiMessengerLogoFill,
+  PiTiktokLogoFill,
+  PiYoutubeLogoFill,
+} from 'react-icons/pi';
 import { Link } from 'react-router-dom';
 
 export default function Footer() {
+  const [email, setEmail] = useState('');
+
+  const handleSubscribe = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email.trim()) {
+      alert('Đăng ký thành công! Cảm ơn bạn.');
+      setEmail('');
+    }
+  };
+
   return (
-    <footer className="main-footer">
-      <div className="footer-container">
-        {/* Column 1: GIỚI THIỆU */}
-        <div className="footer-column">
-          <h3>GIỚI THIỆU</h3>
-          <a href="#">Về chúng tôi</a>
-          <a href="#">Liên hệ</a>
-          <a href="#">Tuyển dụng</a>
-          <a href="#">Tin tức</a>
-          <div className="footer-contact">
-            <p>Email:</p>
-            <p>kaitokid@gmail.com</p>
-            <p>Hotline:</p>
-            <p>0906264126</p>
+    <footer className="ivy-footer">
+      <div className="ivy-footer-main">
+        {/* Col 1: Logo + Social + Hotline */}
+        <div className="ivy-footer-col ivy-footer-brand">
+          <div className="ivy-footer-logo">
+            <img src="/images/logokaitokid.png" alt="KAITO KID" />
+          </div>
+          <div className="ivy-footer-socials">
+            <a href="#" aria-label="Facebook"><PiFacebookLogoFill aria-hidden="true" /></a>
+            <a href="#" aria-label="Messenger"><PiMessengerLogoFill aria-hidden="true" /></a>
+            <a href="#" aria-label="Instagram"><PiInstagramLogoFill aria-hidden="true" /></a>
+            <a href="#" aria-label="TikTok"><PiTiktokLogoFill aria-hidden="true" /></a>
+            <a href="#" aria-label="YouTube"><PiYoutubeLogoFill aria-hidden="true" /></a>
+          </div>
+          <div className="ivy-footer-hotline">
+            HOTLINE: 0246 662 3434
           </div>
         </div>
 
-        {/* Column 2: HỖ TRỢ KHÁCH HÀNG */}
-        <div className="footer-column">
-          <h3>HỖ TRỢ KHÁCH HÀNG</h3>
-          <Link to="/order-tracking"><i className="fa fa-box"></i> Tra cứu đơn hàng</Link>
-          <a href="#">Hướng dẫn đặt hàng</a>
-          <a href="#">Hướng dẫn chọn size</a>
-          <a href="#">Câu hỏi thường gặp</a>
-          <a href="#">Thanh toán - Giao hàng</a>
+        {/* Col 2: Giới thiệu */}
+        <div className="ivy-footer-col">
+          <h4>Giới thiệu</h4>
+          <ul>
+            <li><Link to="/lookbook">Về KAITO KID</Link></li>
+            <li><a href="#">Tuyển dụng</a></li>
+            <li><a href="#">Hệ thống cửa hàng</a></li>
+          </ul>
         </div>
 
-        {/* Column 3: HỆ THỐNG CỬA HÀNG */}
-        <div className="footer-column">
-          <h3>HỆ THỐNG CỬA HÀNG</h3>
-          <p>Tìm địa chỉ cửa hàng gần bạn</p>
+        {/* Col 3: Dịch vụ khách hàng */}
+        <div className="ivy-footer-col">
+          <h4>Dịch vụ khách hàng</h4>
+          <ul>
+            <li><a href="#">Chính sách điều khoản</a></li>
+            <li><a href="#">Hướng dẫn mua hàng</a></li>
+            <li><a href="#">Chính sách thanh toán</a></li>
+            <li><a href="#">Chính sách đổi trả</a></li>
+            <li><a href="#">Chính sách bảo hành</a></li>
+            <li><a href="#">Chính sách giao nhận vận chuyển</a></li>
+            <li><a href="#">Chính sách thẻ thành viên</a></li>
+            <li><a href="#">Q&A</a></li>
+          </ul>
         </div>
 
-        {/* Column 4: KẾT NỐI VỚI KAITO KID SHOP + MAP */}
-        <div className="footer-column footer-map-column">
-          <h3>KẾT NỐI VỚI KAITO KID SHOP</h3>
-          <div className="social-links">
-            <a href="https://www.facebook.com/KaitooKidd.1412" target="_blank" rel="noreferrer" aria-label="Facebook">
-              <i className="fab fa-facebook"></i>
-            </a>
-            <a href="https://www.youtube.com/@Kuroba_Kaito_GM" target="_blank" rel="noreferrer" aria-label="YouTube">
-              <i className="fab fa-youtube"></i>
-            </a>
-            <a href="https://www.tiktok.com/@kurobaa_kaitoo" target="_blank" rel="noreferrer" aria-label="TikTok">
-              <i className="fab fa-tiktok"></i>
-            </a>
-            <a href="https://www.instagram.com/kaitoo.kidd1412" target="_blank" rel="noreferrer" aria-label="Instagram">
-              <i className="fab fa-instagram"></i>
-            </a>
+        {/* Col 4: Liên hệ */}
+        <div className="ivy-footer-col">
+          <h4>Liên hệ</h4>
+          <ul>
+            <li><a href="#">Hotline</a></li>
+            <li><a href="#">Email</a></li>
+            <li><a href="#">Live Chat</a></li>
+            <li><a href="#">Messenger</a></li>
+            <li><a href="#">Liên hệ</a></li>
+          </ul>
+        </div>
+
+        {/* Col 5: Newsletter + Download */}
+        <div className="ivy-footer-col ivy-footer-newsletter">
+          <div className="ivy-newsletter-box">
+            <p className="ivy-newsletter-title">Nhận thông tin các chương trình của KAITO KID</p>
+            <form className="ivy-newsletter-form" onSubmit={handleSubscribe}>
+              <input
+                type="email"
+                placeholder="Nhập địa chỉ email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+              />
+              <button type="submit">Đăng ký</button>
+            </form>
           </div>
-          {/* Google Maps Embed */}
-          <div className="footer-map">
-            <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3724.096890417594!2d105.78031287503188!3d21.028810980629447!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3135ab4cd0c66f05%3A0xea31563511af2e54!2zVHLGsOG7nW5nIMSQ4bqhaSBo4buNYyBDw7RuZyBuZ2hp4buHcCBIw6AgTuG7mWk!5e0!3m2!1svi!2s!4v1710000000000!5m2!1svi!2s"
-              width="100%"
-              height="150"
-              style={{ border: 0, borderRadius: '8px' }}
-              allowFullScreen
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              title="Kaito Kid Shop Location"
-            ></iframe>
+          <div className="ivy-download-app">
+            <p>Download App</p>
+            <div className="ivy-app-badges">
+              <a href="#" aria-label="App Store">
+                <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="App Store" />
+              </a>
+              <a href="#" aria-label="Google Play">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Google Play" />
+              </a>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Footer Bottom */}
-      <div className="footer-bottom">
-        <p>© 2025 KAITO KID. All rights reserved.</p>
-        <button 
-          className="back-to-top" 
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-          aria-label="Back to top"
-        >
-          <i className="fa fa-arrow-up"></i>
-        </button>
+      {/* Bottom */}
+      <div className="ivy-footer-bottom">
+        <p>©KAITO KID All rights reserved</p>
       </div>
     </footer>
   );

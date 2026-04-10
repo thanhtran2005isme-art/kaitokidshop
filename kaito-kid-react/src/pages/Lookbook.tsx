@@ -15,19 +15,19 @@ export default function Lookbook() {
       setItems(saved);
     } else {
       setItems([
-        { id: 1, title: 'Street Style', image: '/images/slide_1.jpg', description: 'Phong cach duong pho nang dong', tags: ['Ao hoodie', 'Quan jogger', 'Sneakers'] },
-        { id: 2, title: 'Office Look', image: '/images/slide_2.jpg', description: 'Thanh lich noi cong so', tags: ['Ao so mi', 'Quan tay', 'Giay da'] },
-        { id: 3, title: 'Weekend Vibes', image: '/images/slide_3.jpg', description: 'Thoai mai cuoi tuan', tags: ['Ao thun', 'Quan short', 'Sandal'] },
-        { id: 4, title: 'Date Night', image: '/images/london.png', description: 'Quyen ru cho buoi hen', tags: ['Dam da hoi', 'Clutch', 'Giay cao got'] },
+        { id: 1, title: 'Street Style', image: '/images/slide_1.jpg', description: 'Phong cách đường phố năng động', tags: ['Ao hoodie', 'Quan jogger', 'Sneakers'] },
+        { id: 2, title: 'Office Look', image: '/images/slide_2.jpg', description: 'Thanh lich noi công sở', tags: ['Ao so mi', 'Quan tay', 'Giay da'] },
+        { id: 3, title: 'Weekend Vibes', image: '/images/slide_3.jpg', description: 'Thoải mái cuối tuần', tags: ['Ao thun', 'Quan short', 'Sandal'] },
+        { id: 4, title: 'Date Night', image: '/images/london.png', description: 'Quyến rũ cho buổi hẹn', tags: ['Dam da hoi', 'Clutch', 'Giay cao got'] },
       ]);
     }
   }, []);
 
   return (
-    <>
+    <div className="lookbook-page">
       <div className="lookbook-hero">
         <h1>LOOKBOOK</h1>
-        <p>Cam hung phoi do tu KAITO KID</p>
+        <p>Cam hung phối đồ tu KAITO KID</p>
       </div>
       <div className="lookbook-container">
         <div className="lookbook-grid">
@@ -52,6 +52,6 @@ export default function Lookbook() {
           ))}
         </div>
       </div>
-    </>
+    </div>
   );
 }

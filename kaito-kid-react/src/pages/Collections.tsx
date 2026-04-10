@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { slugifyLabel } from '../utils/adminProductRelations';
 
 interface Collection {
-  id: number; name: string; description: string; image: string; productCount?: number;
+  id: number; name: string; description: string; image: string; productCount?: number; order?: number; status?: 'active' | 'hidden';
 }
 
 export default function Collections() {
@@ -12,8 +13,12 @@ export default function Collections() {
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem('collections') || '[]');
-    if (saved.length > 0) {
-      setCollections(saved);
+    if (Array.isArray(saved) && saved.length > 0) {
+      setCollections(
+        saved
+          .filter((collection: Collection) => collection.status !== 'hidden')
+          .sort((leftCollection: Collection, rightCollection: Collection) => Number(leftCollection.order || 999) - Number(rightCollection.order || 999))
+      );
     } else {
       setCollections([
         { id: 1, name: 'Xuân Hè 2025', description: 'Bộ sưu tập mới nhất cho mùa xuân hè', image: '/images/slide_1.jpg', productCount: 24 },
@@ -36,7 +41,7 @@ export default function Collections() {
               <div className="collection-image">
                 <img src={col.image} alt={col.name} />
                 <div className="collection-overlay">
-                  <Link to="/products" className="btn-view">Xem bộ sưu tập</Link>
+                  <Link to={`/products?collection=${slugifyLabel(col.name)}`} className="btn-view">Xem bộ sưu tập</Link>
                 </div>
               </div>
               <div className="collection-info">

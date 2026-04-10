@@ -673,3 +673,45 @@
 .sale-bar {
   background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
 }
+
+
+/* Sort Link (BestSeller sidebar) */
+.sort-link {
+  color: #666;
+  text-decoration: none;
+  font-size: 14px;
+  padding: 6px 0;
+  display: block;
+  transition: color 0.3s;
+}
+
+.sort-link:hover,
+.sort-link.active {
+  color: #667eea;
+  font-weight: 600;
+}
+
+/* Bestseller Description */
+.bestseller-desc {
+  font-size: 14px;
+  color: #666;
+  margin-top: 5px;
+}
+
+/* Filters Select Dropdown */
+.filters select {
+  padding: 10px 20px;
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.filters select:hover,
+.filters select:focus {
+  border-color: #333;
+  outline: none;
+}

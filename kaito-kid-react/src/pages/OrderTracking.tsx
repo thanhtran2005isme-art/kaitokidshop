@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { orderService } from '../services/orderService';
 import { formatCurrency, formatDate } from '../utils/format';
-import { readAdminSettings } from '../utils/adminSettingsConfig';
 import { readStoredReviews, saveStoredReviews, type ReviewRecord } from '../utils/reviewConfig';
 import toast from 'react-hot-toast';
 import type { Order, CartItem } from '../types';

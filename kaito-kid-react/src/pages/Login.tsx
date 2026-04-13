@@ -26,8 +26,8 @@ export default function Login() {
     setError('');
     if (!loginEmail || !loginPassword) { setError('Vui lòng nhập đầy đủ thông tin'); return; }
     setLoading(true);
-    setTimeout(() => {
-      const result = login(loginEmail, loginPassword);
+    setTimeout(async () => {
+      const result = await login(loginEmail, loginPassword);
       setLoading(false);
       if (result.success) navigate('/');
       else setError(result.error || 'Đăng nhập thất bại');
@@ -43,8 +43,8 @@ export default function Login() {
     if (regPassword.length < 6) { setError('Mật khẩu phải có ít nhất 6 ký tự'); return; }
     if (regPassword !== regConfirm) { setError('Mật khẩu xác nhận không khớp'); return; }
     setLoading(true);
-    setTimeout(() => {
-      const result = register({ name: regName, email: regEmail, phone: regPhone, password: regPassword });
+    setTimeout(async () => {
+      const result = await register({ name: regName, email: regEmail, phone: regPhone, password: regPassword });
       setLoading(false);
       if (result.success) {
         setSuccess('Đăng ký thành công! Chuyển sang đăng nhập...');

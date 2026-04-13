@@ -1,7 +1,4 @@
-// AuthContext - thay thế auth-check.js
-// Quản lý trạng thái đăng nhập toàn app
-
-import { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { authService } from '../services/authService';
 import type { User } from '../types';
@@ -10,8 +7,8 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => { success: boolean; error?: string };
-  register: (data: { name: string; email: string; phone: string; password: string }) => { success: boolean; error?: string };
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
@@ -21,25 +18,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Khôi phục session khi app load
   useEffect(() => {
-    authService.initDefaultAdmin();
-    if (authService.isLoggedIn()) {
-      setUser(authService.getCurrentUser());
+    let active = true;
+
+    async function restoreSession() {
+      const cachedUser = authService.getCurrentUser();
+      if (cachedUser) setUser(cachedUser);
+
+      const profile = await authService.getProfile();
+      if (!active) return;
+
+      setUser(profile);
+      setLoading(false);
     }
-    setLoading(false);
+
+    restoreSession();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const login = (email: string, password: string) => {
-    const result = authService.login(email, password);
+  const login = async (email: string, password: string) => {
+    const result = await authService.login(email, password);
     if (result.success && result.user) {
       setUser(result.user);
     }
-    return result;
+    return { success: result.success, error: result.error };
   };
 
-  const register = (data: { name: string; email: string; phone: string; password: string }) => {
-    return authService.register(data);
+  const register = async (data: { name: string; email: string; phone: string; password: string }) => {
+    const result = await authService.register(data);
+    if (result.success && result.user) {
+      setUser(result.user);
+    }
+    return { success: result.success, error: result.error };
   };
 
   const logout = () => {

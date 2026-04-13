@@ -10,6 +10,22 @@ builder.Services.AddSqlServerDb<AdminDbContext>(builder.Configuration);
 // JWT Authentication từ Shared
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
+// CORS cho React frontend
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+                "http://localhost:5173",
+                "http://localhost:5174",
+                "http://localhost:3000"
+            )
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
@@ -19,6 +35,9 @@ if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
 }
+
+// CORS phải đặt trước Authentication
+app.UseCors("AllowFrontend");
 
 // Middleware từ Shared
 app.UseRequestLogging();

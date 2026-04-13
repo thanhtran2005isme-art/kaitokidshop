@@ -1,6 +1,5 @@
-// AuthContext - thay thế auth-check.js
-// Quản lý trạng thái đăng nhập toàn app
-// Sử dụng API mới qua Gateway
+// AuthContext - Quản lý trạng thái đăng nhập toàn app
+// Sử dụng API Backend
 
 import { createContext, useState, useContext, useEffect } from 'react';
 import type { ReactNode } from 'react';
@@ -27,13 +26,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const initAuth = async () => {
       if (authApi.isLoggedIn()) {
-        // Lấy user từ localStorage trước
         const storedUser = authApi.getStoredUser();
         if (storedUser) {
           setUser(storedUser);
         }
 
-        // Sau đó fetch user mới nhất từ API
         const result = await authApi.getCurrentUser();
         if (result.success && result.user) {
           setUser(result.user);

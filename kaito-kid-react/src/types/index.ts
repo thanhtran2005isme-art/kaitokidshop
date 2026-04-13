@@ -71,6 +71,7 @@ export interface CartItem {
 // Đơn hàng - từ checkout-page.js placeOrder()
 export interface Order {
   id: string;
+  orderCode?: string; // Mã đơn hàng để tracking
   customer: {
     name: string;
     phone: string;
@@ -81,7 +82,7 @@ export interface Order {
   total: number;
   subtotal: number;
   shippingFee: number;
-  paymentFee?: number;
+  paymentFee?: number; // Phí thanh toán (COD, banking, etc.)
   discount: number;
   couponCode?: string;
   paymentMethod: string;

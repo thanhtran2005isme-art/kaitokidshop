@@ -11,7 +11,7 @@ import {
 } from 'react-icons/pi';
 import { Link } from 'react-router-dom';
 import ProductCard from '../components/product/ProductCard';
-import { productApi } from '../services/api';
+import { productService } from '../services/productService';
 import type { Product } from '../types';
 import { readStoredBanners, type BannerItem } from '../utils/bannerConfig';
 import { matchesProductCategory, matchesProductGender } from '../utils/productTaxonomy';
@@ -33,6 +33,10 @@ interface HomeReview {
   text: string;
   rating: number;
 }
+
+type HomepageSectionKey = 'newArrivals' | 'saleProducts' | 'bestSellers';
+
+type HomepageSectionsConfig = Partial<Record<HomepageSectionKey, number[]>>;
 
 const defaultHeroSlides: HeroSlide[] = [
   {
@@ -127,6 +131,58 @@ const emptyStateStyle = {
   color: '#616161',
 } as const;
 
+function readHomepageSectionsConfig(): HomepageSectionsConfig | null {
+  try {
+    const rawValue = localStorage.getItem('homepageSections');
+
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsedValue = JSON.parse(rawValue);
+
+    if (!parsedValue || typeof parsedValue !== 'object' || Array.isArray(parsedValue)) {
+      return null;
+    }
+
+    return parsedValue as HomepageSectionsConfig;
+  } catch {
+    return null;
+  }
+}
+
+function hasConfiguredHomepageSection(config: HomepageSectionsConfig | null, sectionKey: HomepageSectionKey): boolean {
+  return !!config && Object.prototype.hasOwnProperty.call(config, sectionKey) && Array.isArray(config[sectionKey]);
+}
+
+function getFallbackNewArrivals(products: Product[]) {
+  const newProducts = products
+    .filter((product) => product.isNew)
+    .sort((first, second) => second.id - first.id);
+
+  return (newProducts.length > 0 ? newProducts : [...products].sort((first, second) => second.id - first.id)).slice(0, 8);
+}
+
+function getFallbackSaleProducts(products: Product[]) {
+  const saleProducts = products
+    .filter((product) => product.isSale || (!!product.oldPrice && product.oldPrice > product.price))
+    .sort((first, second) => {
+      const firstDiscount = first.oldPrice ? first.oldPrice - first.price : 0;
+      const secondDiscount = second.oldPrice ? second.oldPrice - second.price : 0;
+      return secondDiscount - firstDiscount;
+    });
+
+  return saleProducts.slice(0, 8);
+}
+
+function getFallbackBestSellers(products: Product[]) {
+  const bestSellerProducts = products
+    .filter((product) => product.isBestSeller)
+    .sort((first, second) => second.soldCount - first.soldCount);
+
+  return (bestSellerProducts.length > 0 ? bestSellerProducts : [...products].sort((first, second) => second.soldCount - first.soldCount)).slice(0, 8);
+}
+
 function matchesCategory(product: Product, filter: string) {
   return matchesProductCategory(product.category, filter);
 }
@@ -173,52 +229,35 @@ export default function Home() {
   const [bestSellers, setBestSellers] = useState<Product[]>([]);
   const [filteredBestSellers, setFilteredBestSellers] = useState<Product[]>([]);
   const [bestSellersFilter, setBestSellersFilter] = useState('all');
+  const [flashSaleProducts, setFlashSaleProducts] = useState<Product[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [countdown, setCountdown] = useState({ hours: 2, minutes: 15, seconds: 32 });
 
   useEffect(() => {
-    // Load data từ API thay vì localStorage
-    const loadHomeData = async () => {
-      try {
-        // Load song song bằng Promise.all
-        const [newArrivalsResult, saleResult, bestSellersResult] = await Promise.all([
-          productApi.getNewArrivals(8),
-          productApi.getSaleProducts(8),
-          productApi.getBestSellers(8),
-        ]);
+    const activeProducts = productService.getActive();
+    const homepageSectionsConfig = readHomepageSectionsConfig();
+    const configuredNewArrivals = productService.getNewArrivals();
+    const configuredSaleProducts = productService.getSaleProducts();
+    const configuredBestSellers = productService.getBestSellers();
+    const nextNewArrivals = hasConfiguredHomepageSection(homepageSectionsConfig, 'newArrivals')
+      ? configuredNewArrivals
+      : getFallbackNewArrivals(activeProducts);
+    const nextSaleProducts = hasConfiguredHomepageSection(homepageSectionsConfig, 'saleProducts')
+      ? configuredSaleProducts
+      : getFallbackSaleProducts(activeProducts);
+    const nextBestSellers = hasConfiguredHomepageSection(homepageSectionsConfig, 'bestSellers')
+      ? configuredBestSellers
+      : getFallbackBestSellers(activeProducts);
 
-        // Set new arrivals
-        if (newArrivalsResult.success && newArrivalsResult.data) {
-          setNewArrivals(newArrivalsResult.data);
-        } else {
-          setNewArrivals([]);
-        }
+    setNewArrivals(nextNewArrivals);
+    setFilteredNewArrivals(nextNewArrivals);
+    setSaleProducts(nextSaleProducts);
+    setBestSellers(nextBestSellers);
+    setFilteredBestSellers(nextBestSellers);
+    setFlashSaleProducts(nextSaleProducts.slice(0, 4));
+  }, []);
 
-        // Set sale products
-        if (saleResult.success && saleResult.data) {
-          setSaleProducts(saleResult.data);
-        } else {
-          setSaleProducts([]);
-        }
-
-        // Set best sellers
-        if (bestSellersResult.success && bestSellersResult.data) {
-          setBestSellers(bestSellersResult.data);
-        } else {
-          setBestSellers([]);
-        }
-      } catch (error) {
-        console.error('Error loading home data:', error);
-        // Fallback to empty arrays
-        setNewArrivals([]);
-        setSaleProducts([]);
-        setBestSellers([]);
-      }
-    };
-
-    loadHomeData();
-
-    // Load banners và reviews (giữ nguyên)
+  useEffect(() => {
     const loadHomepageContent = () => {
       const storedBanners = readStoredBanners()
         .filter((banner) => banner.type === 'slider' && banner.status === 'active' && banner.position === 'homepage')
@@ -464,7 +503,11 @@ export default function Home() {
         </div>
 
         <div className="flash-sale-grid">
-          <p style={emptyStateStyle}>Flash sale sẽ xuất hiện ngay khi có chương trình mới.</p>
+          {flashSaleProducts.length > 0 ? (
+            flashSaleProducts.map((product) => <ProductCard key={product.id} product={product} />)
+          ) : (
+            <p style={emptyStateStyle}>Flash sale sẽ xuất hiện ngay khi có chương trình mới.</p>
+          )}
         </div>
       </section>
 

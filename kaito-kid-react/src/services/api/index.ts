@@ -5,4 +5,5 @@
 export { authApi } from './authApi';
 export { productApi } from './productApi';
 export { adminApi } from './adminApi';
+export { orderApi } from './orderApi';
 export { adminProductsApi } from './adminProductsApi';

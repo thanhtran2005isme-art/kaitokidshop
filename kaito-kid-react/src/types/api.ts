@@ -22,6 +22,13 @@ export interface TokenDTO {
   user: UserInfoDTO;
 }
 
+export interface TokenResponseDTO {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+  user: UserInfoDTO;
+}
+
 export interface UserInfoDTO {
   id: number;
   name: string;
@@ -39,6 +46,43 @@ export interface ChangePasswordDTO {
 
 export interface RefreshTokenDTO {
   refreshToken: string;
+}
+
+// Order DTOs
+export interface OrderItemDTO {
+  id: number;
+  productId: number;
+  productName: string;
+  image: string;
+  color: string;
+  size?: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+}
+
+export interface OrderDTO {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  customerAddress: string;
+  items: OrderItemDTO[];
+  subtotal: number;
+  shippingFee: number;
+  discount: number;
+  total: number;
+  paymentMethod: string;
+  status: 'pending' | 'confirmed' | 'shipping' | 'completed' | 'cancelled';
+  note?: string;
+  adminNote?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface UpdateOrderStatusDTO {
+  trangThai: 'pending' | 'confirmed' | 'shipping' | 'completed' | 'cancelled';
+  ghiChuAdmin?: string;
 }
 
 // Common Response

@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminIcon from '../components/admin/AdminIcon';
-import { orderApi } from '../services/api';
-import type { OrderDTO } from '../types/api';
+import { orderService } from '../services/orderService';
+import type { Order } from '../types';
 import { formatCurrency, formatDate, formatDateShort } from '../utils/format';
-import toast from 'react-hot-toast';
 
-type StatusFilter = 'all' | OrderDTO['status'];
+type StatusFilter = 'all' | Order['status'];
 
-const STATUS_OPTIONS: Array<{ value: OrderDTO['status']; label: string }> = [
+const STATUS_OPTIONS: Array<{ value: Order['status']; label: string }> = [
   { value: 'pending', label: 'Chờ xác nhận' },
   { value: 'confirmed', label: 'Đã xác nhận' },
   { value: 'shipping', label: 'Đang giao' },
@@ -16,7 +15,7 @@ const STATUS_OPTIONS: Array<{ value: OrderDTO['status']; label: string }> = [
   { value: 'cancelled', label: 'Đã hủy' },
 ];
 
-const statusMap: Record<OrderDTO['status'], string> = {
+const statusMap: Record<Order['status'], string> = {
   pending: 'Chờ xác nhận',
   confirmed: 'Đã xác nhận',
   shipping: 'Đang giao',
@@ -25,7 +24,7 @@ const statusMap: Record<OrderDTO['status'], string> = {
 };
 
 const STATUS_META: Record<
-  OrderDTO['status'],
+  Order['status'],
   { label: string; icon: string; tone: 'pending' | 'confirmed' | 'shipping' | 'completed' | 'cancelled' }
 > = {
   pending: { label: 'Chờ xác nhận', icon: 'fa-clock', tone: 'pending' },
@@ -49,11 +48,11 @@ function getStatusFilter(value: string | null): StatusFilter {
   return 'all';
 }
 
-function getOrderDateKey(order: OrderDTO) {
+function getOrderDateKey(order: Order) {
   return order.createdAt?.split('T')[0] || '';
 }
 
-function matchesStatusFilter(order: OrderDTO, filter: StatusFilter) {
+function matchesStatusFilter(order: Order, filter: StatusFilter) {
   if (filter === 'all') {
     return true;
   }
@@ -117,7 +116,7 @@ function formatRelativeTime(dateValue?: string) {
   return formatDate(dateValue);
 }
 
-function getStatusMeta(status: OrderDTO['status']) {
+function getStatusMeta(status: Order['status']) {
   return STATUS_META[status];
 }
 
@@ -143,7 +142,7 @@ function getPaymentMeta(method?: string) {
   return { label: method || 'Thanh toán', icon: 'fa-receipt', tone: 'bank' as const };
 }
 
-function getNextStatus(status: OrderDTO['status']) {
+function getNextStatus(status: Order['status']) {
   switch (status) {
     case 'pending':
       return 'confirmed';
@@ -156,7 +155,7 @@ function getNextStatus(status: OrderDTO['status']) {
   }
 }
 
-function getQuickTransitions(status: OrderDTO['status']): OrderDTO['status'][] {
+function getQuickTransitions(status: Order['status']): Order['status'][] {
   switch (status) {
     case 'pending':
       return ['confirmed', 'cancelled'];
@@ -194,15 +193,14 @@ function getCustomerInitial(name?: string) {
     .join('');
 }
 
-function getOrderItemCount(order: OrderDTO) {
+function getOrderItemCount(order: Order) {
   return order.items.reduce((sum, item) => sum + item.quantity, 0);
 }
 
 export default function AdminOrders() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [orders, setOrders] = useState<OrderDTO[]>([]);
-  const [selected, setSelected] = useState<OrderDTO | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [selected, setSelected] = useState<Order | null>(null);
   const searchKeyword = searchParams.get('search') || '';
   const [search, setSearch] = useState(searchKeyword);
   const [dateFrom, setDateFrom] = useState('');
@@ -210,60 +208,11 @@ export default function AdminOrders() {
 
   const statusFilter = getStatusFilter(searchParams.get('status'));
 
-  const reload = async () => {
-    try {
-      setLoading(true);
-      console.log('Fetching orders from API...');
-      const response = await orderApi.getOrders({});
-      console.log('API Response:', response);
-      
-      // Map backend Vietnamese properties to frontend English properties
-      const allOrders = (response.items || [])
-        .map((order: any) => {
-          console.log('Mapping order:', order);
-          const mappedOrder = {
-            id: order.maDonHang || order.id?.toString() || '',
-            numericId: order.id, // Keep numeric ID for API calls
-            customerName: order.tenNguoiNhan || '',
-            customerPhone: order.soDienThoai || '',
-            customerEmail: order.email || '',
-            customerAddress: order.diaChiGiao || '',
-            items: (order.chiTiet || []).map((item: any) => ({
-              id: item.id,
-              productId: item.sanPhamId,
-              productName: item.tenSanPham,
-              image: item.hinhAnhSP,
-              color: item.mauSac,
-              size: item.kichCo,
-              quantity: item.soLuong,
-              price: item.donGia,
-              subtotal: item.donGia * item.soLuong
-            })),
-            subtotal: order.tamTinh || 0,
-            shippingFee: order.phiVanChuyen || 0,
-            discount: order.giamGia || 0,
-            total: order.tongTien || 0,
-            paymentMethod: order.phuongThucThanhToan || 'COD',
-            status: order.trangThai || 'pending',
-            note: order.ghiChu,
-            adminNote: order.ghiChuAdmin,
-            createdAt: order.ngayTao,
-            updatedAt: order.ngayCapNhat
-          };
-          console.log('Mapped order status:', mappedOrder.status, 'Valid?', ['pending', 'confirmed', 'shipping', 'completed', 'cancelled'].includes(mappedOrder.status));
-          return mappedOrder;
-        })
-        .sort((leftOrder, rightOrder) => new Date(rightOrder.createdAt).getTime() - new Date(leftOrder.createdAt).getTime());
-      
-      console.log('Mapped orders:', allOrders);
-      setOrders(allOrders);
-    } catch (error) {
-      console.error('Failed to fetch orders:', error);
-      toast.error('Không thể tải danh sách đơn hàng');
-      setOrders([]);
-    } finally {
-      setLoading(false);
-    }
+  const reload = () => {
+    const allOrders = orderService
+      .getAll()
+      .sort((leftOrder, rightOrder) => new Date(rightOrder.createdAt).getTime() - new Date(leftOrder.createdAt).getTime());
+    setOrders(allOrders);
   };
 
   useEffect(() => {
@@ -319,9 +268,9 @@ export default function AdminOrders() {
     const matchesSearch =
       !keyword ||
       order.id.toLowerCase().includes(keyword) ||
-      order.customerName?.toLowerCase().includes(keyword) ||
-      order.customerPhone?.toLowerCase().includes(keyword) ||
-      order.customerEmail?.toLowerCase().includes(keyword);
+      order.customer?.name?.toLowerCase().includes(keyword) ||
+      order.customer?.phone?.toLowerCase().includes(keyword) ||
+      order.customer?.email?.toLowerCase().includes(keyword);
     const matchesDateFrom = !dateFrom || (orderDate && orderDate >= dateFrom);
     const matchesDateTo = !dateTo || (orderDate && orderDate <= dateTo);
 
@@ -338,28 +287,11 @@ export default function AdminOrders() {
     .filter((order) => order.status !== 'cancelled')
     .reduce((sum, order) => sum + (order.total || 0), 0);
 
-  const updateStatus = async (id: string, status: OrderDTO['status']) => {
-    try {
-      // Find order to get numeric ID
-      const order = orders.find(o => o.id === id) as any;
-      if (!order || !order.numericId) {
-        toast.error('Không tìm thấy đơn hàng');
-        return;
-      }
-      
-      await orderApi.updateOrderStatus(order.numericId.toString(), { trangThai: status });
-      toast.success('Cập nhật trạng thái thành công');
-      await reload();
-      
-      if (selected?.id === id) {
-        const updatedOrder = orders.find(o => o.id === id);
-        if (updatedOrder) {
-          setSelected(updatedOrder);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to update status:', error);
-      toast.error('Không thể cập nhật trạng thái');
+  const updateStatus = (id: string, status: Order['status']) => {
+    const updatedOrder = orderService.updateStatus(id, status);
+    reload();
+    if (selected?.id === id && updatedOrder) {
+      setSelected(updatedOrder);
     }
   };
 
@@ -698,7 +630,7 @@ export default function AdminOrders() {
             </thead>
             <tbody>
               {filteredOrders.map((order) => {
-                const statusMeta = getStatusMeta(order.status) || STATUS_META.pending;
+                const statusMeta = getStatusMeta(order.status);
                 const paymentMeta = getPaymentMeta(order.paymentMethod);
                 const nextStatus = getNextStatus(order.status);
                 const nextStatusMeta = nextStatus ? getStatusMeta(nextStatus) : null;
@@ -710,16 +642,17 @@ export default function AdminOrders() {
                       <div className="order-code-block">
                         <span className="order-id">#{order.id}</span>
                         <span className="order-item-count">{totalItems} sản phẩm</span>
+                        {order.couponCode && <span className="order-mini-chip">Mã {order.couponCode}</span>}
                       </div>
                     </td>
 
                     <td>
                       <div className="customer-cell">
-                        <div className="customer-avatar">{getCustomerInitial(order.customerName)}</div>
+                        <div className="customer-avatar">{getCustomerInitial(order.customer?.name)}</div>
                         <div className="customer-info">
-                          <span className="customer-name">{order.customerName}</span>
-                          <span className="customer-phone">{order.customerPhone}</span>
-                          <span className="customer-email">{order.customerEmail}</span>
+                          <span className="customer-name">{order.customer?.name}</span>
+                          <span className="customer-phone">{order.customer?.phone}</span>
+                          <span className="customer-email">{order.customer?.email}</span>
                         </div>
                       </div>
                     </td>
@@ -753,7 +686,7 @@ export default function AdminOrders() {
                         <select
                           className="filter-select status-select"
                           value={order.status}
-                          onChange={(event) => updateStatus(order.id, event.target.value as OrderDTO['status'])}
+                          onChange={(event) => updateStatus(order.id, event.target.value as Order['status'])}
                         >
                           {STATUS_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -839,7 +772,7 @@ export default function AdminOrders() {
                   <div className="orders-modal-summary-card">
                     <span>Phí vận chuyển</span>
                     <strong>{selected.shippingFee === 0 ? 'Miễn phí' : formatCurrency(selected.shippingFee)}</strong>
-                    <p>Phí giao hàng</p>
+                    <p>{selected.paymentFee ? `${formatCurrency(selected.paymentFee)} phí thanh toán` : 'Không có phí bổ sung'}</p>
                   </div>
                 </div>
 
@@ -887,19 +820,19 @@ export default function AdminOrders() {
                     <h4>Thông tin khách hàng</h4>
                     <div className="detail-row">
                       <span className="detail-label">Tên khách</span>
-                      <span className="detail-value">{selected.customerName}</span>
+                      <span className="detail-value">{selected.customer?.name}</span>
                     </div>
                     <div className="detail-row">
                       <span className="detail-label">Số điện thoại</span>
-                      <span className="detail-value">{selected.customerPhone}</span>
+                      <span className="detail-value">{selected.customer?.phone}</span>
                     </div>
                     <div className="detail-row">
                       <span className="detail-label">Email</span>
-                      <span className="detail-value">{selected.customerEmail}</span>
+                      <span className="detail-value">{selected.customer?.email}</span>
                     </div>
                     <div className="detail-row">
                       <span className="detail-label">Địa chỉ</span>
-                      <span className="detail-value">{selected.customerAddress}</span>
+                      <span className="detail-value">{selected.customer?.address}</span>
                     </div>
                   </div>
 
@@ -920,10 +853,14 @@ export default function AdminOrders() {
                       <span className="detail-label">Ngày tạo</span>
                       <span className="detail-value">{formatDate(selected.createdAt)}</span>
                     </div>
-                    {selected.updatedAt && (
+                    <div className="detail-row">
+                      <span className="detail-label">Cập nhật gần nhất</span>
+                      <span className="detail-value">{selected.updatedAt ? formatDate(selected.updatedAt) : 'Chưa cập nhật'}</span>
+                    </div>
+                    {selected.couponCode && (
                       <div className="detail-row">
-                        <span className="detail-label">Cập nhật gần nhất</span>
-                        <span className="detail-value">{formatDate(selected.updatedAt)}</span>
+                        <span className="detail-label">Mã giảm giá</span>
+                        <span className="detail-value">{selected.couponCode}</span>
                       </div>
                     )}
                   </div>
@@ -940,11 +877,11 @@ export default function AdminOrders() {
                   <h4>Sản phẩm trong đơn ({selected.items.length})</h4>
                   {selected.items.map((item, index) => (
                     <div key={`${item.id}-${index}`} className="order-item">
-                      <img src={item.image} alt={item.productName} className="item-image" />
+                      <img src={item.image} alt={item.name} className="item-image" />
                       <div className="item-info">
-                        <div className="item-name">{item.productName}</div>
+                        <div className="item-name">{item.name}</div>
                         <div className="item-variant">
-                          {item.color} • {item.size || 'N/A'} • SL {item.quantity}
+                          {item.color} • {item.size} • SL {item.quantity}
                         </div>
                         <div className="item-price">{formatCurrency(item.price * item.quantity)}</div>
                       </div>
@@ -963,6 +900,12 @@ export default function AdminOrders() {
                       {selected.shippingFee === 0 ? 'Miễn phí' : formatCurrency(selected.shippingFee)}
                     </span>
                   </div>
+                  {selected.paymentFee ? (
+                    <div className="detail-row">
+                      <span className="detail-label">Phí thanh toán</span>
+                      <span className="detail-value">{formatCurrency(selected.paymentFee)}</span>
+                    </div>
+                  ) : null}
                   {selected.discount > 0 && (
                     <div className="detail-row">
                       <span className="detail-label">Giảm giá</span>

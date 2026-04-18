@@ -7,3 +7,4 @@ export { productApi } from './productApi';
 export { adminApi } from './adminApi';
 export { orderApi } from './orderApi';
 export { adminProductsApi } from './adminProductsApi';
+export { customerApi } from './customerApi';

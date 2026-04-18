@@ -4,12 +4,8 @@ import AdminIcon from '../components/admin/AdminIcon';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { orderService } from '../services/orderService';
 import { productService } from '../services/productService';
-import { customerApi } from '../services/api';
-import type { CustomerDTO } from '../services/api/customerApi';
-import LoadingSpinner from '../components/LoadingSpinner';
 import type { Order, Product } from '../types';
 import { formatCurrency, formatDate } from '../utils/format';
-import toast from 'react-hot-toast';
 import {
   buildCustomerSummaries,
   readStoredCustomerProfiles,
@@ -26,9 +22,6 @@ interface RawCustomer {
   phone?: string;
   createdAt?: string;
   password?: string;
-  isActive?: boolean;
-  orderCount?: number;
-  totalSpent?: number;
 }
 
 const CARE_OPTIONS: Array<{ value: CustomerCareStatus; label: string; detail: string }> = [
@@ -86,7 +79,6 @@ export default function AdminCustomers() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [profiles, setProfiles] = useState(readStoredCustomerProfiles());
-  const [loading, setLoading] = useState(true);
   const searchKeyword = searchParams.get('search') || '';
   const [searchTerm, setSearchTerm] = useState(searchKeyword);
   const [tierFilter, setTierFilter] = useState<'all' | CustomerTier>('all');
@@ -96,48 +88,12 @@ export default function AdminCustomers() {
   const [detailNote, setDetailNote] = useState('');
   const [detailTags, setDetailTags] = useState('');
 
-  // Fetch customers from backend
   useEffect(() => {
-    fetchCustomers();
+    setUsers(JSON.parse(localStorage.getItem('users') || '[]'));
     setOrders(orderService.getAll());
     setProducts(productService.getAll());
     setProfiles(readStoredCustomerProfiles());
   }, []);
-
-  async function fetchCustomers() {
-    try {
-      setLoading(true);
-      const response = await customerApi.getCustomers({
-        search: searchKeyword || undefined,
-        page: 1,
-        pageSize: 1000, // Get all customers for now
-      });
-
-      if (response.success && response.data) {
-        // Map CustomerDTO to RawCustomer format
-        const mappedUsers: RawCustomer[] = response.data.items.map((customer) => ({
-          id: customer.id,
-          name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
-          createdAt: customer.createdAt,
-          isActive: customer.isActive,
-          orderCount: customer.orderCount,
-          totalSpent: customer.totalSpent,
-        }));
-        setUsers(mappedUsers);
-      } else {
-        toast.error(response.error || 'Không thể tải danh sách khách hàng');
-        setUsers([]);
-      }
-    } catch (error) {
-      console.error('Failed to fetch customers:', error);
-      toast.error('Không thể tải danh sách khách hàng');
-      setUsers([]);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   useEffect(() => {
     setSearchTerm(searchKeyword);
@@ -256,9 +212,9 @@ export default function AdminCustomers() {
 
   const handleDelete = async (customer: CustomerSummary) => {
     const accepted = await confirm({
-      title: 'Khóa tài khoản khách hàng',
-      message: `Tài khoản ${customer.name} sẽ bị khóa (inactive). Bạn có thể mở khóa lại sau.`,
-      confirmLabel: 'Khóa tài khoản',
+      title: 'Xóa tài khoản khách hàng',
+      message: `Tài khoản ${customer.name} sẽ bị xóa, nhưng lịch sử đơn hàng vẫn được giữ lại để đối soát.`,
+      confirmLabel: 'Xóa tài khoản',
       tone: 'danger',
       icon: 'fa-user-slash',
     });
@@ -267,38 +223,25 @@ export default function AdminCustomers() {
       return;
     }
 
-    // Find customer ID from users list
-    const user = users.find((u) => u.email.toLowerCase() === customer.email.toLowerCase());
-    if (!user || !user.id) {
-      notify({ message: 'Không tìm thấy ID khách hàng.', tone: 'error' });
-      return;
+    const nextUsers = users.filter((user) => user.email.toLowerCase() !== customer.email.toLowerCase());
+    localStorage.setItem('users', JSON.stringify(nextUsers));
+    setUsers(nextUsers);
+
+    const nextProfiles = { ...profiles };
+    delete nextProfiles[customer.email.toLowerCase()];
+    saveStoredCustomerProfiles(nextProfiles);
+    setProfiles(nextProfiles);
+
+    if (selectedCustomerKey === customer.email.toLowerCase()) {
+      setSelectedCustomerKey(null);
     }
 
-    try {
-      const response = await customerApi.toggleStatus(user.id);
-      
-      if (response.success) {
-        notify({ message: 'Đã cập nhật trạng thái khách hàng.', tone: 'success' });
-        fetchCustomers(); // Refresh list
-        
-        if (selectedCustomerKey === customer.email.toLowerCase()) {
-          setSelectedCustomerKey(null);
-        }
-      } else {
-        notify({ message: response.error || 'Không thể cập nhật trạng thái.', tone: 'error' });
-      }
-    } catch (error) {
-      console.error('Failed to toggle customer status:', error);
-      notify({ message: 'Không thể cập nhật trạng thái khách hàng.', tone: 'error' });
-    }
+    notify({ message: 'Đã xóa tài khoản khách hàng.', tone: 'success' });
   };
 
   return (
     <div className="customers-admin-page customers-concierge-page">
-      {loading ? (
-        <LoadingSpinner />
-      ) : (
-        <div className="customers-concierge-shell">
+      <div className="customers-concierge-shell">
         <aside className="customers-sideboard">
           <section className="customers-brand-card">
             <span className="customers-overline">Quản lý khách hàng</span>
@@ -501,8 +444,8 @@ export default function AdminCustomers() {
                         event.stopPropagation();
                         void handleDelete(customer);
                       }}>
-                        <AdminIcon name="fa-ban" />
-                        <span>Khóa</span>
+                        <AdminIcon name="fa-trash" />
+                        <span>Xóa</span>
                       </button>
                     </div>
                   </article>
@@ -595,8 +538,8 @@ export default function AdminCustomers() {
                     <span>Lưu hồ sơ</span>
                   </button>
                   <button type="button" className="customers-ghost-btn is-danger" onClick={() => void handleDelete(selectedCustomer)}>
-                    <AdminIcon name="fa-ban" />
-                    <span>Khóa khách hàng</span>
+                    <AdminIcon name="fa-trash" />
+                    <span>Xóa khách hàng</span>
                   </button>
                 </div>
               </section>
@@ -679,7 +622,6 @@ export default function AdminCustomers() {
           )}
         </aside>
       </div>
-      )}
     </div>
   );
 }

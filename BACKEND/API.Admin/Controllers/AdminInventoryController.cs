@@ -22,7 +22,21 @@ public class AdminInventoryController(AdminDbContext db) : ControllerBase
         if (lowStock == true) q = q.Where(p => p.TonKho <= 5);
 
         var items = await q.OrderBy(p => p.TonKho)
-            .Select(p => new { p.Id, p.TenSanPham, p.MaSanPham, p.HinhAnh, p.TonKho, p.SoLuongDaBan, p.TrangThai })
+            .Select(p => new
+            {
+                p.Id,
+                p.TenSanPham,
+                p.MaSanPham,
+                p.HinhAnh,
+                p.TonKho,
+                p.SoLuongDaBan,
+                p.TrangThai,
+                p.DanhMuc,
+                p.DanhMucPhu,
+                p.GioiTinh,
+                p.NgayTao,
+                p.NgayCapNhat
+            })
             .ToListAsync();
         return Ok(items);
     }

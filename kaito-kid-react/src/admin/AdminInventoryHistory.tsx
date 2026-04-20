@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   INVENTORY_UPDATED_EVENT,
-  inventoryService,
   type InventoryHistoryItem,
 } from '../services/inventoryService';
+import { inventoryApi, type InventoryHistoryDTO } from '../services/api';
 import AdminIcon from '../components/admin/AdminIcon';
 
 interface HistoryDayGroup {
@@ -104,21 +104,52 @@ function formatSignedValue(value: number): string {
   return '0';
 }
 
+function mapBackendTypeToFrontend(loaiThayDoi: string): InventoryHistoryItem['type'] {
+  if (loaiThayDoi === 'import') return 'in';
+  if (loaiThayDoi === 'export') return 'out';
+  return 'set';
+}
+
+function mapHistoryDtoToItem(dto: InventoryHistoryDTO): InventoryHistoryItem {
+  return {
+    id: String(dto.id),
+    productId: dto.sanPhamId,
+    productName: dto.tenSanPham || '',
+    sku: '',
+    quantity: dto.soLuong || 0,
+    oldStock: dto.tonKhoTruoc || 0,
+    newStock: dto.tonKhoSau || 0,
+    note: dto.ghiChu || '',
+    createdBy: dto.nguoiThucHien || 'Admin',
+    createdAt: dto.ngayTao,
+    type: mapBackendTypeToFrontend(dto.loaiThayDoi),
+  };
+}
+
 export default function AdminInventoryHistory() {
   const [history, setHistory] = useState<InventoryHistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const loadHistory = () => {
-    setHistory(inventoryService.getHistory());
+  const loadHistory = async () => {
+    setLoading(true);
+    const result = await inventoryApi.getHistory({ page: 1, pageSize: 200 });
+    if (result.success && result.data) {
+      const mapped = result.data.items.map(mapHistoryDtoToItem);
+      setHistory(mapped);
+    } else {
+      setHistory([]);
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
-    loadHistory();
+    void loadHistory();
 
-    const handleInventoryUpdated = () => loadHistory();
+    const handleInventoryUpdated = () => void loadHistory();
     window.addEventListener(INVENTORY_UPDATED_EVENT, handleInventoryUpdated);
 
     return () => {
@@ -567,7 +598,17 @@ export default function AdminInventoryHistory() {
             </section>
           ))}
 
-          {filteredHistory.length === 0 && (
+          {loading && (
+            <div className="inventory-history-empty">
+              <div className="inventory-history-empty-icon">
+                <AdminIcon name="fa-spinner" />
+              </div>
+              <h3>Đang tải lịch sử</h3>
+              <p>Đang lấy lịch sử nhập/xuất kho từ backend.</p>
+            </div>
+          )}
+
+          {!loading && filteredHistory.length === 0 && (
             <div className="inventory-history-empty">
               <div className="inventory-history-empty-icon">
                 <AdminIcon name="fa-history" />

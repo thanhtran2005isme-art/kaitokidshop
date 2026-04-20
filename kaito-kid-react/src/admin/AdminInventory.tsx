@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminIcon from '../components/admin/AdminIcon';
-import { productService } from '../services/productService';
+import { inventoryApi } from '../services/api';
 import {
   INVENTORY_UPDATED_EVENT,
   inventoryService,
@@ -59,6 +59,7 @@ function getStockProgress(stock: number, settings: InventoryAlertSettings): numb
 
 export default function AdminInventory() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -77,15 +78,26 @@ export default function AdminInventory() {
   );
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  const loadInventory = () => {
-    setProducts(productService.getAll());
+  const loadInventory = async () => {
+    setLoading(true);
     setAlertSettings(inventoryService.getAlertSettings());
+
+    const result = await inventoryApi.getAll();
+    if (result.success && result.data) {
+      setProducts(result.data);
+    } else {
+      setToast({
+        type: 'error',
+        message: result.error || 'Không thể tải danh sách tồn kho từ backend.',
+      });
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
-    loadInventory();
+    void loadInventory();
 
-    const handleInventoryUpdated = () => loadInventory();
+    const handleInventoryUpdated = () => void loadInventory();
     window.addEventListener(INVENTORY_UPDATED_EVENT, handleInventoryUpdated);
 
     return () => {
@@ -262,7 +274,7 @@ export default function AdminInventory() {
     setShowExportModal(false);
   };
 
-  const handleExportSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleExportSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!activeProduct || !activeProductProfile?.canManageDirectly) {
@@ -286,25 +298,27 @@ export default function AdminInventory() {
       return;
     }
 
-    const result = inventoryService.exportStock(
-      activeProduct.id,
-      exportQuantity,
-      exportNote.trim() || `Phiếu xuất cho ${activeProduct.name}`,
-    );
+    const result = await inventoryApi.adjust({
+      sanPhamId: activeProduct.id,
+      soLuong: exportQuantity,
+      loaiThayDoi: 'export',
+      ghiChu: exportNote.trim() || `Phiếu xuất cho ${activeProduct.name}`,
+    });
 
-    if (!result) {
-      setToast({ type: 'error', message: 'Không thể xuất kho. Kiểm tra lại số lượng tồn.' });
+    if (!result.success || !result.data) {
+      setToast({ type: 'error', message: result.error || 'Không thể xuất kho. Kiểm tra lại số lượng tồn.' });
       return;
     }
 
     setToast({
       type: 'success',
-      message: `Đã ghi nhận xuất ${result.quantity} sản phẩm cho ${activeProduct.name}.`,
+      message: `Đã ghi nhận xuất ${exportQuantity} sản phẩm cho ${activeProduct.name}.`,
     });
     closeExportModal();
+    await loadInventory();
   };
 
-  const handleRestockSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRestockSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!activeProduct || !activeProductProfile?.canManageDirectly) {
@@ -323,25 +337,27 @@ export default function AdminInventory() {
       return;
     }
 
-    const result = inventoryService.restockProduct(
-      activeProduct.id,
-      restockQuantity,
-      restockNote.trim() || `Phiếu nhập bổ sung cho ${activeProduct.name}`,
-    );
+    const result = await inventoryApi.adjust({
+      sanPhamId: activeProduct.id,
+      soLuong: restockQuantity,
+      loaiThayDoi: 'import',
+      ghiChu: restockNote.trim() || `Phiếu nhập bổ sung cho ${activeProduct.name}`,
+    });
 
-    if (!result) {
+    if (!result.success || !result.data) {
       setToast({
         type: 'error',
-        message: activeProductProfile.note,
+        message: result.error || activeProductProfile.note,
       });
       return;
     }
 
     setToast({
       type: 'success',
-      message: `Đã ghi nhận nhập ${result.quantity} sản phẩm cho ${activeProduct.name}.`,
+      message: `Đã ghi nhận nhập ${restockQuantity} sản phẩm cho ${activeProduct.name}.`,
     });
     closeRestockModal();
+    await loadInventory();
   };
 
   const openBulkModal = () => {
@@ -364,7 +380,7 @@ export default function AdminInventory() {
     setShowBulkModal(false);
   };
 
-  const handleBulkSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleBulkSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (selectedCount === 0) {
@@ -383,25 +399,34 @@ export default function AdminInventory() {
       return;
     }
 
-    const results = inventoryService.bulkRestock(
-      selectedProducts.map((product) => ({ productId: product.id, quantity: bulkQuantity })),
-      bulkNote.trim() || `Phiếu nhập nhanh cho ${selectedCount} sản phẩm`,
+    const note = bulkNote.trim() || `Phiếu nhập nhanh cho ${selectedCount} sản phẩm`;
+    const results = await Promise.all(
+      selectedProducts.map((product) =>
+        inventoryApi.adjust({
+          sanPhamId: product.id,
+          soLuong: bulkQuantity,
+          loaiThayDoi: 'import',
+          ghiChu: note,
+        }),
+      ),
     );
+    const successfulResults = results.filter((result) => result.success);
 
-    if (results.length === 0) {
+    if (successfulResults.length === 0) {
       setToast({
         type: 'error',
-        message: 'Không có sản phẩm nào được cập nhật. Hãy kiểm tra lại mô hình tồn kho của sản phẩm.',
+        message: results.find((result) => result.error)?.error || 'Không có sản phẩm nào được cập nhật. Hãy kiểm tra lại mô hình tồn kho của sản phẩm.',
       });
       return;
     }
 
     setToast({
       type: 'success',
-      message: `Đã ghi nhận phiếu nhập cho ${results.length} sản phẩm đủ điều kiện.`,
+      message: `Đã ghi nhận phiếu nhập cho ${successfulResults.length} sản phẩm đủ điều kiện.`,
     });
     setSelectedIds([]);
     closeBulkModal();
+    await loadInventory();
   };
 
   return (
@@ -670,7 +695,17 @@ export default function AdminInventory() {
             </tbody>
           </table>
 
-          {filteredProducts.length === 0 && (
+          {loading && (
+            <div className="inventory-ops-empty">
+              <div className="inventory-ops-empty-icon">
+                <AdminIcon name="fa-spinner" />
+              </div>
+              <h3>Đang tải tồn kho</h3>
+              <p>Đang lấy danh sách tồn kho từ backend.</p>
+            </div>
+          )}
+
+          {!loading && filteredProducts.length === 0 && (
             <div className="inventory-ops-empty">
               <div className="inventory-ops-empty-icon">
                 <AdminIcon name="fa-box-open" />

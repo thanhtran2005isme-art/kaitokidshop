@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { productService } from '../services/productService';
+import { inventoryApi } from '../services/api';
 import {
   INVENTORY_UPDATED_EVENT,
   inventoryService,
   type InventoryAlertProduct,
   type InventoryAlertSettings,
 } from '../services/inventoryService';
+import type { Product } from '../types';
 import AdminIcon from '../components/admin/AdminIcon';
 
 interface ToastState {
@@ -42,6 +43,7 @@ function getSectionTitle(level: InventoryAlertProduct['alertLevel'], settings: I
 
 export default function AdminInventoryAlerts() {
   const [products, setProducts] = useState<InventoryAlertProduct[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showSettings, setShowSettings] = useState(false);
   const [showRestockModal, setShowRestockModal] = useState(false);
@@ -51,16 +53,34 @@ export default function AdminInventoryAlerts() {
   const [settings, setSettings] = useState<InventoryAlertSettings>(inventoryService.getAlertSettings());
   const [toast, setToast] = useState<ToastState | null>(null);
 
-  const loadAlerts = () => {
+  const loadAlerts = async () => {
+    setLoading(true);
     const latestSettings = inventoryService.getAlertSettings();
     setSettings(latestSettings);
-    setProducts(inventoryService.getAlertProducts(productService.getAll(), latestSettings));
+
+    // Backend lowStock=true => stock <= 5. Nếu watchThreshold > 5, fetch all để filter client.
+    const useBackendFilter = latestSettings.watchThreshold <= 5;
+    const result = await inventoryApi.getAll(useBackendFilter ? { lowStock: true } : undefined);
+
+    if (result.success && result.data) {
+      const allProducts: Product[] = result.data;
+      // Client-side filter theo threshold tùy chỉnh
+      const alertProducts = inventoryService.getAlertProducts(allProducts, latestSettings);
+      setProducts(alertProducts);
+    } else {
+      setProducts([]);
+      setToast({
+        type: 'error',
+        message: result.error || 'Không thể tải cảnh báo tồn kho từ backend.',
+      });
+    }
+    setLoading(false);
   };
 
   useEffect(() => {
-    loadAlerts();
+    void loadAlerts();
 
-    const handleInventoryUpdated = () => loadAlerts();
+    const handleInventoryUpdated = () => void loadAlerts();
     window.addEventListener(INVENTORY_UPDATED_EVENT, handleInventoryUpdated);
 
     return () => {
@@ -122,7 +142,7 @@ export default function AdminInventoryAlerts() {
     setShowRestockModal(false);
   };
 
-  const handleRestockSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleRestockSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!activeProduct || restockQuantity <= 0) {
@@ -142,28 +162,30 @@ export default function AdminInventoryAlerts() {
       return;
     }
 
-    const result = inventoryService.restockProduct(
-      activeProduct.id,
-      restockQuantity,
-      restockNote.trim() || `Phiếu nhập từ trang cảnh báo cho ${activeProduct.name}`,
-    );
+    const result = await inventoryApi.adjust({
+      sanPhamId: activeProduct.id,
+      soLuong: restockQuantity,
+      loaiThayDoi: 'import',
+      ghiChu: restockNote.trim() || `Phiếu nhập từ trang cảnh báo cho ${activeProduct.name}`,
+    });
 
-    if (!result) {
+    if (!result.success || !result.data) {
       setToast({
         type: 'error',
-        message: stockProfile.note,
+        message: result.error || stockProfile.note,
       });
       return;
     }
 
     setToast({
       type: 'success',
-      message: `Đã ghi nhận nhập ${result.quantity} sản phẩm cho ${activeProduct.name}.`,
+      message: `Đã ghi nhận nhập ${restockQuantity} sản phẩm cho ${activeProduct.name}.`,
     });
     closeRestockModal();
+    await loadAlerts();
   };
 
-  const handleSaveSettings = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveSettings = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalized = inventoryService.saveAlertSettings(settings);
     setSettings(normalized);
@@ -172,6 +194,7 @@ export default function AdminInventoryAlerts() {
       message: 'Đã lưu ngưỡng cảnh báo tồn kho.',
     });
     setShowSettings(false);
+    await loadAlerts();
   };
 
   const sections = [
@@ -326,7 +349,15 @@ export default function AdminInventoryAlerts() {
           );
         })}
 
-        {filteredProducts.length === 0 && (
+        {loading && (
+          <div className="card alert-empty-state">
+            <AdminIcon name="fa fa-spinner" />
+            <h3>Đang tải cảnh báo</h3>
+            <p>Đang lấy dữ liệu tồn kho từ backend.</p>
+          </div>
+        )}
+
+        {!loading && filteredProducts.length === 0 && (
           <div className="card alert-empty-state">
             <AdminIcon name="fa fa-check-circle" />
             <h3>Kho hàng đang an toàn</h3>

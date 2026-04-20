@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { productService } from '../services/productService';
+import { categoryApi, type CategoryDTO } from '../services/api';
 import { getProductsForCategory, slugifyLabel } from '../utils/adminProductRelations';
 import { matchesProductCategory, toCanonicalCategory } from '../utils/productTaxonomy';
 import type { Product } from '../types';
 import AdminIcon from '../components/admin/AdminIcon';
+import toast from 'react-hot-toast';
 
 interface Category {
   id: number;
@@ -13,6 +15,8 @@ interface Category {
   description: string;
   productCount: number;
   updatedAt?: string;
+  parentId?: number | null; // Thêm parentId
+  children?: Category[]; // Thêm children
 }
 
 type CategorySort = 'products-desc' | 'products-asc' | 'name-asc' | 'recent';
@@ -168,20 +172,53 @@ export default function AdminCategories() {
   const { confirm, notify } = useAdminUi();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<CategorySort>('products-desc');
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
+  const [parentId, setParentId] = useState<number | null>(null); // Thêm state cho parent
+
+  // Load categories from backend
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      const backendCategories = await categoryApi.getAll();
+      
+      // Map backend data to frontend format
+      const mappedCategories: Category[] = backendCategories.map((cat: CategoryDTO) => ({
+        id: cat.id,
+        name: cat.tenDanhMuc,
+        slug: cat.slug || slugifyLabel(cat.tenDanhMuc),
+        description: cat.moTa || '',
+        productCount: 0, // Will be synced with products
+        updatedAt: cat.ngayTao,
+        parentId: cat.danhMucChaId || null, // Map parentId
+      }));
+
+      const savedProducts = productService.getAll();
+      const syncedCategories = syncCategoriesWithProducts(mappedCategories, savedProducts);
+      
+      setProducts(savedProducts);
+      setCategories(syncedCategories);
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+      toast.error('Không thể tải danh mục');
+      
+      // Fallback to default categories
+      const savedProducts = productService.getAll();
+      const syncedCategories = syncCategoriesWithProducts(DEFAULT_CATEGORIES, savedProducts);
+      setProducts(savedProducts);
+      setCategories(syncedCategories);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const savedProducts = productService.getAll();
-    const syncedCategories = syncCategoriesWithProducts(readStoredCategories(), savedProducts);
-
-    setProducts(savedProducts);
-    setCategories(syncedCategories);
-    localStorage.setItem('categories', JSON.stringify(syncedCategories));
+    loadCategories();
   }, []);
 
   const saveCategories = (list: Category[]) => {
@@ -243,12 +280,14 @@ export default function AdminCategories() {
     setEditId(null);
     setName('');
     setDesc('');
+    setParentId(null); // Reset parentId
   };
 
   const openAdd = () => {
     setEditId(null);
     setName('');
     setDesc('');
+    setParentId(null); // Reset parentId
     setShowForm(true);
   };
 
@@ -256,10 +295,11 @@ export default function AdminCategories() {
     setEditId(category.id);
     setName(category.name);
     setDesc(category.description);
+    setParentId(category.parentId || null); // Set parentId
     setShowForm(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedName = name.trim();
 
     if (!trimmedName) {
@@ -270,59 +310,79 @@ export default function AdminCategories() {
       return;
     }
 
-    const canonicalCategory = toCanonicalCategory(trimmedName);
+    // Chỉ validate taxonomy chuẩn cho danh mục gốc (không có parent)
+    let normalizedName = trimmedName;
+    
+    if (!parentId) {
+      // Danh mục gốc phải map vào taxonomy chuẩn
+      const canonicalCategory = toCanonicalCategory(trimmedName);
 
-    if (!canonicalCategory) {
-      notify({
-        tone: 'error',
-        message: 'Tên danh mục cần map được vào taxonomy chuẩn như Áo, Quần, Váy, Đầm hoặc Phụ kiện.',
-      });
-      return;
+      if (!canonicalCategory) {
+        notify({
+          tone: 'error',
+          message: 'Tên danh mục gốc cần map được vào taxonomy chuẩn như Áo, Quần, Váy, Đầm hoặc Phụ kiện.',
+        });
+        return;
+      }
+
+      normalizedName = CANONICAL_CATEGORY_LABELS[canonicalCategory] || trimmedName;
     }
-
-    const normalizedName = CANONICAL_CATEGORY_LABELS[canonicalCategory] || trimmedName;
+    
+    // Check duplicate: same name AND same parent (or both are root)
     const duplicateCategory = categories.find(
-      (category) => category.id !== editId && slugifyLabel(category.name) === slugifyLabel(normalizedName)
+      (category) => 
+        category.id !== editId && 
+        slugifyLabel(category.name) === slugifyLabel(normalizedName) &&
+        category.parentId === parentId // Chỉ trùng nếu cùng parent
     );
 
     if (duplicateCategory) {
       notify({
         tone: 'error',
-        message: `Danh mục ${normalizedName} đã tồn tại trong taxonomy.`,
+        message: `Danh mục ${normalizedName} đã tồn tại ${parentId ? 'trong danh mục cha này' : 'ở cấp gốc'}.`,
       });
       return;
     }
 
-    let nextCategories = [...categories];
+    try {
+      if (editId) {
+        // Update existing category
+        await categoryApi.update(editId, {
+          tenDanhMuc: normalizedName,
+          slug: slugifyLabel(normalizedName),
+          moTa: desc.trim(),
+          danhMucChaId: parentId || undefined, // Include parentId
+          thuTu: 0,
+          trangThai: true,
+        });
+        
+        toast.success('Đã cập nhật danh mục');
+      } else {
+        // Create new category
+        await categoryApi.create({
+          tenDanhMuc: normalizedName,
+          slug: slugifyLabel(normalizedName),
+          moTa: desc.trim(),
+          danhMucChaId: parentId || undefined, // Include parentId
+          thuTu: categories.length,
+          trangThai: true,
+        });
+        
+        toast.success('Đã tạo danh mục mới');
+      }
 
-    if (editId) {
-      nextCategories = nextCategories.map((category) =>
-        category.id === editId
-          ? {
-              ...category,
-              name: normalizedName,
-              description: desc.trim(),
-              updatedAt: new Date().toISOString(),
-            }
-          : category
-      );
-    } else {
-      nextCategories.push({
-        id: Date.now(),
-        name: normalizedName,
-        slug: slugifyLabel(normalizedName),
-        description: desc.trim(),
-        productCount: 0,
-        updatedAt: new Date().toISOString(),
+      // Reload categories from backend
+      await loadCategories();
+      closeForm();
+      
+      notify({
+        tone: 'success',
+        message: editId ? 'Đã cập nhật danh mục.' : 'Đã tạo danh mục mới.',
       });
+    } catch (error) {
+      console.error('Failed to save category:', error);
+      toast.error('Không thể lưu danh mục');
     }
-
-    saveCategories(nextCategories);
-    closeForm();
-    notify({
-      tone: 'success',
-      message: editId ? 'Đã cập nhật danh mục.' : 'Đã tạo danh mục mới.',
-    });
   };
 
   const handleDelete = async (id: number) => {
@@ -338,15 +398,31 @@ export default function AdminCategories() {
       return;
     }
 
-    saveCategories(categories.filter((category) => category.id !== id));
-    notify({
-      tone: 'success',
-      message: 'Đã xóa danh mục.',
-    });
+    try {
+      await categoryApi.delete(id);
+      toast.success('Đã xóa danh mục');
+      
+      // Reload categories from backend
+      await loadCategories();
+      
+      notify({
+        tone: 'success',
+        message: 'Đã xóa danh mục.',
+      });
+    } catch (error) {
+      console.error('Failed to delete category:', error);
+      toast.error('Không thể xóa danh mục');
+    }
   };
 
   return (
     <div className="categories-admin-page taxonomy-studio-page">
+      {loading ? (
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <p>Đang tải danh mục...</p>
+        </div>
+      ) : (
+        <>
       <section className="taxonomy-hero">
         <div className="taxonomy-hero-copy">
           <span className="taxonomy-eyebrow">Taxonomy studio</span>
@@ -508,7 +584,14 @@ export default function AdminCategories() {
                       <span className="taxonomy-card-kicker">{theme.kicker}</span>
                       <div className="taxonomy-card-heading">
                         <div>
-                          <h3>{category.name}</h3>
+                          <h3>
+                            {category.name}
+                            {category.parentId && (
+                              <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '0.5rem' }}>
+                                (Con của: {categories.find(c => c.id === category.parentId)?.name || 'N/A'})
+                              </span>
+                            )}
+                          </h3>
                           <p>/{category.slug}</p>
                         </div>
                         <span className="taxonomy-card-count">{linkedProducts.length}</span>
@@ -658,6 +741,25 @@ export default function AdminCategories() {
                 </div>
 
                 <div className="taxonomy-form-group">
+                  <label>Danh mục cha</label>
+                  <select 
+                    value={parentId || ''} 
+                    onChange={(event) => setParentId(event.target.value ? Number(event.target.value) : null)}
+                  >
+                    <option value="">-- Không có (Danh mục gốc) --</option>
+                    {categories
+                      .filter(cat => cat.id !== editId && !cat.parentId) // Chỉ hiển thị danh mục gốc, không hiển thị chính nó
+                      .map(cat => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))
+                    }
+                  </select>
+                  <small>Chọn danh mục cha nếu đây là danh mục con (subcategory)</small>
+                </div>
+
+                <div className="taxonomy-form-group">
                   <label>Mô tả</label>
                   <textarea
                     rows={4}
@@ -727,6 +829,8 @@ export default function AdminCategories() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

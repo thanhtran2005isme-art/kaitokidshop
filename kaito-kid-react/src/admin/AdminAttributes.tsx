@@ -1,9 +1,11 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { productService } from '../services/productService';
+import { attributeApi, type AttributeDTO } from '../services/api';
 import { getLinkedProducts, sortProductsForPicker, syncLinkedProductIds } from '../utils/adminProductRelations';
 import type { Product } from '../types';
 import AdminIcon from '../components/admin/AdminIcon';
+import toast from 'react-hot-toast';
 
 interface Attribute {
   id: number;
@@ -254,44 +256,6 @@ function buildDefaultAttributes(products: Product[]): Attribute[] {
   }));
 }
 
-function readStoredAttributes(products: Product[]) {
-  try {
-    const rawAttributes = JSON.parse(localStorage.getItem('attributes') || '[]');
-
-    if (!Array.isArray(rawAttributes) || rawAttributes.length === 0) {
-      return buildDefaultAttributes(products);
-    }
-
-    const normalizedAttributes = rawAttributes
-      .map((attribute: Partial<Attribute>, index: number) => {
-        const name = String(attribute.name || '').trim();
-
-        if (!name) {
-          return null;
-        }
-
-        const nextAttribute: Attribute = {
-          id: Number(attribute.id) || Date.now() + index,
-          name,
-          type: attribute.type === 'select' || attribute.type === 'color' ? attribute.type : 'text',
-          values: dedupeValues(Array.isArray(attribute.values) ? attribute.values.map((value) => String(value).trim()) : []),
-          productIds: Array.isArray(attribute.productIds)
-            ? attribute.productIds.map((id) => Number(id)).filter((id) => Number.isFinite(id))
-            : [],
-          usageCount: Number(attribute.usageCount || 0),
-          updatedAt: attribute.updatedAt,
-        };
-
-        return nextAttribute;
-      })
-      .filter(Boolean) as Attribute[];
-
-    return normalizedAttributes.length > 0 ? normalizedAttributes : buildDefaultAttributes(products);
-  } catch {
-    return buildDefaultAttributes(products);
-  }
-}
-
 function syncAttributesWithProducts(attributes: Attribute[], products: Product[]) {
   return attributes.map((attribute) => {
     const productIds = resolveAttributeProductIds(attribute, products);
@@ -333,6 +297,7 @@ export default function AdminAttributes() {
   const { confirm, notify } = useAdminUi();
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | Attribute['type']>('all');
   const [usageFilter, setUsageFilter] = useState<AttributeUsageFilter>('all');
@@ -343,20 +308,70 @@ export default function AdminAttributes() {
   const [valuesText, setValuesText] = useState('');
   const [productSearch, setProductSearch] = useState('');
 
-  useEffect(() => {
-    const allProducts = productService.getAll();
-    const syncedAttributes = syncAttributesWithProducts(readStoredAttributes(allProducts), allProducts);
-
-    setProducts(allProducts);
-    setAttributes(syncedAttributes);
-    localStorage.setItem('attributes', JSON.stringify(syncedAttributes));
-  }, []);
-
-  const saveAttributes = (nextAttributes: Attribute[]) => {
-    const syncedAttributes = syncAttributesWithProducts(nextAttributes, products);
-    setAttributes(syncedAttributes);
-    localStorage.setItem('attributes', JSON.stringify(syncedAttributes));
+  // Helper: Map nhomThuocTinh to type
+  const mapNhomToType = (nhom?: string): Attribute['type'] => {
+    if (nhom === 'color') return 'color';
+    if (nhom === 'size' || nhom === 'select') return 'select';
+    return 'text';
   };
+
+  // Helper: Map type to nhomThuocTinh
+  const mapTypeToNhom = (type: Attribute['type']): string => {
+    if (type === 'color') return 'color';
+    if (type === 'select') return 'size';
+    return 'material';
+  };
+
+  // Load attributes from backend
+  const loadAttributes = async () => {
+    try {
+      setLoading(true);
+      const rows = await attributeApi.getAll();
+      const allProducts = productService.getAll();
+      
+      // Group rows by tenThuocTinh
+      const grouped: Record<string, Attribute> = {};
+      
+      rows.forEach((row: AttributeDTO) => {
+        const key = row.tenThuocTinh;
+        if (!grouped[key]) {
+          grouped[key] = {
+            id: row.id,
+            name: row.tenThuocTinh,
+            type: mapNhomToType(row.nhomThuocTinh),
+            values: [],
+            productIds: [],
+            usageCount: 0,
+            updatedAt: row.ngayTao,
+          };
+        }
+        if (row.giaTri) {
+          grouped[key].values.push(row.giaTri);
+        }
+      });
+
+      const mappedAttributes = Object.values(grouped);
+      const syncedAttributes = syncAttributesWithProducts(mappedAttributes, allProducts);
+      
+      setProducts(allProducts);
+      setAttributes(syncedAttributes);
+    } catch (error) {
+      console.error('Failed to load attributes:', error);
+      toast.error('Không thể tải thuộc tính');
+      
+      // Fallback to default
+      const allProducts = productService.getAll();
+      const defaultAttrs = buildDefaultAttributes(allProducts);
+      setProducts(allProducts);
+      setAttributes(defaultAttrs);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAttributes();
+  }, []);
 
   const closeModal = () => {
     setShowModal(false);
@@ -386,10 +401,9 @@ export default function AdminAttributes() {
     setShowModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedName = form.name.trim();
     const values = parseValuesText(valuesText);
-    const productIds = syncLinkedProductIds(form.productIds, products);
     const duplicateAttribute = attributes.find(
       (attribute) =>
         attribute.id !== editId &&
@@ -420,39 +434,45 @@ export default function AdminAttributes() {
       return;
     }
 
-    let nextAttributes = [...attributes];
-
-    if (editId) {
-      nextAttributes = nextAttributes.map((attribute) =>
-        attribute.id === editId
-          ? {
-              ...attribute,
-              name: trimmedName,
-              type: form.type,
-              values,
-              productIds,
-              updatedAt: new Date().toISOString(),
-            }
-          : attribute
-      );
-    } else {
-      nextAttributes.push({
-        id: Date.now(),
-        name: trimmedName,
-        type: form.type,
-        values,
-        productIds,
-        usageCount: productIds.length,
-        updatedAt: new Date().toISOString(),
+    try {
+      const nhom = mapTypeToNhom(form.type);
+      
+      if (editId) {
+        // Update: Delete old rows and create new ones
+        // Find all rows with same name
+        const allRows = await attributeApi.getAll();
+        const oldRows = allRows.filter((row: AttributeDTO) => row.tenThuocTinh === trimmedName);
+        
+        // Delete old rows
+        for (const row of oldRows) {
+          await attributeApi.delete(row.id);
+        }
+      }
+      
+      // Create new rows for each value
+      for (let i = 0; i < values.length; i++) {
+        await attributeApi.create({
+          tenThuocTinh: trimmedName,
+          giaTri: values[i],
+          nhomThuocTinh: nhom,
+          thuTu: i,
+        });
+      }
+      
+      toast.success(editId ? 'Đã cập nhật thuộc tính' : 'Đã tạo thuộc tính mới');
+      
+      // Reload from backend
+      await loadAttributes();
+      closeModal();
+      
+      notify({
+        tone: 'success',
+        message: editId ? 'Đã cập nhật thuộc tính.' : 'Đã tạo thuộc tính mới.',
       });
+    } catch (error) {
+      console.error('Failed to save attribute:', error);
+      toast.error('Không thể lưu thuộc tính');
     }
-
-    saveAttributes(nextAttributes);
-    closeModal();
-    notify({
-      tone: 'success',
-      message: editId ? 'Đã cập nhật thuộc tính.' : 'Đã tạo thuộc tính mới.',
-    });
   };
 
   const handleDelete = async (id: number) => {
@@ -468,11 +488,32 @@ export default function AdminAttributes() {
       return;
     }
 
-    saveAttributes(attributes.filter((attribute) => attribute.id !== id));
-    notify({
-      tone: 'success',
-      message: 'Đã xóa thuộc tính.',
-    });
+    try {
+      // Find attribute name
+      const attribute = attributes.find(attr => attr.id === id);
+      if (!attribute) return;
+      
+      // Delete all rows with same name
+      const allRows = await attributeApi.getAll();
+      const rowsToDelete = allRows.filter((row: AttributeDTO) => row.tenThuocTinh === attribute.name);
+      
+      for (const row of rowsToDelete) {
+        await attributeApi.delete(row.id);
+      }
+      
+      toast.success('Đã xóa thuộc tính');
+      
+      // Reload from backend
+      await loadAttributes();
+      
+      notify({
+        tone: 'success',
+        message: 'Đã xóa thuộc tính.',
+      });
+    } catch (error) {
+      console.error('Failed to delete attribute:', error);
+      toast.error('Không thể xóa thuộc tính');
+    }
   };
 
   const toggleProduct = (productId: number) => {
@@ -560,12 +601,18 @@ export default function AdminAttributes() {
 
   return (
     <div className="attributes-admin-page attribute-workshop-page">
-      <section className="attribute-workshop-hero">
-        <div className="attribute-hero-copy">
-          <span className="attribute-hero-eyebrow">Attribute workshop</span>
-          <h1>Thuộc tính và preset vận hành catalog</h1>
-          <p>
-            Tổ chức các thuộc tính theo hướng dễ dùng hơn cho team vận hành: nhìn nhanh loại nào đang phủ nhiều sản
+      {loading ? (
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <p>Đang tải thuộc tính...</p>
+        </div>
+      ) : (
+        <>
+          <section className="attribute-workshop-hero">
+            <div className="attribute-hero-copy">
+              <span className="attribute-hero-eyebrow">Attribute workshop</span>
+              <h1>Thuộc tính và preset vận hành catalog</h1>
+              <p>
+                Tổ chức các thuộc tính theo hướng dễ dùng hơn cho team vận hành: nhìn nhanh loại nào đang phủ nhiều sản
             phẩm, loại nào còn trống và preset nào nên chuẩn hóa để đồng bộ size, màu, chất liệu và form dáng.
           </p>
 
@@ -1149,6 +1196,8 @@ export default function AdminAttributes() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

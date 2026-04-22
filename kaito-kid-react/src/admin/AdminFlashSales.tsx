@@ -3,10 +3,9 @@ import { useAdminUi } from '../components/admin/AdminUiProvider';
 import type { Product } from '../types';
 import { productService } from '../services/productService';
 import { formatCurrency } from '../utils/format';
+import { flashSaleApi, type FlashSaleDTO } from '../services/api';
 import {
   getFlashSaleStatus,
-  readStoredFlashSales,
-  saveStoredFlashSales,
   type FlashSale,
 } from '../utils/marketingConfig';
 import AdminIcon from '../components/admin/AdminIcon';
@@ -62,6 +61,20 @@ function calculateSalePrice(price: number, discountPercent: number): number {
   return Math.max(0, Math.round(price * (100 - discountPercent) / 100));
 }
 
+function mapDtoToFlashSale(dto: FlashSaleDTO): FlashSale {
+  return {
+    id: dto.id,
+    name: dto.tenFlashSale || '',
+    description: '',
+    startDate: dto.ngayBatDau || '',
+    endDate: dto.ngayKetThuc || '',
+    discountPercent: 0, // calculated from chiTiet
+    productIds: (dto.chiTiet || []).map((item) => item.sanPhamId),
+    status: dto.trangThai ? 'upcoming' : 'draft',
+    createdAt: dto.ngayTao || new Date().toISOString(),
+  };
+}
+
 export default function AdminFlashSales() {
   const { confirm } = useAdminUi();
   const [sales, setSales] = useState<FlashSale[]>([]);
@@ -79,8 +92,15 @@ export default function AdminFlashSales() {
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
 
+  const loadSales = async () => {
+    const result = await flashSaleApi.getAll();
+    if (result.success && result.data) {
+      setSales(result.data.map(mapDtoToFlashSale));
+    }
+  };
+
   useEffect(() => {
-    setSales(readStoredFlashSales());
+    void loadSales();
     setProducts(productService.getAll().filter((product) => product.status === 'active'));
   }, []);
 
@@ -171,14 +191,12 @@ export default function AdminFlashSales() {
     resetForm();
   };
 
-  const persistSales = (nextSales: FlashSale[], message: string) => {
-    const saved = saveStoredFlashSales(nextSales);
-    setSales(saved);
+  const showFeedback = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => setFeedback(''), 3000);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim() || !form.startDate || !form.endDate) {
       setError('Cần nhập ten flash sale và khoang thoi gian.');
       return;
@@ -194,26 +212,41 @@ export default function AdminFlashSales() {
       return;
     }
 
-    const now = new Date().toISOString();
-    const nextSale: FlashSale = {
-      id: editId || Date.now(),
-      name: form.name.trim(),
-      description: form.description.trim(),
-      startDate: form.startDate,
-      endDate: form.endDate,
-      discountPercent: Math.max(0, Math.min(100, form.discountPercent)),
-      productIds: form.productIds,
-      status: form.status,
-      createdAt: editId ? sales.find((sale) => sale.id === editId)?.createdAt || now : now,
-      updatedAt: now,
+    const chiTiet = form.productIds.map((productId) => {
+      const product = products.find((p) => p.id === productId);
+      const originalPrice = product?.price || 0;
+      const salePrice = Math.round(originalPrice * (100 - form.discountPercent) / 100);
+      return {
+        sanPhamId: productId,
+        giaFlashSale: salePrice,
+        soLuongGioiHan: 50,
+        daBan: 0,
+      };
+    });
+
+    const payload = {
+      tenFlashSale: form.name.trim(),
+      ngayBatDau: form.startDate,
+      ngayKetThuc: form.endDate,
+      trangThai: form.status !== 'draft',
+      chiTiet,
     };
 
-    const nextSales = editId
-      ? sales.map((sale) => sale.id === editId ? nextSale : sale)
-      : [...sales, nextSale];
-
-    persistSales(nextSales, editId ? 'Đã cập nhật flash sale.' : 'Đã tạo flash sale mới.');
-    closeForm();
+    try {
+      if (editId) {
+        const result = await flashSaleApi.update(editId, payload);
+        if (!result.success) { setError(result.error || 'Lỗi cập nhật.'); return; }
+        showFeedback('Đã cập nhật flash sale.');
+      } else {
+        const result = await flashSaleApi.create(payload);
+        if (!result.success) { setError(result.error || 'Lỗi tạo mới.'); return; }
+        showFeedback('Đã tạo flash sale mới.');
+      }
+      await loadSales();
+      closeForm();
+    } catch {
+      setError('Lỗi kết nối server.');
+    }
   };
 
   const handleDelete = async (saleId: number) => {
@@ -235,10 +268,13 @@ export default function AdminFlashSales() {
       return;
     }
 
-    persistSales(
-      sales.filter((sale) => sale.id !== saleId),
-      'Đã xóa flash sale.',
-    );
+    const result = await flashSaleApi.delete(saleId);
+    if (result.success) {
+      showFeedback('Đã xóa flash sale.');
+      await loadSales();
+    } else {
+      setFeedback(result.error || 'Không thể xóa.');
+    }
   };
 
   const toggleProduct = (productId: number) => {

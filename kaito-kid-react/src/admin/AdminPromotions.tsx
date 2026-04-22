@@ -2,12 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import type { Product } from '../types';
 import { productService } from '../services/productService';
+import { promotionApi, type PromotionDTO } from '../services/api';
 import {
   getPromotionProducts,
   getPromotionStatus,
   getPromotionTargetSummary,
-  readStoredPromotions,
-  saveStoredPromotions,
   type Promotion,
   type PromotionTargetType,
   type PromotionType,
@@ -77,6 +76,40 @@ function formatDateTime(value: string): string {
   }).format(new Date(value));
 }
 
+function mapDtoToPromotion(dto: PromotionDTO): Promotion {
+  // Determine targetType and targetValues from backend fields
+  let targetType: PromotionTargetType = 'all';
+  let targetValues: string[] = [];
+  let productIds: number[] = [];
+
+  if (dto.apDungCho === 'gender' && dto.danhMucApDung) {
+    targetType = 'gender';
+    targetValues = dto.danhMucApDung.split(',').map((s) => s.trim()).filter(Boolean);
+  } else if (dto.apDungCho === 'category' && dto.danhMucApDung) {
+    targetType = 'category';
+    targetValues = dto.danhMucApDung.split(',').map((s) => s.trim()).filter(Boolean);
+  } else if (dto.apDungCho === 'products' && dto.sanPhamApDung) {
+    targetType = 'products';
+    productIds = dto.sanPhamApDung.split(',').map((s) => Number(s.trim())).filter((n) => n > 0);
+  }
+
+  return {
+    id: dto.id,
+    name: dto.tenKhuyenMai || '',
+    description: '',
+    type: (dto.loaiGiamGia === 'fixed' ? 'discount' : 'discount') as PromotionType,
+    discountPercent: dto.giaTri || 0,
+    startDate: dto.ngayBatDau || '',
+    endDate: dto.ngayKetThuc || '',
+    status: dto.trangThai ? 'scheduled' : 'draft',
+    targetType,
+    targetValues,
+    productIds,
+    isHomepageVisible: false,
+    createdAt: dto.ngayTao || new Date().toISOString(),
+  };
+}
+
 export default function AdminPromotions() {
   const { confirm } = useAdminUi();
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -95,8 +128,15 @@ export default function AdminPromotions() {
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
 
+  const loadPromotions = async () => {
+    const result = await promotionApi.getAll();
+    if (result.success && result.data) {
+      setPromotions(result.data.map(mapDtoToPromotion));
+    }
+  };
+
   useEffect(() => {
-    setPromotions(readStoredPromotions());
+    void loadPromotions();
     setProducts(productService.getAll().filter((product) => product.status === 'active'));
   }, []);
 
@@ -222,14 +262,12 @@ export default function AdminPromotions() {
     resetForm();
   };
 
-  const persistPromotions = (nextPromotions: Promotion[], message: string) => {
-    const saved = saveStoredPromotions(nextPromotions);
-    setPromotions(saved);
+  const showFeedback = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => setFeedback(''), 3000);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim() || !form.startDate || !form.endDate) {
       setError('Cần nhập ten chuong trinh và khoang thoi gian ap dung.');
       return;
@@ -250,30 +288,35 @@ export default function AdminPromotions() {
       return;
     }
 
-    const now = new Date().toISOString();
-    const nextPromotion: Promotion = {
-      id: editId || Date.now(),
-      name: form.name.trim(),
-      description: form.description.trim(),
-      type: form.type,
-      discountPercent: Math.max(0, Math.min(100, form.discountPercent)),
-      startDate: form.startDate,
-      endDate: form.endDate,
-      status: form.status,
-      targetType: form.targetType,
-      targetValues: form.targetValues,
-      productIds: form.productIds,
-      isHomepageVisible: form.isHomepageVisible,
-      createdAt: editId ? promotions.find((promotion) => promotion.id === editId)?.createdAt || now : now,
-      updatedAt: now,
+    const payload = {
+      tenKhuyenMai: form.name.trim(),
+      loaiGiamGia: 'percent',
+      giaTri: Math.max(0, Math.min(100, form.discountPercent)),
+      apDungCho: form.targetType,
+      danhMucApDung: (form.targetType === 'gender' || form.targetType === 'category')
+        ? form.targetValues.join(',') : undefined,
+      sanPhamApDung: form.targetType === 'products'
+        ? form.productIds.join(',') : undefined,
+      ngayBatDau: form.startDate,
+      ngayKetThuc: form.endDate,
+      trangThai: form.status !== 'draft',
     };
 
-    const nextPromotions = editId
-      ? promotions.map((promotion) => promotion.id === editId ? nextPromotion : promotion)
-      : [...promotions, nextPromotion];
-
-    persistPromotions(nextPromotions, editId ? 'Đã cập nhật chuong trinh khuyến mãi.' : 'Đã tạo chuong trinh khuyến mãi mới.');
-    closeForm();
+    try {
+      if (editId) {
+        const result = await promotionApi.update(editId, payload);
+        if (!result.success) { setError(result.error || 'Lỗi cập nhật.'); return; }
+        showFeedback('Đã cập nhật chuong trinh khuyến mãi.');
+      } else {
+        const result = await promotionApi.create(payload);
+        if (!result.success) { setError(result.error || 'Lỗi tạo mới.'); return; }
+        showFeedback('Đã tạo chuong trinh khuyến mãi mới.');
+      }
+      await loadPromotions();
+      closeForm();
+    } catch {
+      setError('Lỗi kết nối server.');
+    }
   };
 
   const handleDelete = async (promotionId: number) => {
@@ -295,10 +338,13 @@ export default function AdminPromotions() {
       return;
     }
 
-    persistPromotions(
-      promotions.filter((item) => item.id !== promotionId),
-      'Đã xóa chuong trinh khuyến mãi.',
-    );
+    const result = await promotionApi.delete(promotionId);
+    if (result.success) {
+      showFeedback('Đã xóa chuong trinh khuyến mãi.');
+      await loadPromotions();
+    } else {
+      setFeedback(result.error || 'Không thể xóa.');
+    }
   };
 
   const toggleTargetValue = (value: string) => {

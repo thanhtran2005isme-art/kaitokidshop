@@ -1,11 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { formatCurrency } from '../utils/format';
+import { couponApi, type CouponDTO } from '../services/api';
 import {
   calculateCouponDiscount,
   getCouponStatus,
-  readStoredCoupons,
-  saveStoredCoupons,
   type Coupon,
   type CouponDiscountType,
 } from '../utils/marketingConfig';
@@ -62,9 +61,30 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
+// Map backend DTO to frontend Coupon
+function mapDtoToCoupon(dto: CouponDTO): Coupon {
+  return {
+    id: dto.id,
+    code: dto.maCoupon || '',
+    description: dto.moTa || '',
+    discountType: (dto.loaiGiamGia === 'fixed' ? 'fixed' : 'percent') as CouponDiscountType,
+    discountValue: dto.giaTri || 0,
+    maxDiscount: dto.giamToiDa || undefined,
+    minOrder: dto.donToiThieu || 0,
+    quantity: dto.soLuotDung || 0,
+    used: dto.daSuDung || 0,
+    startDate: dto.ngayBatDau ? dto.ngayBatDau.slice(0, 10) : '',
+    endDate: dto.ngayKetThuc ? dto.ngayKetThuc.slice(0, 10) : '',
+    status: dto.trangThai ? 'active' : 'paused',
+    isPublic: true,
+    createdAt: dto.ngayTao || new Date().toISOString(),
+  };
+}
+
 export default function AdminCoupons() {
   const { confirm } = useAdminUi();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,8 +93,19 @@ export default function AdminCoupons() {
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
 
+  const loadCoupons = async () => {
+    setLoading(true);
+    const result = await couponApi.getAll();
+    if (result.success && result.data) {
+      setCoupons(result.data.map(mapDtoToCoupon));
+    } else {
+      setCoupons([]);
+    }
+    setLoading(false);
+  };
+
   useEffect(() => {
-    setCoupons(readStoredCoupons());
+    void loadCoupons();
   }, []);
 
   const filteredCoupons = useMemo(() => {
@@ -136,14 +167,12 @@ export default function AdminCoupons() {
     resetForm();
   };
 
-  const persistCoupons = (nextCoupons: Coupon[], message: string) => {
-    const saved = saveStoredCoupons(nextCoupons);
-    setCoupons(saved);
+  const showFeedback = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => setFeedback(''), 3000);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.code.trim() || !form.endDate) {
       setError('Cần nhập ma coupon và ngay het han.');
       return;
@@ -162,31 +191,40 @@ export default function AdminCoupons() {
       return;
     }
 
-    const now = new Date().toISOString();
-    const nextCoupon: Coupon = {
-      id: editId || Date.now(),
-      code: normalizedCode,
-      description: form.description.trim(),
-      discountType: form.discountType,
-      discountValue: Math.max(0, form.discountValue),
-      maxDiscount: form.discountType === 'percent' && (form.maxDiscount || 0) > 0 ? form.maxDiscount : undefined,
-      minOrder: Math.max(0, form.minOrder),
-      quantity: Math.max(0, form.quantity),
-      used: Math.min(Math.max(0, form.used), Math.max(0, form.quantity)),
-      startDate: form.startDate,
-      endDate: form.endDate,
-      status: form.status,
-      isPublic: form.isPublic,
-      createdAt: editId ? coupons.find((coupon) => coupon.id === editId)?.createdAt || now : now,
-      updatedAt: now,
+    const payload = {
+      maCoupon: normalizedCode,
+      loaiGiamGia: form.discountType,
+      giaTri: Math.max(0, form.discountValue),
+      donToiThieu: form.minOrder > 0 ? form.minOrder : undefined,
+      giamToiDa: form.discountType === 'percent' && (form.maxDiscount || 0) > 0 ? form.maxDiscount : undefined,
+      soLuotDung: Math.max(0, form.quantity),
+      ngayBatDau: form.startDate,
+      ngayKetThuc: form.endDate,
+      trangThai: form.status === 'active',
+      moTa: form.description.trim() || undefined,
     };
 
-    const nextCoupons = editId
-      ? coupons.map((coupon) => coupon.id === editId ? nextCoupon : coupon)
-      : [...coupons, nextCoupon];
-
-    persistCoupons(nextCoupons, editId ? 'Đã cập nhật coupon.' : 'Đã tạo coupon mới.');
-    closeForm();
+    try {
+      if (editId) {
+        const result = await couponApi.update(editId, payload);
+        if (!result.success) {
+          setError(result.error || 'Không thể cập nhật coupon.');
+          return;
+        }
+        showFeedback('Đã cập nhật coupon.');
+      } else {
+        const result = await couponApi.create(payload);
+        if (!result.success) {
+          setError(result.error || 'Không thể tạo coupon.');
+          return;
+        }
+        showFeedback('Đã tạo coupon mới.');
+      }
+      await loadCoupons();
+      closeForm();
+    } catch {
+      setError('Lỗi kết nối server.');
+    }
   };
 
   const handleDelete = async (couponId: number) => {
@@ -208,24 +246,37 @@ export default function AdminCoupons() {
       return;
     }
 
-    persistCoupons(
-      coupons.filter((coupon) => coupon.id !== couponId),
-      'Đã xóa coupon.',
-    );
+    const result = await couponApi.delete(couponId);
+    if (result.success) {
+      showFeedback('Đã xóa coupon.');
+      await loadCoupons();
+    } else {
+      setFeedback(result.error || 'Không thể xóa coupon.');
+    }
   };
 
-  const togglePausedState = (couponId: number) => {
-    const nextCoupons: Coupon[] = coupons.map((coupon) =>
-      coupon.id === couponId
-        ? {
-            ...coupon,
-            status: (coupon.status === 'paused' ? 'active' : 'paused') as Coupon['status'],
-            updatedAt: new Date().toISOString(),
-          }
-        : coupon,
-    );
+  const togglePausedState = async (couponId: number) => {
+    const coupon = coupons.find((c) => c.id === couponId);
+    if (!coupon) return;
 
-    persistCoupons(nextCoupons, 'Đã cập nhật trạng thái coupon.');
+    const newStatus = coupon.status === 'paused' ? true : false;
+    const result = await couponApi.update(couponId, {
+      maCoupon: coupon.code,
+      loaiGiamGia: coupon.discountType,
+      giaTri: coupon.discountValue,
+      donToiThieu: coupon.minOrder > 0 ? coupon.minOrder : undefined,
+      giamToiDa: coupon.maxDiscount,
+      soLuotDung: coupon.quantity,
+      ngayBatDau: coupon.startDate,
+      ngayKetThuc: coupon.endDate,
+      trangThai: newStatus,
+      moTa: coupon.description || undefined,
+    });
+
+    if (result.success) {
+      showFeedback('Đã cập nhật trạng thái coupon.');
+      await loadCoupons();
+    }
   };
 
   const handleCopyCode = async (code: string) => {

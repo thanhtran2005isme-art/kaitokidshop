@@ -12,5 +12,7 @@ export { inventoryApi, type InventoryAdjustPayload, type InventoryAdjustmentType
 export { couponApi, type CouponDTO, type CouponValidateRequest, type CouponValidateResult } from './couponApi';
 export { promotionApi, type PromotionDTO } from './promotionApi';
 export { flashSaleApi, type FlashSaleDTO, type FlashSaleItemDTO } from './flashSaleApi';
+export { reviewApi, type ReviewDTO, type ReviewListResponse } from './reviewApi';
+export { reportApi, type RevenueDataPoint, type TopProductItem, type OrderStatItem, type DashboardData } from './reportApi';
 export { adminProductsApi } from './adminProductsApi';
 export { customerApi } from './customerApi';

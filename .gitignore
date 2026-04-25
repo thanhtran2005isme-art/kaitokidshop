@@ -16,12 +16,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Dependencies (if you add Node.js later)
+# Dependencies
 node_modules/
 package-lock.json
 yarn.lock
 
-# Build outputs (if you migrate to React later)
+# Build outputs
 dist/
 build/
 .cache/
@@ -34,3 +34,27 @@ build/
 # Temporary files
 *.tmp
 *.temp
+
+# .NET Build outputs
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+*.dll
+*.pdb
+*.exe
+*.cache
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+project.assets.json
+project.fragment.lock.json
+artifacts/
+
+# .NET Core
+.dotnet/
+
+# Visual Studio
+.vs/
+*.csproj.user

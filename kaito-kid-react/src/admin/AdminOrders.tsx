@@ -787,7 +787,17 @@ export default function AdminOrders() {
             </tbody>
           </table>
 
-          {filteredOrders.length === 0 && (
+          {loading && (
+            <div className="orders-empty-state">
+              <div className="orders-empty-icon">
+                <AdminIcon name="fa-spinner" />
+              </div>
+              <h3>Đang tải đơn hàng</h3>
+              <p>Đang lấy danh sách đơn hàng từ backend.</p>
+            </div>
+          )}
+
+          {!loading && filteredOrders.length === 0 && (
             <div className="orders-empty-state">
               <div className="orders-empty-icon">
                 <AdminIcon name="fa-inbox" />
@@ -849,7 +859,7 @@ export default function AdminOrders() {
                     <select
                       className="filter-select status-select"
                       value={selected.status}
-                      onChange={(event) => updateStatus(selected.id, event.target.value as Order['status'])}
+                      onChange={(event) => updateStatus(selected.id, event.target.value as OrderDTO['status'])}
                     >
                       {STATUS_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>

@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { productService } from '../services/productService';
 import { formatDate } from '../utils/format';
-import { readStoredReviews, saveStoredReviews, type ReviewRecord, type ReviewStatus } from '../utils/reviewConfig';
+import { reviewApi, type ReviewDTO } from '../services/api';
+import { type ReviewRecord, type ReviewStatus } from '../utils/reviewConfig';
 import type { Product } from '../types';
 import AdminIcon from '../components/admin/AdminIcon';
 
@@ -35,6 +36,24 @@ function renderStars(rating: number) {
   ));
 }
 
+function mapDtoToReview(dto: ReviewDTO): ReviewRecord {
+  return {
+    id: dto.id,
+    orderId: String(dto.donHangId || ''),
+    productId: dto.sanPhamId,
+    productName: '', // will be resolved from product lookup
+    customerName: dto.tenKhachHang || 'Khách hàng',
+    customerEmail: '',
+    rating: dto.soSao || 5,
+    comment: dto.noiDung || '',
+    createdAt: dto.ngayTao || new Date().toISOString(),
+    status: (dto.trangThai as ReviewStatus) || 'pending',
+    adminReply: dto.phanHoiAdmin || '',
+    isHidden: false,
+    isPinned: false,
+  };
+}
+
 export default function AdminReviews() {
   const [searchParams] = useSearchParams();
   const { confirm } = useAdminUi();
@@ -49,8 +68,15 @@ export default function AdminReviews() {
   const [adminReplyDraft, setAdminReplyDraft] = useState('');
   const [feedback, setFeedback] = useState('');
 
+  const loadReviews = async () => {
+    const result = await reviewApi.getAll({ page: 1, pageSize: 200 });
+    if (result.success && result.data) {
+      setReviews(result.data.items.map(mapDtoToReview));
+    }
+  };
+
   useEffect(() => {
-    setReviews(readStoredReviews());
+    void loadReviews();
     setProducts(productService.getAll());
   }, []);
 
@@ -73,10 +99,19 @@ export default function AdminReviews() {
     return lookup;
   }, [products]);
 
+  // Enrich reviews with product names from lookup
+  const enrichedReviews = useMemo(() => {
+    return reviews.map((review) => {
+      if (review.productName) return review;
+      const product = review.productId ? productLookup.get(`id:${review.productId}`) : undefined;
+      return { ...review, productName: product?.name || `Sản phẩm #${review.productId || '?'}` };
+    });
+  }, [reviews, productLookup]);
+
   const filteredReviews = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
 
-    return [...reviews]
+    return [...enrichedReviews]
       .filter((review) => {
         const matchesSearch = !normalizedSearch
           || review.customerName.toLowerCase().includes(normalizedSearch)
@@ -96,45 +131,70 @@ export default function AdminReviews() {
 
         return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
       });
-  }, [reviews, searchTerm, statusFilter, visibilityFilter]);
+  }, [enrichedReviews, searchTerm, statusFilter, visibilityFilter]);
 
   const stats = useMemo(() => {
-    const approved = reviews.filter((review) => review.status === 'approved').length;
-    const pending = reviews.filter((review) => review.status === 'pending').length;
-    const hidden = reviews.filter((review) => review.isHidden).length;
+    const approved = enrichedReviews.filter((review) => review.status === 'approved').length;
+    const pending = enrichedReviews.filter((review) => review.status === 'pending').length;
+    const hidden = enrichedReviews.filter((review) => review.isHidden).length;
     const averageRating = reviews.length > 0
       ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
       : '0.0';
 
     return {
-      total: reviews.length,
+      total: enrichedReviews.length,
       approved,
       pending,
       hidden,
       averageRating,
     };
-  }, [reviews]);
+  }, [enrichedReviews]);
 
   const selectedReview = selectedReviewId
-    ? reviews.find((review) => review.id === selectedReviewId) || null
+    ? enrichedReviews.find((review) => review.id === selectedReviewId) || null
     : null;
 
   useEffect(() => {
     setAdminReplyDraft(selectedReview?.adminReply || '');
   }, [selectedReviewId, selectedReview?.adminReply]);
 
-  const persistReviews = (nextReviews: ReviewRecord[], message: string) => {
-    const saved = saveStoredReviews(nextReviews);
-    setReviews(saved);
+  const showFeedback = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => setFeedback(''), 3000);
   };
 
+  const updateReviewStatus = async (reviewId: number, newStatus: ReviewStatus, message: string) => {
+    let result;
+    if (newStatus === 'approved') {
+      result = await reviewApi.approve(reviewId);
+    } else if (newStatus === 'rejected') {
+      result = await reviewApi.reject(reviewId);
+    } else {
+      // pending - no dedicated endpoint, skip
+      showFeedback(message);
+      await loadReviews();
+      return;
+    }
+
+    if (result?.success) {
+      showFeedback(message);
+      await loadReviews();
+    }
+  };
+
   const updateReview = (reviewId: number, updater: (review: ReviewRecord) => ReviewRecord, message: string) => {
-    persistReviews(
-      reviews.map((review) => review.id === reviewId ? updater(review) : review),
-      message,
-    );
+    const review = reviews.find((r) => r.id === reviewId);
+    if (!review) return;
+    const updated = updater(review);
+
+    // Detect status change
+    if (updated.status !== review.status) {
+      void updateReviewStatus(reviewId, updated.status, message);
+    } else {
+      // Local-only update (pin/hide) - update state directly
+      setReviews((prev) => prev.map((r) => r.id === reviewId ? updated : r));
+      showFeedback(message);
+    }
   };
 
   const handleDelete = async (reviewId: number) => {
@@ -156,10 +216,11 @@ export default function AdminReviews() {
       return;
     }
 
-    persistReviews(
-      reviews.filter((review) => review.id !== reviewId),
-      'Đã xóa đánh giá.',
-    );
+    const result = await reviewApi.delete(reviewId);
+    if (result.success) {
+      showFeedback('Đã xóa đánh giá.');
+      await loadReviews();
+    }
 
     if (selectedReviewId === reviewId) {
       setSelectedReviewId(null);
@@ -207,21 +268,16 @@ export default function AdminReviews() {
     window.setTimeout(() => setFeedback(''), 2000);
   };
 
-  const saveAdminReply = () => {
+  const saveAdminReply = async () => {
     if (!selectedReview) {
       return;
     }
 
-    updateReview(
-      selectedReview.id,
-      (review) => ({
-        ...review,
-        adminReply: adminReplyDraft.trim(),
-        adminReplyAt: adminReplyDraft.trim() ? new Date().toISOString() : undefined,
-        updatedAt: new Date().toISOString(),
-      }),
-      'Đã lưu phản hồi admin.',
-    );
+    const result = await reviewApi.reply(selectedReview.id, adminReplyDraft.trim());
+    if (result.success) {
+      showFeedback('Đã lưu phản hồi admin.');
+      await loadReviews();
+    }
   };
 
   return (
@@ -381,58 +437,42 @@ export default function AdminReviews() {
                   ) : null}
 
                   <div className="review-card-actions">
-                    <button
-                      className="btn btn-success btn-sm"
-                      onClick={() => updateReview(
-                        review.id,
-                        (current) => ({ ...current, status: 'approved', updatedAt: new Date().toISOString() }),
-                        'Đã duyệt đánh giá.',
-                      )}
-                    >
-                      <AdminIcon name="fa fa-check" /> Duyet
-                    </button>
-                    <button
-                      className="btn btn-warning btn-sm"
-                      onClick={() => updateReview(
-                        review.id,
-                        (current) => ({ ...current, status: 'pending', updatedAt: new Date().toISOString() }),
-                        'Da đưa đánh giá ve trạng thái cho duyet.',
-                      )}
-                    >
-                      <AdminIcon name="fa fa-hourglass-half" /> Cho duyet
-                    </button>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => updateReview(
-                        review.id,
-                        (current) => ({ ...current, status: 'rejected', updatedAt: new Date().toISOString() }),
-                        'Đã từ chối đánh giá.',
-                      )}
-                    >
-                      <AdminIcon name="fa fa-ban" /> Tu choi
-                    </button>
-                    <button
-                      className="btn btn-outline btn-sm"
-                      onClick={() => updateReview(
-                        review.id,
-                        (current) => ({ ...current, isPinned: !current.isPinned, updatedAt: new Date().toISOString() }),
-                        review.isPinned ? 'Đã bỏ ghim đánh giá.' : 'Đã ghim đánh giá.',
-                      )}
-                    >
-                      <AdminIcon name="fa fa-thumb-tack" />
-                      {review.isPinned ? 'Bo ghim' : 'Ghim'}
-                    </button>
-                    <button
-                      className="btn btn-outline btn-sm"
-                      onClick={() => updateReview(
-                        review.id,
-                        (current) => ({ ...current, isHidden: !current.isHidden, updatedAt: new Date().toISOString() }),
-                        review.isHidden ? 'Đã hiện đánh giá.' : 'Đã ẩn đánh giá.',
-                      )}
-                    >
-                      <AdminIcon name={review.isHidden ? 'fa-eye' : 'fa-eye-slash'} />
-                      {review.isHidden ? 'Hien' : 'An'}
-                    </button>
+                    {review.status !== 'approved' && (
+                      <button
+                        className="btn btn-success btn-sm"
+                        onClick={() => updateReview(
+                          review.id,
+                          (current) => ({ ...current, status: 'approved', updatedAt: new Date().toISOString() }),
+                          'Đã duyệt đánh giá.',
+                        )}
+                      >
+                        <AdminIcon name="fa fa-check" /> Duyệt
+                      </button>
+                    )}
+                    {review.status !== 'pending' && (
+                      <button
+                        className="btn btn-warning btn-sm"
+                        onClick={() => updateReview(
+                          review.id,
+                          (current) => ({ ...current, status: 'pending', updatedAt: new Date().toISOString() }),
+                          'Đã đưa đánh giá về trạng thái chờ duyệt.',
+                        )}
+                      >
+                        <AdminIcon name="fa fa-hourglass-half" /> Chờ duyệt
+                      </button>
+                    )}
+                    {review.status !== 'rejected' && (
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => updateReview(
+                          review.id,
+                          (current) => ({ ...current, status: 'rejected', updatedAt: new Date().toISOString() }),
+                          'Đã từ chối đánh giá.',
+                        )}
+                      >
+                        <AdminIcon name="fa fa-ban" /> Từ chối
+                      </button>
+                    )}
                     <button className="btn btn-outline btn-sm" onClick={() => setSelectedReviewId(review.id)}>
                       <AdminIcon name="fa fa-reply" /> Chi tiết
                     </button>

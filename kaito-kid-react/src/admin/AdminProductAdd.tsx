@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { productService } from '../services/productService';
+import { attributeApi, type AttributeDTO } from '../services/api/attributeApi';
+import { categoryApi, type CategoryDTO } from '../services/api/categoryApi';
 import { getMenuCategoryOptions, getMenuTaxonomyGroups, toCanonicalCategory, type ProductMenuKey } from '../utils/productTaxonomy';
 import type { Product } from '../types';
 import AdminIcon from '../components/admin/AdminIcon';
@@ -228,6 +230,38 @@ function getPrimaryActionLabel(status: Product['status']) {
   }
 }
 
+const COLOR_HEX_MAP: Record<string, string> = {
+  'trắng': '#ffffff',
+  'trang': '#ffffff',
+  'đen': '#111827',
+  'den': '#111827',
+  'xám': '#9ca3af',
+  'xam': '#9ca3af',
+  'xanh navy': '#1e3a8a',
+  'xanh dương': '#3b82f6',
+  'xanh duong': '#3b82f6',
+  'đỏ': '#ef4444',
+  'do': '#ef4444',
+  'hồng': '#ec4899',
+  'hong': '#ec4899',
+  'vàng': '#fbbf24',
+  'vang': '#fbbf24',
+  'be': '#d4a574',
+  'nâu': '#92400e',
+  'nau': '#92400e',
+  'cam': '#f97316',
+  'tím': '#a855f7',
+  'tim': '#a855f7',
+  'xanh lá': '#22c55e',
+  'xanh la': '#22c55e',
+  'kem': '#fef3c7',
+};
+
+function getColorHex(colorName: string): string {
+  const normalized = colorName.toLowerCase().trim();
+  return COLOR_HEX_MAP[normalized] || '#9ca3af';
+}
+
 export default function AdminProductAdd() {
   const { notify } = useAdminUi();
   const navigate = useNavigate();
@@ -246,12 +280,87 @@ export default function AdminProductAdd() {
   });
   const [form, setForm] = useState<BuilderFormState>(DEFAULT_FORM);
 
+  // Backend-loaded data
+  const [backendSizes, setBackendSizes] = useState<string[]>([]);
+  const [backendColors, setBackendColors] = useState<Array<{ name: string; color: string; border?: boolean }>>([]);
+  const [backendCategories, setBackendCategories] = useState<CategoryDTO[]>([]);
+
   useEffect(() => {
     setCollectionOptions(readStoredCollections());
+
+    // Load attributes (size, color) from backend
+    const loadAttributes = async () => {
+      try {
+        const rows = await attributeApi.getAll();
+
+        // Group by nhomThuocTinh
+        const sizeRows = rows.filter((r: AttributeDTO) => r.nhomThuocTinh === 'size');
+        const colorRows = rows.filter((r: AttributeDTO) => r.nhomThuocTinh === 'color');
+
+        if (sizeRows.length > 0) {
+          const sizeValues = sizeRows.map((r: AttributeDTO) => r.giaTri).filter(Boolean);
+          setBackendSizes(sizeValues);
+        }
+
+        if (colorRows.length > 0) {
+          const colorValues = colorRows.map((r: AttributeDTO) => ({
+            name: r.giaTri,
+            color: getColorHex(r.giaTri),
+            border: r.giaTri.toLowerCase() === 'trắng' || r.giaTri.toLowerCase() === 'trang',
+          }));
+          setBackendColors(colorValues);
+        }
+      } catch (error) {
+        console.error('Failed to load attributes:', error);
+      }
+    };
+
+    // Load categories from backend
+    const loadCategories = async () => {
+      try {
+        const cats = await categoryApi.getAll();
+        setBackendCategories(cats);
+      } catch (error) {
+        console.error('Failed to load categories:', error);
+      }
+    };
+
+    void loadAttributes();
+    void loadCategories();
   }, []);
 
-  const activeCategoryGroups = form.menu ? getMenuTaxonomyGroups(form.menu, ['category']) : [];
-  const activeCategoryOptions = form.menu ? getMenuCategoryOptions(form.menu, ['category']) : [];
+  // Resolved sizes/colors: use backend if available, fallback to hardcoded
+  const resolvedSizes = backendSizes.length > 0 ? backendSizes : DEFAULT_SIZES;
+  const resolvedColors = backendColors.length > 0 ? backendColors : COLOR_OPTIONS;
+
+  // Build category groups from backend data
+  const backendCategoryGroups = useMemo(() => {
+    if (backendCategories.length === 0) return [];
+
+    // Root categories (no parent)
+    const roots = backendCategories.filter((c) => !c.danhMucChaId);
+    // Build groups: each root is a group, its children are options
+    return roots.map((root) => {
+      const children = backendCategories
+        .filter((c) => c.danhMucChaId === root.id)
+        .map((c) => c.tenDanhMuc);
+      return {
+        label: root.tenDanhMuc,
+        kind: 'category' as const,
+        children: children.length > 0 ? children : [root.tenDanhMuc],
+      };
+    });
+  }, [backendCategories]);
+
+  // Use backend categories if available, otherwise fallback to local taxonomy
+  const activeCategoryGroups = backendCategoryGroups.length > 0
+    ? backendCategoryGroups
+    : (form.menu ? getMenuTaxonomyGroups(form.menu, ['category']) : []);
+  const activeCategoryOptions = backendCategoryGroups.length > 0
+    ? backendCategoryGroups.flatMap((group) =>
+        group.children.map((child) => ({ value: child, label: child, group: group.label, kind: 'category' as const }))
+      )
+    : (form.menu ? getMenuCategoryOptions(form.menu, ['category']) : []);
   const activeStyleOptions = form.menu && form.menu !== 'treem' ? getMenuCategoryOptions(form.menu, ['style']) : [];
   const activeAgeOptions = form.menu === 'treem' ? getMenuCategoryOptions(form.menu, ['age']) : [];
   const selectedMenuLabel = MENU_OPTIONS.find((option) => option.value === form.menu)?.label || 'Chưa chọn menu';
@@ -965,7 +1074,7 @@ export default function AdminProductAdd() {
               <div className="builder-field-group">
                 <label className="builder-label">Size</label>
                 <div className="builder-size-grid">
-                  {DEFAULT_SIZES.map((size) => (
+                  {resolvedSizes.map((size) => (
                     <button
                       key={size}
                       type="button"
@@ -981,7 +1090,7 @@ export default function AdminProductAdd() {
               <div className="builder-field-group">
                 <label className="builder-label">Bảng màu</label>
                 <div className="builder-color-grid">
-                  {COLOR_OPTIONS.map((colorOption) => (
+                  {resolvedColors.map((colorOption) => (
                     <button
                       key={colorOption.name}
                       type="button"

@@ -6,7 +6,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { orderService } from '../services/orderService';
 import { formatCurrency } from '../utils/format';
-import { calculateCouponDiscount, findAvailableCouponByCode, incrementCouponUsage } from '../utils/marketingConfig';
+import { couponApi } from '../services/api';
 
 export default function Checkout() {
   const { cart, subtotal, clearCart } = useCart();
@@ -43,14 +43,22 @@ export default function Checkout() {
     );
   }
 
-  const applyCoupon = () => {
+  const applyCoupon = async () => {
     const code = promoCode.trim().toUpperCase();
     if (!code) return;
-    const { coupon, error: err } = findAvailableCouponByCode(code, subtotal);
-    if (!coupon) { setError(err || 'Mã không hợp lệ'); return; }
-    setDiscount(calculateCouponDiscount(coupon, subtotal));
-    setAppliedCoupon(code);
-    setError('');
+
+    const result = await couponApi.validate({ code, orderAmount: subtotal });
+    if (result.success && result.data) {
+      if (result.data.isValid) {
+        setDiscount(result.data.discountAmount);
+        setAppliedCoupon(code);
+        setError('');
+      } else {
+        setError(result.data.message || 'Mã không hợp lệ');
+      }
+    } else {
+      setError(result.error || 'Không thể kiểm tra mã giảm giá');
+    }
   };
 
   const handlePlaceOrder = () => {
@@ -64,7 +72,6 @@ export default function Checkout() {
       items: cart, total, subtotal, shippingFee, paymentFee: 0, discount,
       couponCode: appliedCoupon || undefined, paymentMethod,
     });
-    if (appliedCoupon) incrementCouponUsage(appliedCoupon);
     clearCart();
     alert(`Đặt hàng thành công!\nMã đơn: ${order.id}\nTổng: ${formatCurrency(total)}`);
     navigate('/orders');

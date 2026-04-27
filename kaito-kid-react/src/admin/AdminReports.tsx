@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Bar,
@@ -14,11 +14,9 @@ import {
   YAxis,
 } from 'recharts';
 import AdminIcon from '../components/admin/AdminIcon';
-import { orderService } from '../services/orderService';
-import { productService } from '../services/productService';
-import type { Order, Product, User } from '../types';
+import { reportApi, type RevenueDataPoint, type TopProductItem, type OrderStatItem } from '../services/api';
 import { formatCurrency } from '../utils/format';
-import { buildReportSnapshot, type ReportPeriod } from '../utils/reportAnalytics';
+import type { ReportPeriod } from '../utils/reportAnalytics';
 
 const PERIOD_OPTIONS: Array<{ value: ReportPeriod; label: string; description: string }> = [
   { value: 'today', label: 'Hôm nay', description: 'Theo dõi biến động ngay trong ngày để phản ứng thật nhanh.' },
@@ -31,17 +29,6 @@ const PERIOD_OPTIONS: Array<{ value: ReportPeriod; label: string; description: s
 const STATUS_COLORS = ['#d97706', '#0f766e', '#2563eb', '#dc2626'];
 const BAR_COLORS = ['#c96f4a', '#d39262', '#647a62', '#4f6d7a', '#9b5c5c'];
 
-function normalizeUsers(rawUsers: Array<Partial<User>>): User[] {
-  return rawUsers.map((user, index) => ({
-    id: user.id || index + 1,
-    name: user.name || 'Khách hàng',
-    email: user.email || `guest-${index + 1}@example.com`,
-    phone: user.phone,
-    role: user.role === 'admin' ? 'admin' : 'user',
-    createdAt: user.createdAt,
-  }));
-}
-
 function formatChange(value: number, direction: 'up' | 'down' | 'neutral') {
   const prefix = direction === 'up' ? '+' : direction === 'down' ? '-' : '';
   return `${prefix}${value.toFixed(1)}%`;
@@ -51,22 +38,85 @@ function toCsvCell(value: string | number | undefined) {
   return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
 
+const STATUS_NAME_MAP: Record<string, string> = {
+  pending: 'Chờ xác nhận',
+  confirmed: 'Đã xác nhận',
+  shipping: 'Đang giao',
+  completed: 'Hoàn thành',
+  cancelled: 'Đã hủy',
+};
+
 export default function AdminReports() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [period, setPeriod] = useState<ReportPeriod>('month');
+  const [loading, setLoading] = useState(true);
+  const [revenueData, setRevenueData] = useState<RevenueDataPoint[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProductItem[]>([]);
+  const [orderStats, setOrderStats] = useState<OrderStatItem[]>([]);
+
+  const loadReports = async () => {
+    setLoading(true);
+    const daysMap: Record<ReportPeriod, number> = {
+      today: 1, week: 7, month: 30, quarter: 90, year: 365,
+    };
+    const days = daysMap[period] || 30;
+
+    const [revResult, topResult, statsResult] = await Promise.all([
+      reportApi.getRevenue(days),
+      reportApi.getTopProducts(10),
+      reportApi.getOrderStats(),
+    ]);
+
+    if (revResult.success && revResult.data) setRevenueData(revResult.data);
+    if (topResult.success && topResult.data) setTopProducts(topResult.data);
+    if (statsResult.success && statsResult.data) setOrderStats(statsResult.data);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    setOrders(orderService.getAll());
-    setProducts(productService.getAll());
-    setUsers(normalizeUsers(JSON.parse(localStorage.getItem('users') || '[]')));
-  }, []);
+    void loadReports();
+  }, [period]);
 
-  const snapshot = useMemo(
-    () => buildReportSnapshot(orders, products, users, period),
-    [orders, period, products, users],
-  );
+  // Derived data for charts
+  const totalRevenue = revenueData.reduce((sum, d) => sum + d.revenue, 0);
+  const totalOrders = revenueData.reduce((sum, d) => sum + d.orders, 0);
+  const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+  const revenueSeries = revenueData.map((d) => ({
+    label: new Date(d.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+    revenue: d.revenue,
+    orders: d.orders,
+  }));
+
+  const statusData = orderStats.map((s) => ({
+    name: STATUS_NAME_MAP[s.status] || s.status,
+    value: s.count,
+  }));
+
+  const topProductsChart = topProducts.map((p) => ({
+    productId: p.id,
+    name: p.tenSanPham,
+    quantity: p.soLuongDaBan,
+    revenue: p.soLuongDaBan * p.gia,
+    share: 0,
+  }));
+
+  // Snapshot-like object for UI compatibility
+  const snapshot = {
+    revenue: totalRevenue,
+    orderCount: totalOrders,
+    itemsSold: topProducts.reduce((sum, p) => sum + p.soLuongDaBan, 0),
+    newCustomers: 0,
+    averageOrderValue,
+    revenueChange: { value: 0, direction: 'neutral' as const },
+    orderChange: { value: 0, direction: 'neutral' as const },
+    customerChange: { value: 0, direction: 'neutral' as const },
+    averageOrderChange: { value: 0, direction: 'neutral' as const },
+    revenueSeries,
+    statusData,
+    topProducts: topProductsChart,
+    categoryData: [] as Array<{ category: string; quantity: number; revenue: number; share: number }>,
+    currentOrders: { length: totalOrders },
+  };
 
   const activePeriod = PERIOD_OPTIONS.find((option) => option.value === period) || PERIOD_OPTIONS[2];
   const hasRevenueData = snapshot.revenueSeries.some((point) => point.revenue > 0);

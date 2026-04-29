@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
+import { bannerApi, type BannerDTO } from '../services/api';
 import {
   createBannerDefaults,
   normalizeBannerItem,
-  readStoredBanners,
-  saveStoredBanners,
   type BannerItem,
   type BannerType,
 } from '../utils/bannerConfig';
@@ -48,12 +47,48 @@ export default function AdminBanners() {
   const [form, setForm] = useState<BannerFormState>(createBannerDefaults('slider'));
 
   useEffect(() => {
-    setBanners(readStoredBanners());
+    const loadBanners = async () => {
+      const result = await bannerApi.getAll();
+      if (result.success && result.data) {
+        const mapped: BannerItem[] = result.data.map((dto: BannerDTO) => normalizeBannerItem({
+          id: dto.id,
+          title: dto.tieuDe || '',
+          subtitle: dto.tieuDePhu || '',
+          description: dto.moTa || '',
+          imageUrl: dto.hinhAnh || '',
+          link: dto.lienKet || '',
+          type: (dto.loaiBanner || 'slider') as BannerType,
+          position: dto.viTri || 'homepage',
+          order: dto.thuTu || 0,
+          status: dto.trangThai === 'active' ? 'active' : 'inactive',
+          startDate: dto.ngayBatDau || '',
+          endDate: dto.ngayKetThuc || '',
+        }, (dto.loaiBanner || 'slider') as BannerType, dto.thuTu));
+        setBanners(mapped);
+      }
+    };
+    void loadBanners();
   }, []);
 
   const persistBanners = (list: BannerItem[]) => {
-    const saved = saveStoredBanners(list);
-    setBanners(saved);
+    setBanners(list);
+  };
+
+  const saveBannerToBackend = async (banner: BannerItem) => {
+    const payload = {
+      tieuDe: banner.title,
+      tieuDePhu: banner.subtitle || undefined,
+      moTa: banner.description || undefined,
+      hinhAnh: banner.imageUrl,
+      lienKet: banner.link || undefined,
+      loaiBanner: banner.type,
+      viTri: banner.position || 'homepage',
+      thuTu: banner.order,
+      trangThai: banner.status || 'active',
+      ngayBatDau: banner.startDate || undefined,
+      ngayKetThuc: banner.endDate || undefined,
+    };
+    return payload;
   };
 
   const filteredBanners = useMemo(
@@ -95,7 +130,7 @@ export default function AdminBanners() {
     setShowForm(false);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.title.trim() || !form.imageUrl.trim()) {
       notify({
         tone: 'error',
@@ -113,16 +148,38 @@ export default function AdminBanners() {
       form.order,
     );
 
+    const payload = await saveBannerToBackend(normalizedBanner);
+
     if (editingBannerId) {
-      persistBanners(
-        banners.map((banner) =>
-          banner.id === editingBannerId ? normalizedBanner : banner,
-        ),
-      );
-      setMsg('Đã cập nhật banner.');
+      const result = await bannerApi.update(editingBannerId, payload);
+      if (result.success) {
+        setMsg('Đã cập nhật banner.');
+      }
     } else {
-      persistBanners([...banners, normalizedBanner]);
-      setMsg('Đã thêm banner mới.');
+      const result = await bannerApi.create(payload);
+      if (result.success) {
+        setMsg('Đã thêm banner mới.');
+      }
+    }
+
+    // Reload from backend
+    const reloadResult = await bannerApi.getAll();
+    if (reloadResult.success && reloadResult.data) {
+      const mapped: BannerItem[] = reloadResult.data.map((dto: BannerDTO) => normalizeBannerItem({
+        id: dto.id,
+        title: dto.tieuDe || '',
+        subtitle: dto.tieuDePhu || '',
+        description: dto.moTa || '',
+        imageUrl: dto.hinhAnh || '',
+        link: dto.lienKet || '',
+        type: (dto.loaiBanner || 'slider') as BannerType,
+        position: dto.viTri || 'homepage',
+        order: dto.thuTu || 0,
+        status: dto.trangThai === 'active' ? 'active' : 'inactive',
+        startDate: dto.ngayBatDau || '',
+        endDate: dto.ngayKetThuc || '',
+      }, (dto.loaiBanner || 'slider') as BannerType, dto.thuTu));
+      setBanners(mapped);
     }
 
     window.setTimeout(() => setMsg(''), 3000);
@@ -140,8 +197,11 @@ export default function AdminBanners() {
 
     if (!accepted) return;
 
-    persistBanners(banners.filter((banner) => banner.id !== id));
-    setMsg('Đã xóa banner.');
+    const result = await bannerApi.delete(id);
+    if (result.success) {
+      persistBanners(banners.filter((banner) => banner.id !== id));
+      setMsg('Đã xóa banner.');
+    }
     window.setTimeout(() => setMsg(''), 3000);
   };
 

@@ -140,8 +140,8 @@
 
 .admin-wrapper .homepage-library-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
   max-height: 720px;
   overflow-y: auto;
 }
@@ -253,16 +253,19 @@
 
 .admin-wrapper .homepage-selected-body,
 .admin-wrapper .homepage-library-body {
-  padding: 16px 16px 12px;
+  padding: 10px 12px 8px;
 }
 
 .admin-wrapper .homepage-selected-body h4,
 .admin-wrapper .homepage-library-body h4 {
-  margin: 0 0 8px;
-  font-size: 15px;
+  margin: 0 0 4px;
+  font-size: 13px;
   font-weight: 700;
   color: #111827;
-  line-height: 1.5;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-wrapper .homepage-selected-meta {
@@ -376,22 +379,30 @@
 
 .admin-wrapper .homepage-library-card {
   border: 1px solid #e5e7eb;
-  border-radius: 18px;
+  border-radius: 14px;
   background: #ffffff;
   overflow: hidden;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-wrapper .homepage-library-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.1);
 }
 
 .admin-wrapper .homepage-library-card img {
   width: 100%;
-  height: 180px;
+  height: 120px;
   object-fit: cover;
   display: block;
 }
 
 .admin-wrapper .homepage-library-card .btn {
-  margin: 0 16px 16px;
-  width: calc(100% - 32px);
+  margin: 0 12px 12px;
+  width: calc(100% - 24px);
+  font-size: 13px;
+  padding: 8px 12px;
 }
 
 @media (max-width: 1200px) {

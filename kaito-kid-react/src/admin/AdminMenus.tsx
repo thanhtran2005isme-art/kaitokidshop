@@ -1,13 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getDefaultFooterConfig,
-  readStoredFooterConfig,
-  saveStoredFooterConfig,
   type FooterConfig,
   type FooterContactItem,
   type FooterLinkItem,
   type FooterSocialItem,
 } from '../utils/footerConfig';
+import { menuApi, type MenuDTO } from '../services/api';
 import AdminIcon from '../components/admin/AdminIcon';
 
 
@@ -28,8 +27,31 @@ function moveItem<T>(items: T[], index: number, direction: 'up' | 'down'): T[] {
 }
 
 export default function AdminMenus() {
-  const [footerConfig, setFooterConfig] = useState<FooterConfig>(readStoredFooterConfig());
+  const [footerConfig, setFooterConfig] = useState<FooterConfig>(getDefaultFooterConfig());
+  const [menus, setMenus] = useState<MenuDTO[]>([]);
   const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    const loadMenus = async () => {
+      const result = await menuApi.getAll();
+      if (result.success && result.data) {
+        setMenus(result.data);
+        // Build footer config from menu data
+        const headerMenus = result.data.filter((m) => m.viTri === 'header');
+        const footerMenus = result.data.filter((m) => m.viTri === 'footer');
+        if (headerMenus.length > 0 || footerMenus.length > 0) {
+          setFooterConfig((current) => ({
+            ...current,
+            about: {
+              ...current.about,
+              links: footerMenus.map((m) => ({ label: m.tenMenu, href: m.lienKet, id: m.id })),
+            },
+          }));
+        }
+      }
+    };
+    void loadMenus();
+  }, []);
 
   const stats = useMemo(() => ({
     totalLinks:
@@ -40,10 +62,35 @@ export default function AdminMenus() {
     socialItems: footerConfig.social.links.length,
   }), [footerConfig]);
 
-  const handleSaveAll = () => {
-    const saved = saveStoredFooterConfig(footerConfig);
-    setFooterConfig(saved);
-    setMsg('Đã lưu cấu hình footer.');
+  const handleSaveAll = async () => {
+    // Save footer links as menu items to backend
+    const allLinks = [
+      ...footerConfig.about.links.map((link, i) => ({
+        tenMenu: link.label,
+        lienKet: link.href,
+        viTri: 'footer',
+        thuTu: i,
+        trangThai: true,
+      })),
+      ...footerConfig.support.links.map((link, i) => ({
+        tenMenu: link.label,
+        lienKet: link.href,
+        viTri: 'footer-support',
+        thuTu: i,
+        trangThai: true,
+      })),
+    ];
+
+    // Delete existing footer menus and recreate
+    const existingFooter = menus.filter((m) => m.viTri === 'footer' || m.viTri === 'footer-support');
+    for (const m of existingFooter) {
+      await menuApi.delete(m.id);
+    }
+    for (const link of allLinks) {
+      await menuApi.create(link);
+    }
+
+    setMsg('Đã lưu cấu hình menu.');
     window.setTimeout(() => setMsg(''), 3000);
   };
 

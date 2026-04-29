@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
+import { pageApi, type PageDTO } from '../services/api';
 import AdminIcon from '../components/admin/AdminIcon';
 
 
@@ -140,29 +141,11 @@ function normalizePage(rawPage: Partial<PageRecord>, fallbackId: number): PageRe
 }
 
 function readStoredPages(): PageRecord[] {
-  try {
-    const rawValue = localStorage.getItem(STORAGE_KEY);
-
-    if (!rawValue) {
-      return [];
-    }
-
-    const parsed = JSON.parse(rawValue);
-
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.map((page, index) => normalizePage(page, Date.now() + index));
-  } catch {
-    return [];
-  }
+  return [];
 }
 
 function saveStoredPages(pages: PageRecord[]): PageRecord[] {
-  const normalized = pages.map((page, index) => normalizePage(page, page.id || Date.now() + index));
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-  return normalized;
+  return pages;
 }
 
 function formatDateTime(value?: string): string {
@@ -193,7 +176,24 @@ export default function AdminPages() {
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
-    setPages(readStoredPages());
+    const loadPages = async () => {
+      const result = await pageApi.getAll();
+      if (result.success && result.data) {
+        const mapped: PageRecord[] = result.data.map((dto: PageDTO) => normalizePage({
+          id: dto.id,
+          title: dto.tieuDe || '',
+          slug: dto.slug || '',
+          content: dto.noiDung || '',
+          status: (dto.trangThai || 'draft') as PageStatus,
+          seoTitle: dto.metaTitle || '',
+          seoDescription: dto.metaDescription || '',
+          createdAt: dto.ngayTao,
+          updatedAt: dto.ngayCapNhat || dto.ngayTao,
+        }, dto.id));
+        setPages(mapped);
+      }
+    };
+    void loadPages();
   }, []);
 
   const orderedPages = useMemo(() => (
@@ -225,8 +225,7 @@ export default function AdminPages() {
   const previewPage = previewPageId ? pages.find((page) => page.id === previewPageId) || null : null;
 
   const persistPages = (nextPages: PageRecord[], message: string) => {
-    const saved = saveStoredPages(nextPages);
-    setPages(saved);
+    setPages(nextPages);
     setFeedback(message);
     window.setTimeout(() => setFeedback(''), 3000);
   };
@@ -261,7 +260,7 @@ export default function AdminPages() {
     setForm(DEFAULT_FORM);
   };
 
-  const handleSavePage = () => {
+  const handleSavePage = async () => {
     if (!form.title.trim() || !form.slug.trim() || !form.content.trim()) {
       setError('Cần nhập tiêu đề, slug và nội dung trang.');
       return;
@@ -293,11 +292,30 @@ export default function AdminPages() {
         : undefined,
     }, editId || Date.now());
 
-    const nextPages = editId
-      ? pages.map((page) => (page.id === editId ? basePage : page))
-      : [...pages, basePage];
+    const payload = {
+      tieuDe: form.title.trim(),
+      slug: normalizedSlug,
+      noiDung: form.content,
+      trangThai: form.status,
+      metaTitle: form.seoTitle || form.title,
+      metaDescription: form.seoDescription || form.excerpt || stripHtmlTags(form.content).slice(0, 160),
+    };
 
-    persistPages(nextPages, editId ? 'Đã cập nhật trang nội dung.' : 'Đã tạo trang nội dung mới.');
+    try {
+      if (editId) {
+        await pageApi.update(editId, payload);
+        persistPages(pages.map((page) => (page.id === editId ? basePage : page)), 'Đã cập nhật trang nội dung.');
+      } else {
+        const result = await pageApi.create(payload);
+        if (result.success && result.data) {
+          basePage.id = result.data.id;
+        }
+        persistPages([...pages, basePage], 'Đã tạo trang nội dung mới.');
+      }
+    } catch {
+      setError('Lỗi kết nối server.');
+      return;
+    }
     closeEditor();
   };
 
@@ -320,10 +338,13 @@ export default function AdminPages() {
       return;
     }
 
-    persistPages(
-      pages.filter((page) => page.id !== pageId),
-      'Đã xóa trang nội dung.',
-    );
+    const result = await pageApi.delete(pageId);
+    if (result.success) {
+      persistPages(
+        pages.filter((page) => page.id !== pageId),
+        'Đã xóa trang nội dung.',
+      );
+    }
   };
 
   const insertContentBlock = (snippet: string) => {

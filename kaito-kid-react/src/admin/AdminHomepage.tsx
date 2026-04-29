@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import { productService } from '../services/productService';
+import { homepageApi, type HomepageSectionDTO } from '../services/api';
 import type { Product } from '../types';
 import AdminIcon from '../components/admin/AdminIcon';
 
@@ -67,16 +68,7 @@ function normalizeSectionIds(ids: unknown): number[] {
 }
 
 function parseSavedSections(): HomepageSections {
-  const raw = JSON.parse(
-    localStorage.getItem('homepageSections') ||
-      '{"newArrivals":[],"saleProducts":[],"bestSellers":[]}',
-  );
-
-  return {
-    newArrivals: normalizeSectionIds(raw?.newArrivals),
-    saleProducts: normalizeSectionIds(raw?.saleProducts),
-    bestSellers: normalizeSectionIds(raw?.bestSellers),
-  };
+  return EMPTY_SECTIONS;
 }
 
 function formatCurrency(value: number): string {
@@ -111,7 +103,21 @@ export default function AdminHomepage() {
 
   useEffect(() => {
     setProducts(productService.getAll());
-    setSections(parseSavedSections());
+    // Load from backend
+    const loadSections = async () => {
+      const result = await homepageApi.getAll();
+      if (result.success && result.data) {
+        const loaded: HomepageSections = { ...EMPTY_SECTIONS };
+        result.data.forEach((s: HomepageSectionDTO) => {
+          const ids = normalizeSectionIds((s.danhSachSPId || '').split(',').map(Number));
+          if (s.tenSection === 'newArrivals') loaded.newArrivals = ids;
+          else if (s.tenSection === 'saleProducts') loaded.saleProducts = ids;
+          else if (s.tenSection === 'bestSellers') loaded.bestSellers = ids;
+        });
+        setSections(loaded);
+      }
+    };
+    void loadSections();
   }, []);
 
   const productMap = useMemo(
@@ -197,9 +203,18 @@ export default function AdminHomepage() {
     setDragState(null);
   };
 
-  const handleSave = () => {
-    localStorage.setItem('homepageSections', JSON.stringify(sections));
-    setMsg('Đã lưu cấu hình trang chu.');
+  const handleSave = async () => {
+    const payload: HomepageSectionDTO[] = [
+      { tenSection: 'newArrivals', danhSachSPId: sections.newArrivals.join(','), thuTu: 0, trangThai: true },
+      { tenSection: 'saleProducts', danhSachSPId: sections.saleProducts.join(','), thuTu: 1, trangThai: true },
+      { tenSection: 'bestSellers', danhSachSPId: sections.bestSellers.join(','), thuTu: 2, trangThai: true },
+    ];
+    const result = await homepageApi.update(payload);
+    if (result.success) {
+      setMsg('Đã lưu cấu hình trang chủ.');
+    } else {
+      setMsg(result.error || 'Lỗi lưu cấu hình.');
+    }
     window.setTimeout(() => setMsg(''), 3000);
   };
 

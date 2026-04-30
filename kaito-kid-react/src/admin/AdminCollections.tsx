@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { productService } from '../services/productService';
+import { collectionApi, type CollectionDTO } from '../services/api';
 import { getLinkedProducts, slugifyLabel, sortProductsForPicker, syncLinkedProductIds } from '../utils/adminProductRelations';
 import type { Product } from '../types';
 import AdminIcon from '../components/admin/AdminIcon';
@@ -72,26 +73,6 @@ function syncCollectionsWithProducts(collections: Collection[], products: Produc
   }));
 }
 
-function readStoredCollections(products: Product[]) {
-  try {
-    const rawCollections = JSON.parse(localStorage.getItem('collections') || '[]');
-    if (!Array.isArray(rawCollections) || rawCollections.length === 0) return buildDefaultCollections(products);
-    const normalized = rawCollections.map((collection: Partial<Collection>, index: number) => ({
-      id: Number(collection.id) || Date.now() + index,
-      name: String(collection.name || '').trim(),
-      description: String(collection.description || '').trim(),
-      image: String(collection.image || '').trim(),
-      order: Math.max(1, Number(collection.order || index + 1)),
-      status: (collection.status === 'hidden' ? 'hidden' : 'active') as Collection['status'],
-      productCount: 0,
-      productIds: Array.isArray(collection.productIds) ? collection.productIds : [],
-      updatedAt: collection.updatedAt,
-    }));
-    return normalized.filter((collection) => collection.name);
-  } catch {
-    return buildDefaultCollections(products);
-  }
-}
 
 export default function AdminCollections() {
   const { confirm, notify } = useAdminUi();
@@ -107,16 +88,36 @@ export default function AdminCollections() {
 
   useEffect(() => {
     const savedProducts = productService.getAll();
-    const syncedCollections = syncCollectionsWithProducts(readStoredCollections(savedProducts), savedProducts);
     setProducts(savedProducts);
-    setCollections(syncedCollections);
-    localStorage.setItem('collections', JSON.stringify(syncedCollections));
+
+    const loadCollections = async () => {
+      const result = await collectionApi.getAll();
+      if (result.success && result.data) {
+        const mapped: Collection[] = result.data.map((dto: CollectionDTO) => ({
+          id: dto.id,
+          name: dto.tenBoSuuTap || '',
+          description: dto.moTa || '',
+          image: dto.hinhAnh || '',
+          order: dto.thuTu || 0,
+          status: dto.trangThai ? 'active' : 'hidden' as Collection['status'],
+          productCount: 0,
+          productIds: [],
+          updatedAt: dto.ngayTao,
+        }));
+        const synced = syncCollectionsWithProducts(mapped, savedProducts);
+        setCollections(synced);
+      } else {
+        const defaults = buildDefaultCollections(savedProducts);
+        const synced = syncCollectionsWithProducts(defaults, savedProducts);
+        setCollections(synced);
+      }
+    };
+    void loadCollections();
   }, []);
 
   const saveCollections = (list: Collection[]) => {
     const syncedCollections = syncCollectionsWithProducts(list, products);
     setCollections(syncedCollections);
-    localStorage.setItem('collections', JSON.stringify(syncedCollections));
   };
 
   const selectedProducts = useMemo(() => getLinkedProducts(form.productIds, products), [form.productIds, products]);
@@ -173,7 +174,7 @@ export default function AdminCollections() {
     setShowModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const trimmedName = form.name.trim();
     const trimmedImage = form.image.trim();
     if (!trimmedName) return notify({ tone: 'error', message: 'Vui lòng nhập tên bộ sưu tập trước khi lưu.' });
@@ -183,28 +184,57 @@ export default function AdminCollections() {
 
     const productIds = syncLinkedProductIds(form.productIds, products);
     const resolvedImage = resolveCollectionImage(trimmedImage, productIds, products);
-    let nextCollections = [...collections];
 
-    if (editId) {
-      nextCollections = nextCollections.map((collection) =>
-        collection.id === editId
-          ? { ...collection, name: trimmedName, description: form.description.trim(), image: resolvedImage, order: Math.max(1, Number(form.order || collection.order || 1)), status: form.status, productIds, updatedAt: new Date().toISOString() }
-          : collection
-      );
-    } else {
-      nextCollections.push({ id: Date.now(), name: trimmedName, description: form.description.trim(), image: resolvedImage, order: Math.max(1, Number(form.order || collections.length + 1)), status: form.status, productIds, productCount: productIds.length, updatedAt: new Date().toISOString() });
+    const payload = {
+      tenBoSuuTap: trimmedName,
+      slug: slugifyLabel(trimmedName),
+      moTa: form.description.trim() || undefined,
+      hinhAnh: resolvedImage || undefined,
+      trangThai: form.status === 'active',
+      thuTu: Math.max(1, Number(form.order || collections.length + 1)),
+    };
+
+    try {
+      if (editId) {
+        await collectionApi.update(editId, payload);
+      } else {
+        await collectionApi.create(payload);
+      }
+
+      // Reload from backend
+      const result = await collectionApi.getAll();
+      if (result.success && result.data) {
+        const mapped: Collection[] = result.data.map((dto: CollectionDTO) => ({
+          id: dto.id,
+          name: dto.tenBoSuuTap || '',
+          description: dto.moTa || '',
+          image: dto.hinhAnh || '',
+          order: dto.thuTu || 0,
+          status: dto.trangThai ? 'active' : 'hidden' as Collection['status'],
+          productCount: 0,
+          productIds: [],
+          updatedAt: dto.ngayTao,
+        }));
+        const synced = syncCollectionsWithProducts(mapped, products);
+        setCollections(synced);
+      }
+
+      closeModal();
+      notify({ tone: 'success', message: editId ? 'Đã cập nhật bộ sưu tập.' : 'Đã tạo bộ sưu tập mới.' });
+    } catch {
+      notify({ tone: 'error', message: 'Lỗi kết nối server.' });
     }
-
-    saveCollections(nextCollections);
-    closeModal();
-    notify({ tone: 'success', message: editId ? 'Đã cập nhật bộ sưu tập.' : 'Đã tạo bộ sưu tập mới.' });
   };
 
   const handleDelete = async (id: number) => {
     const accepted = await confirm({ title: 'Xóa bộ sưu tập', message: 'Bộ sưu tập này sẽ bị xóa khỏi cấu hình hiển thị. Sản phẩm liên kết sẽ không bị ảnh hưởng.', confirmLabel: 'Xóa bộ sưu tập', tone: 'danger', icon: 'fa-layer-group' });
     if (!accepted) return;
-    saveCollections(collections.filter((collection) => collection.id !== id));
-    notify({ tone: 'success', message: 'Đã xóa bộ sưu tập.' });
+
+    const result = await collectionApi.delete(id);
+    if (result.success) {
+      saveCollections(collections.filter((collection) => collection.id !== id));
+      notify({ tone: 'success', message: 'Đã xóa bộ sưu tập.' });
+    }
   };
 
   const toggleProduct = (productId: number) => {

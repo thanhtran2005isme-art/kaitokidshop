@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { productService } from '../services/productService';
+import { lookbookApi, type LookbookDTO } from '../services/api';
 import type { Product } from '../types';
 import { formatCurrency } from '../utils/format';
 import {
   calculateLookbookTotalPrice,
   getLookbookProducts,
   normalizeLookbookItem,
-  readStoredLookbooks,
-  saveStoredLookbooks,
   type LookbookItem,
 } from '../utils/lookbookConfig';
 import AdminIcon from '../components/admin/AdminIcon';
@@ -46,8 +45,24 @@ export default function AdminLookbook() {
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    setLookbooks(readStoredLookbooks());
     setProducts(productService.getAll());
+    const loadLookbooks = async () => {
+      const result = await lookbookApi.getAll();
+      if (result.success && result.data) {
+        const mapped: LookbookItem[] = result.data.map((dto: LookbookDTO) => normalizeLookbookItem({
+          id: dto.id,
+          name: dto.tieuDe || '',
+          style: dto.tieuDePhu || 'office',
+          description: dto.moTa || '',
+          image: dto.hinhAnh || '',
+          products: dto.lienKet ? dto.lienKet.split(',').map(Number).filter((n) => n > 0) : [],
+          status: dto.trangThai === 'active' ? 'active' : 'hidden',
+          totalPrice: 0,
+        }));
+        setLookbooks(mapped);
+      }
+    };
+    void loadLookbooks();
   }, []);
 
   const activeProducts = useMemo(
@@ -78,8 +93,7 @@ export default function AdminLookbook() {
   }, [activeProducts, productSearch]);
 
   const saveLookbooks = (list: LookbookItem[]) => {
-    const saved = saveStoredLookbooks(list);
-    setLookbooks(saved);
+    setLookbooks(list);
   };
 
   const openAdd = () => {
@@ -141,7 +155,7 @@ export default function AdminLookbook() {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!form.name.trim()) {
       notify({
         tone: 'error',
@@ -166,26 +180,46 @@ export default function AdminLookbook() {
       return;
     }
 
-    const nextLookbook = normalizeLookbookItem({
-      id: editId || Date.now(),
-      ...form,
-      totalPrice: selectedTotalPrice,
-    });
+    const payload = {
+      tieuDe: form.name.trim(),
+      tieuDePhu: form.style || undefined,
+      moTa: form.description.trim() || undefined,
+      hinhAnh: form.image.trim(),
+      lienKet: form.products.join(','),
+      trangThai: form.status || 'active',
+      thuTu: lookbooks.length + 1,
+    };
 
-    if (editId) {
-      saveLookbooks(
-        lookbooks.map((lookbook) =>
-          lookbook.id === editId ? nextLookbook : lookbook,
-        ),
-      );
-      setMsg('Đã cập nhật lookbook.');
-    } else {
-      saveLookbooks([...lookbooks, nextLookbook]);
-      setMsg('Đã tạo lookbook mới.');
+    try {
+      if (editId) {
+        await lookbookApi.update(editId, payload);
+        setMsg('Đã cập nhật lookbook.');
+      } else {
+        await lookbookApi.create(payload);
+        setMsg('Đã tạo lookbook mới.');
+      }
+
+      // Reload from backend
+      const result = await lookbookApi.getAll();
+      if (result.success && result.data) {
+        const mapped: LookbookItem[] = result.data.map((dto: LookbookDTO) => normalizeLookbookItem({
+          id: dto.id,
+          name: dto.tieuDe || '',
+          style: dto.tieuDePhu || 'office',
+          description: dto.moTa || '',
+          image: dto.hinhAnh || '',
+          products: dto.lienKet ? dto.lienKet.split(',').map(Number).filter((n) => n > 0) : [],
+          status: dto.trangThai === 'active' ? 'active' : 'hidden',
+          totalPrice: 0,
+        }));
+        setLookbooks(mapped);
+      }
+
+      window.setTimeout(() => setMsg(''), 3000);
+      closeModal();
+    } catch {
+      notify({ tone: 'error', message: 'Lỗi kết nối server.' });
     }
-
-    window.setTimeout(() => setMsg(''), 3000);
-    closeModal();
   };
 
   const handleDelete = async (id: number) => {
@@ -198,9 +232,13 @@ export default function AdminLookbook() {
     });
 
     if (!accepted) return;
-    saveLookbooks(lookbooks.filter((lookbook) => lookbook.id !== id));
-    setMsg('Đã xóa lookbook.');
-    window.setTimeout(() => setMsg(''), 3000);
+
+    const result = await lookbookApi.delete(id);
+    if (result.success) {
+      saveLookbooks(lookbooks.filter((lookbook) => lookbook.id !== id));
+      setMsg('Đã xóa lookbook.');
+      window.setTimeout(() => setMsg(''), 3000);
+    }
   };
 
   const toggleLookbookStatus = (id: number) => {

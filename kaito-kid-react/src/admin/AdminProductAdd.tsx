@@ -339,8 +339,18 @@ export default function AdminProductAdd() {
 
     // Root categories (no parent)
     const roots = backendCategories.filter((c) => !c.danhMucChaId);
+
+    // Filter roots by selected menu/gender using backend gioiTinh field
+    const filteredRoots = form.menu
+      ? roots.filter((root) => {
+          const gender = (root as any).gioiTinh || 'all';
+          if (gender === 'all') return true;
+          return gender === form.menu;
+        })
+      : roots;
+
     // Build groups: each root is a group, its children are options
-    return roots.map((root) => {
+    return filteredRoots.map((root) => {
       const children = backendCategories
         .filter((c) => c.danhMucChaId === root.id)
         .map((c) => c.tenDanhMuc);
@@ -350,7 +360,7 @@ export default function AdminProductAdd() {
         children: children.length > 0 ? children : [root.tenDanhMuc],
       };
     });
-  }, [backendCategories]);
+  }, [backendCategories, form.menu]);
 
   // Use backend categories if available, otherwise fallback to local taxonomy
   const activeCategoryGroups = backendCategoryGroups.length > 0

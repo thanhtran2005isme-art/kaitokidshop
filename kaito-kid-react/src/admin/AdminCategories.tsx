@@ -15,8 +15,10 @@ interface Category {
   description: string;
   productCount: number;
   updatedAt?: string;
-  parentId?: number | null; // Thêm parentId
-  children?: Category[]; // Thêm children
+  parentId?: number | null;
+  children?: Category[];
+  order?: number;
+  gioiTinh?: string; // 'all' | 'nu' | 'nam' | 'treem'
 }
 
 type CategorySort = 'products-desc' | 'products-asc' | 'name-asc' | 'recent';
@@ -134,13 +136,10 @@ function readStoredCategories() {
 
 function syncCategoriesWithProducts(categories: Category[], products: Product[]) {
   return categories.map((category) => {
-    const normalizedName = normalizeCategoryLabel(category.name);
-    const linkedProducts = getProductsForCategory(normalizedName, products);
+    const linkedProducts = getProductsForCategory(category.name, products);
 
     return {
       ...category,
-      name: normalizedName,
-      slug: slugifyLabel(normalizedName),
       productCount: linkedProducts.length,
     };
   });
@@ -179,7 +178,8 @@ export default function AdminCategories() {
   const [editId, setEditId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [desc, setDesc] = useState('');
-  const [parentId, setParentId] = useState<number | null>(null); // Thêm state cho parent
+  const [parentId, setParentId] = useState<number | null>(null);
+  const [gioiTinh, setGioiTinh] = useState<string>('all');
 
   // Load categories from backend
   const loadCategories = async () => {
@@ -193,9 +193,11 @@ export default function AdminCategories() {
         name: cat.tenDanhMuc,
         slug: cat.slug || slugifyLabel(cat.tenDanhMuc),
         description: cat.moTa || '',
-        productCount: 0, // Will be synced with products
+        productCount: 0,
         updatedAt: cat.ngayTao,
-        parentId: cat.danhMucChaId || null, // Map parentId
+        parentId: cat.danhMucChaId || null,
+        order: cat.thuTu || 0,
+        gioiTinh: cat.gioiTinh || 'all',
       }));
 
       const savedProducts = productService.getAll();
@@ -280,14 +282,16 @@ export default function AdminCategories() {
     setEditId(null);
     setName('');
     setDesc('');
-    setParentId(null); // Reset parentId
+    setParentId(null);
+    setGioiTinh('all');
   };
 
   const openAdd = () => {
     setEditId(null);
     setName('');
     setDesc('');
-    setParentId(null); // Reset parentId
+    setParentId(null);
+    setGioiTinh('all');
     setShowForm(true);
   };
 
@@ -295,7 +299,8 @@ export default function AdminCategories() {
     setEditId(category.id);
     setName(category.name);
     setDesc(category.description);
-    setParentId(category.parentId || null); // Set parentId
+    setParentId(category.parentId || null);
+    setGioiTinh(category.gioiTinh || 'all');
     setShowForm(true);
   };
 
@@ -351,9 +356,10 @@ export default function AdminCategories() {
           tenDanhMuc: normalizedName,
           slug: slugifyLabel(normalizedName),
           moTa: desc.trim(),
-          danhMucChaId: parentId || undefined, // Include parentId
+          danhMucChaId: parentId || undefined,
           thuTu: 0,
           trangThai: true,
+          gioiTinh: !parentId ? gioiTinh : undefined,
         });
         
         toast.success('Đã cập nhật danh mục');
@@ -363,9 +369,10 @@ export default function AdminCategories() {
           tenDanhMuc: normalizedName,
           slug: slugifyLabel(normalizedName),
           moTa: desc.trim(),
-          danhMucChaId: parentId || undefined, // Include parentId
+          danhMucChaId: parentId || undefined,
           thuTu: categories.length,
           trangThai: true,
+          gioiTinh: !parentId ? gioiTinh : undefined,
         });
         
         toast.success('Đã tạo danh mục mới');
@@ -412,6 +419,47 @@ export default function AdminCategories() {
     } catch (error) {
       console.error('Failed to delete category:', error);
       toast.error('Không thể xóa danh mục');
+    }
+  };
+
+  const handleReorderChild = async (parentCatId: number, currentIndex: number, direction: 'up' | 'down') => {
+    const children = categories
+      .filter((c) => c.parentId === parentCatId)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= children.length) return;
+
+    // Swap locally first for instant UI feedback
+    const reordered = [...children];
+    [reordered[currentIndex], reordered[targetIndex]] = [reordered[targetIndex], reordered[currentIndex]];
+
+    // Update local state immediately (no reload)
+    const updatedCategories = categories.map((cat) => {
+      const newIndex = reordered.findIndex((r) => r.id === cat.id);
+      if (newIndex !== -1) {
+        return { ...cat, order: newIndex };
+      }
+      return cat;
+    });
+    setCategories(updatedCategories);
+
+    // Sync to backend in background
+    try {
+      for (let i = 0; i < reordered.length; i++) {
+        await categoryApi.update(reordered[i].id, {
+          tenDanhMuc: reordered[i].name,
+          slug: reordered[i].slug,
+          moTa: reordered[i].description,
+          danhMucChaId: parentCatId,
+          thuTu: i,
+          trangThai: true,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to reorder:', error);
+      toast.error('Không thể lưu thứ tự');
+      await loadCategories(); // Rollback on error
     }
   };
 
@@ -556,7 +604,9 @@ export default function AdminCategories() {
 
           {visibleCategories.length > 0 ? (
             <div className="taxonomy-board-grid">
-              {visibleCategories.map((category) => {
+              {visibleCategories
+                .filter((category) => !category.parentId)
+                .map((category) => {
                 const linkedProducts = getProductsForCategory(category.name, products);
                 const theme = getCategoryTheme(category.name);
                 const usageShare = products.length > 0 ? Math.round((linkedProducts.length / products.length) * 100) : 0;
@@ -565,6 +615,7 @@ export default function AdminCategories() {
                   '--category-surface': theme.surface,
                   '--category-glow': theme.glow,
                 } as CSSProperties;
+                const children = visibleCategories.filter((c) => c.parentId === category.id).sort((a, b) => (a.order || 0) - (b.order || 0));
 
                 return (
                   <article key={category.id} className={`taxonomy-card ${linkedProducts.length > 0 ? 'active' : 'idle'}`} style={themeStyle}>
@@ -584,18 +635,81 @@ export default function AdminCategories() {
                       <span className="taxonomy-card-kicker">{theme.kicker}</span>
                       <div className="taxonomy-card-heading">
                         <div>
-                          <h3>
-                            {category.name}
-                            {category.parentId && (
-                              <span style={{ fontSize: '0.85em', color: '#888', marginLeft: '0.5rem' }}>
-                                (Con của: {categories.find(c => c.id === category.parentId)?.name || 'N/A'})
-                              </span>
-                            )}
-                          </h3>
+                          <h3>{category.name}</h3>
                           <p>/{category.slug}</p>
                         </div>
                         <span className="taxonomy-card-count">{linkedProducts.length}</span>
                       </div>
+
+                      {children.length > 0 && (
+                        <div style={{ margin: '12px 0 8px', padding: '10px 12px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.04em' }}>
+                            Danh mục con ({children.length})
+                          </span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '8px' }}>
+                            {children.map((child, childIndex) => (
+                              <div key={child.id} style={{ 
+                                display: 'flex', alignItems: 'center', gap: '8px',
+                                padding: '6px 10px', borderRadius: '10px', fontSize: '13px',
+                                background: '#ffffff', border: '1px solid #e2e8f0'
+                              }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                  <button
+                                    type="button"
+                                    disabled={childIndex === 0}
+                                    onClick={() => handleReorderChild(category.id, childIndex, 'up')}
+                                    style={{ border: 'none', background: 'transparent', color: childIndex === 0 ? '#d1d5db' : '#6366f1', cursor: childIndex === 0 ? 'not-allowed' : 'pointer', padding: '0', fontSize: '10px', lineHeight: 1 }}
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={childIndex === children.length - 1}
+                                    onClick={() => handleReorderChild(category.id, childIndex, 'down')}
+                                    style={{ border: 'none', background: 'transparent', color: childIndex === children.length - 1 ? '#d1d5db' : '#6366f1', cursor: childIndex === children.length - 1 ? 'not-allowed' : 'pointer', padding: '0', fontSize: '10px', lineHeight: 1 }}
+                                  >
+                                    ▼
+                                  </button>
+                                </div>
+                                <span style={{ flex: 1, fontWeight: 600, color: '#1e293b' }}>{child.name}</span>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => openEdit(child)}
+                                    style={{ border: 'none', background: '#eef2ff', color: '#4338ca', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}
+                                  >
+                                    Sửa
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDelete(child.id)}
+                                    style={{ border: 'none', background: '#fef2f2', color: '#dc2626', borderRadius: '6px', padding: '3px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: 600 }}
+                                  >
+                                    Xóa
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { setParentId(category.id); setEditId(null); setName(''); setDesc(''); setShowForm(true); }}
+                            style={{ marginTop: '8px', width: '100%', border: '1px dashed #c7d2fe', background: '#f5f3ff', color: '#4338ca', borderRadius: '8px', padding: '6px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                          >
+                            + Thêm danh mục con
+                          </button>
+                        </div>
+                      )}
+
+                      {children.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => { setParentId(category.id); setEditId(null); setName(''); setDesc(''); setShowForm(true); }}
+                          style={{ margin: '12px 0 8px', width: '100%', border: '1px dashed #c7d2fe', background: '#f5f3ff', color: '#4338ca', borderRadius: '8px', padding: '8px', fontSize: '12px', cursor: 'pointer', fontWeight: 600 }}
+                        >
+                          + Thêm danh mục con
+                        </button>
+                      )}
 
                       <p className="taxonomy-card-description">
                         {category.description || 'Chưa có mô tả. Nên mô tả ngắn gọn để team merchandising đọc taxonomy nhanh hơn.'}
@@ -758,6 +872,22 @@ export default function AdminCategories() {
                   </select>
                   <small>Chọn danh mục cha nếu đây là danh mục con (subcategory)</small>
                 </div>
+
+                {!parentId && (
+                  <div className="taxonomy-form-group">
+                    <label>Áp dụng cho giới tính</label>
+                    <select
+                      value={gioiTinh}
+                      onChange={(event) => setGioiTinh(event.target.value)}
+                    >
+                      <option value="all">Tất cả (Nam + Nữ + Trẻ em)</option>
+                      <option value="nu">Chỉ Nữ</option>
+                      <option value="nam">Chỉ Nam</option>
+                      <option value="treem">Chỉ Trẻ em</option>
+                    </select>
+                    <small>Danh mục này sẽ chỉ hiện khi thêm sản phẩm cho giới tính được chọn.</small>
+                  </div>
+                )}
 
                 <div className="taxonomy-form-group">
                   <label>Mô tả</label>

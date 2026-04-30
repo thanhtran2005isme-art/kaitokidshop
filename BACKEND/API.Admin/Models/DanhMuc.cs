@@ -13,5 +13,7 @@ public class DanhMuc
     public int? DanhMucChaId { get; set; }
     public int ThuTu { get; set; }
     public bool TrangThai { get; set; } = true;
+    /// <summary>all | nu | nam | treem</summary>
+    public string GioiTinh { get; set; } = "all";
     public DateTime NgayTao { get; set; } = DateTime.UtcNow;
 }

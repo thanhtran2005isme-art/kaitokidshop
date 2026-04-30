@@ -18,5 +18,7 @@ export { homepageApi, type HomepageSectionDTO } from './homepageApi';
 export { bannerApi, type BannerDTO } from './bannerApi';
 export { pageApi, type PageDTO } from './pageApi';
 export { menuApi, type MenuDTO } from './menuApi';
+export { collectionApi, type CollectionDTO } from './collectionApi';
+export { lookbookApi, type LookbookDTO } from './lookbookApi';
 export { adminProductsApi } from './adminProductsApi';
 export { customerApi } from './customerApi';

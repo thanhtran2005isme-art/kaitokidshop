@@ -9,6 +9,7 @@ export interface CategoryDTO {
   danhMucChaId?: number;
   thuTu: number;
   trangThai: boolean;
+  gioiTinh: string; // 'all' | 'nu' | 'nam' | 'treem'
   ngayTao: string;
 }
 
@@ -20,6 +21,7 @@ export interface CreateCategoryDTO {
   danhMucChaId?: number;
   thuTu: number;
   trangThai: boolean;
+  gioiTinh?: string;
 }
 
 export interface UpdateCategoryDTO {
@@ -30,6 +32,7 @@ export interface UpdateCategoryDTO {
   danhMucChaId?: number;
   thuTu: number;
   trangThai: boolean;
+  gioiTinh?: string;
 }
 
 export const categoryApi = {

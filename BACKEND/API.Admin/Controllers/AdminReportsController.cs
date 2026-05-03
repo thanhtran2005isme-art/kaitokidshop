@@ -41,22 +41,50 @@ public class AdminReportsController(AdminDbContext db) : ControllerBase
 
     /// <summary>Top sản phẩm bán chạy</summary>
     [HttpGet("top-products")]
-    public async Task<IActionResult> TopProducts([FromQuery] int count = 10)
+    public async Task<IActionResult> TopProducts([FromQuery] int count = 10, [FromQuery] int days = 30)
     {
-        var items = await db.SanPham
-            .Where(p => p.TrangThai == "active")
-            .OrderByDescending(p => p.SoLuongDaBan)
+        // Lấy sản phẩm có đơn completed trong kỳ
+        var fromDate = DateTime.UtcNow.AddDays(-days);
+        var productSales = await db.ChiTietDonHang
+            .Where(ct => db.DonHang.Any(d => d.Id == ct.DonHangId && d.TrangThai == "completed" && d.NgayTao >= fromDate))
+            .GroupBy(ct => ct.SanPhamId)
+            .Select(g => new { SanPhamId = g.Key, SoLuong = g.Sum(ct => ct.SoLuong) })
+            .OrderByDescending(x => x.SoLuong)
             .Take(count)
-            .Select(p => new { p.Id, p.TenSanPham, p.MaSanPham, p.HinhAnh, p.Gia, p.SoLuongDaBan, p.TonKho })
             .ToListAsync();
+
+        var productIds = productSales.Select(x => x.SanPhamId).ToList();
+        var products = await db.SanPham.Where(p => productIds.Contains(p.Id)).ToListAsync();
+
+        var items = productSales.Select(ps => {
+            var p = products.FirstOrDefault(x => x.Id == ps.SanPhamId);
+            return new { 
+                Id = ps.SanPhamId, 
+                TenSanPham = p?.TenSanPham ?? "", 
+                MaSanPham = p?.MaSanPham ?? "", 
+                HinhAnh = p?.HinhAnh ?? "", 
+                Gia = p?.Gia ?? 0, 
+                SoLuongDaBan = ps.SoLuong, 
+                TonKho = p?.TonKho ?? 0 
+            };
+        }).ToList();
+
+        // Nếu không có đơn trong kỳ, trả về mảng rỗng
+        if (items.Count == 0)
+        {
+            return Ok(new List<object>());
+        }
+
         return Ok(items);
     }
 
     /// <summary>Thống kê đơn hàng theo trạng thái</summary>
     [HttpGet("order-stats")]
-    public async Task<IActionResult> OrderStats()
+    public async Task<IActionResult> OrderStats([FromQuery] int days = 30)
     {
+        var fromDate = DateTime.UtcNow.AddDays(-days);
         var stats = await db.DonHang
+            .Where(d => d.NgayTao >= fromDate)
             .GroupBy(d => d.TrangThai)
             .Select(g => new { status = g.Key, count = g.Count(), total = g.Sum(d => d.TongTien) })
             .ToListAsync();

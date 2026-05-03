@@ -20,5 +20,6 @@ export { pageApi, type PageDTO } from './pageApi';
 export { menuApi, type MenuDTO } from './menuApi';
 export { collectionApi, type CollectionDTO } from './collectionApi';
 export { lookbookApi, type LookbookDTO } from './lookbookApi';
+export { settingsApi, type SettingDTO, type UpsertSettingDTO } from './settingsApi';
 export { adminProductsApi } from './adminProductsApi';
 export { customerApi } from './customerApi';

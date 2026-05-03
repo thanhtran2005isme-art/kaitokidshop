@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import AdminIcon from '../components/admin/AdminIcon';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
+import { adminProductsApi } from '../services/api';
 import { productService } from '../services/productService';
 import type { Product } from '../types';
 import { formatCurrency } from '../utils/format';
@@ -200,7 +201,16 @@ export default function AdminProducts() {
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    setProducts(productService.getAll());
+    const loadProducts = async () => {
+      const result = await adminProductsApi.getAll({ pageSize: 200 });
+      if (result.success && result.data) {
+        setProducts(result.data.products);
+      } else {
+        // Fallback to local
+        setProducts(productService.getAll());
+      }
+    };
+    void loadProducts();
   }, []);
 
   useEffect(() => {
@@ -332,7 +342,7 @@ export default function AdminProducts() {
     setShowForm(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!editId) {
       return;
     }
@@ -353,7 +363,7 @@ export default function AdminProducts() {
     }
 
     setFormError('');
-    productService.update(editId, {
+    const updatePayload = {
       ...form,
       name: trimmedName,
       category: normalizedCategory,
@@ -368,8 +378,12 @@ export default function AdminProducts() {
       rating: Number(form.rating || 0),
       colors: form.colors ?? [],
       sizes: form.sizes ?? [],
-    });
-    setProducts(productService.getAll());
+    };
+
+    const result = await adminProductsApi.update(editId, updatePayload);
+    if (result.success && result.data) {
+      setProducts((prev) => prev.map((p) => p.id === editId ? result.data! : p));
+    }
     closeForm();
   };
 
@@ -386,12 +400,13 @@ export default function AdminProducts() {
       return;
     }
 
-    productService.delete(id);
-    setProducts(productService.getAll());
-    notify({
-      tone: 'success',
-      message: 'Đã xóa sản phẩm khỏi danh sách quản trị.',
-    });
+    const result = await adminProductsApi.delete(id);
+    if (result.success) {
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      notify({ tone: 'success', message: 'Đã xóa sản phẩm.' });
+    } else {
+      notify({ tone: 'error', message: result.error || 'Không thể xóa sản phẩm.' });
+    }
   };
 
   return (

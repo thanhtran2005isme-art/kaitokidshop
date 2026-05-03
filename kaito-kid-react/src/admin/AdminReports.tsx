@@ -53,17 +53,17 @@ export default function AdminReports() {
   const [topProducts, setTopProducts] = useState<TopProductItem[]>([]);
   const [orderStats, setOrderStats] = useState<OrderStatItem[]>([]);
 
-  const loadReports = async () => {
+  const loadReports = async (selectedPeriod: ReportPeriod) => {
     setLoading(true);
     const daysMap: Record<ReportPeriod, number> = {
       today: 1, week: 7, month: 30, quarter: 90, year: 365,
     };
-    const days = daysMap[period] || 30;
+    const days = daysMap[selectedPeriod] || 30;
 
     const [revResult, topResult, statsResult] = await Promise.all([
       reportApi.getRevenue(days),
-      reportApi.getTopProducts(10),
-      reportApi.getOrderStats(),
+      reportApi.getTopProducts(10, days),
+      reportApi.getOrderStats(days),
     ]);
 
     if (revResult.success && revResult.data) setRevenueData(revResult.data);
@@ -73,7 +73,7 @@ export default function AdminReports() {
   };
 
   useEffect(() => {
-    void loadReports();
+    void loadReports(period);
   }, [period]);
 
   // Derived data for charts
@@ -104,7 +104,7 @@ export default function AdminReports() {
   const snapshot = {
     revenue: totalRevenue,
     orderCount: totalOrders,
-    itemsSold: topProducts.reduce((sum, p) => sum + p.soLuongDaBan, 0),
+    itemsSold: totalOrders, // Số đơn trong kỳ (không phải tổng lịch sử bán)
     newCustomers: 0,
     averageOrderValue,
     revenueChange: { value: 0, direction: 'neutral' as const },

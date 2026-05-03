@@ -46,9 +46,11 @@ export const reportApi = {
   },
 
   /** Top sản phẩm bán chạy */
-  async getTopProducts(count?: number): Promise<ApiResponse<TopProductItem[]>> {
+  async getTopProducts(count?: number, days?: number): Promise<ApiResponse<TopProductItem[]>> {
     try {
-      const params = count ? { count } : {};
+      const params: Record<string, number> = {};
+      if (count) params.count = count;
+      if (days) params.days = days;
       const response = await apiClient.get<TopProductItem[]>('/api/admin/reports/top-products', { params });
       return { success: true, data: response.data };
     } catch (error) {
@@ -57,9 +59,10 @@ export const reportApi = {
   },
 
   /** Thống kê đơn hàng theo trạng thái */
-  async getOrderStats(): Promise<ApiResponse<OrderStatItem[]>> {
+  async getOrderStats(days?: number): Promise<ApiResponse<OrderStatItem[]>> {
     try {
-      const response = await apiClient.get<OrderStatItem[]>('/api/admin/reports/order-stats');
+      const params = days ? { days } : {};
+      const response = await apiClient.get<OrderStatItem[]>('/api/admin/reports/order-stats', { params });
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: getErrorMessage(error) };

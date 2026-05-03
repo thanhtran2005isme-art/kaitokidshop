@@ -84,8 +84,14 @@ function buildProfileMetrics() {
 export default function AdminProfile() {
   const { user, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const initialProfile = readAdminProfile();
-  const initialSettings = readAdminSettings();
+  // Build profile from JWT user data instead of localStorage
+  const initialProfile: AdminProfileRecord = {
+    ...readAdminProfile(),
+    name: user?.name || readAdminProfile().name,
+    email: user?.email || readAdminProfile().email,
+    phone: user?.phone || readAdminProfile().phone,
+    role: user?.role || 'admin',
+  };
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
   const [editingSection, setEditingSection] = useState<EditableSection>(null);
   const [savedProfile, setSavedProfile] = useState<AdminProfileRecord>(initialProfile);
@@ -94,8 +100,8 @@ export default function AdminProfile() {
   const [metrics, setMetrics] = useState(() => buildProfileMetrics());
   const [securityActivities, setSecurityActivities] = useState(() => readSecurityActivities().slice(0, 6));
   const [securityOptions, setSecurityOptions] = useState({
-    enable2FA: initialSettings.enable2FA,
-    loginNotification: initialSettings.loginNotification,
+    enable2FA: false,
+    loginNotification: true,
   });
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>({
     currentPassword: '',

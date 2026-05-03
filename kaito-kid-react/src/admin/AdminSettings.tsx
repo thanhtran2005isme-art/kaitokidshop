@@ -1,14 +1,13 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatCurrency, formatDate } from '../utils/format';
+import { settingsApi, type SettingDTO, type UpsertSettingDTO } from '../services/api';
 import {
   defaultAdminSettings,
   pushEmailActivity,
   pushSecurityActivity,
-  readAdminSettings,
   readEmailActivities,
   readSecurityActivities,
-  saveAdminSettings,
   type AdminSettingsConfig,
   type BankAccountConfig,
   type EmailActivityRecord,
@@ -49,13 +48,18 @@ function formatDateTime(value?: string) {
     return 'Chưa có dữ liệu';
   }
 
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return 'Chưa có dữ liệu';
+  }
+
   try {
     return new Intl.DateTimeFormat('vi-VN', {
       dateStyle: 'short',
       timeStyle: 'short',
-    }).format(new Date(value));
+    }).format(parsed);
   } catch {
-    return formatDate(value);
+    return 'Chưa có dữ liệu';
   }
 }
 
@@ -92,11 +96,38 @@ function getFlashIcon(type: FlashMessage['type']) {
 
 export default function AdminSettings() {
   const [activeTab, setActiveTab] = useState<TabType>('general');
-  const [settings, setSettings] = useState<AdminSettingsConfig>(() => readAdminSettings());
+  const [settings, setSettings] = useState<AdminSettingsConfig>(() => defaultAdminSettings);
   const [message, setMessage] = useState<FlashMessage | null>(null);
   const [passwordForm, setPasswordForm] = useState<PasswordFormState>(emptyPasswordForm);
   const [emailActivities, setEmailActivities] = useState<EmailActivityRecord[]>(() => readEmailActivities().slice(0, 6));
   const [securityActivities, setSecurityActivities] = useState<SecurityActivityRecord[]>(() => readSecurityActivities().slice(0, 6));
+
+  // Load settings from backend on mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      const result = await settingsApi.getAll();
+      if (result.success && result.data) {
+        const loaded = { ...defaultAdminSettings };
+        result.data.forEach((dto: SettingDTO) => {
+          const key = dto.maCauHinh as keyof AdminSettingsConfig;
+          const val = dto.giaTri;
+          if (key in loaded) {
+            if (typeof (loaded as any)[key] === 'boolean') {
+              (loaded as any)[key] = val === 'true';
+            } else if (typeof (loaded as any)[key] === 'number') {
+              (loaded as any)[key] = Number(val) || 0;
+            } else if (key === 'bankAccounts') {
+              try { (loaded as any)[key] = JSON.parse(val); } catch { /* keep default */ }
+            } else {
+              (loaded as any)[key] = val;
+            }
+          }
+        });
+        setSettings(loaded);
+      }
+    };
+    void loadSettings();
+  }, []);
 
   const enabledPaymentMethods = Number(settings.codEnabled) + Number(settings.bankEnabled);
   const enabledNotificationCount =
@@ -168,11 +199,33 @@ export default function AdminSettings() {
     window.setTimeout(() => setMessage(null), 3500);
   };
 
-  const persistSettings = (nextSettings: AdminSettingsConfig, successText: string) => {
-    const savedSettings = saveAdminSettings(nextSettings);
-    setSettings(savedSettings);
-    showMessage('success', successText);
-    return savedSettings;
+  const getSettingGroup = (key: string): string => {
+    if (['storeName', 'storeSlogan', 'storeEmail', 'storePhone', 'storeAddress'].includes(key)) return 'general';
+    if (['codEnabled', 'codFee', 'bankEnabled', 'bankAccounts'].includes(key)) return 'payment';
+    if (['defaultShippingFee', 'freeShippingFrom', 'estimatedDelivery', 'enableTracking'].includes(key)) return 'shipping';
+    if (key.startsWith('smtp') || key.startsWith('email') || key.startsWith('test') || key.startsWith('lastEmail')) return 'email';
+    if (key.startsWith('notify')) return 'notifications';
+    return 'security';
+  };
+
+  const persistSettings = async (nextSettings: AdminSettingsConfig, successText: string) => {
+    setSettings(nextSettings);
+
+    // Convert settings to key-value pairs for backend
+    const payload: UpsertSettingDTO[] = Object.entries(nextSettings)
+      .filter(([key]) => key !== 'updatedAt')
+      .map(([key, value]) => ({
+        maCauHinh: key,
+        giaTri: typeof value === 'object' ? JSON.stringify(value) : String(value),
+        nhomCauHinh: getSettingGroup(key),
+      }));
+
+    const result = await settingsApi.upsert(payload);
+    if (result.success) {
+      showMessage('success', successText);
+    } else {
+      showMessage('error', result.error || 'Lỗi lưu cài đặt.');
+    }
   };
 
   const updateField = <Key extends keyof AdminSettingsConfig>(field: Key, value: AdminSettingsConfig[Key]) => {

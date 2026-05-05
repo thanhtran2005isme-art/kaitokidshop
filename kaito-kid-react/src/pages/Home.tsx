@@ -13,9 +13,7 @@ import { Link } from 'react-router-dom';
 import ProductCard from '../components/product/ProductCard';
 import { productApi } from '../services/api';
 import type { Product } from '../types';
-import { readStoredBanners, type BannerItem } from '../utils/bannerConfig';
 import { matchesProductCategory, matchesProductGender } from '../utils/productTaxonomy';
-import { getHomepageReviews, readStoredReviews, type ReviewRecord } from '../utils/reviewConfig';
 
 interface HeroSlide {
   image: string;
@@ -131,41 +129,9 @@ function matchesCategory(product: Product, filter: string) {
   return matchesProductCategory(product.category, filter);
 }
 
-function mapBannerToHeroSlide(banner: BannerItem): HeroSlide {
-  const primaryLink = banner.primaryButtonLink?.trim() || banner.link?.trim() || '/products';
-  const index = Math.max((banner.order || 1) - 1, 0);
-  const primaryLabel = index === 0 ? 'Khám phá ngay' : index === 1 ? 'Xem chi tiết' : 'Mua ngay';
-  const secondaryLink = primaryLink === '/products' ? '/collections' : '/products';
-  const resolvedPrimaryLabel = banner.primaryButtonLabel?.trim() || primaryLabel;
-  const resolvedTagline = banner.tagline?.trim() || `FEATURED ${String(index + 1).padStart(2, '0')}`;
-  const resolvedSubtitle = banner.subtitle?.trim() || banner.description?.trim() || 'Khám phá bộ sưu tập nổi bật từ KAITO KID';
-  const resolvedSecondaryLabel = banner.secondaryButtonLabel?.trim() || 'Xem tất cả';
-
-  const heroSlide: HeroSlide = {
-    image: banner.imageUrl,
-    alt: banner.title,
-    tagline: resolvedTagline,
-    title: banner.title,
-    subtitle: resolvedSubtitle,
-    primaryAction: { label: resolvedPrimaryLabel, to: primaryLink },
-    secondaryAction: { label: resolvedSecondaryLabel, to: secondaryLink },
-  };
-
-  return heroSlide;
-}
-
-function mapReviewToHomeReview(review: ReviewRecord): HomeReview {
-  return {
-    name: review.customerName?.trim() || 'Khách hàng',
-    meta: review.productName?.trim() || `Đơn hàng ${review.orderId}`,
-    text: `"${review.comment?.trim() || 'Sản phẩm rất đáng thử!'}"`,
-    rating: Math.max(1, Math.min(5, Math.round(review.rating || 5))),
-  };
-}
-
 export default function Home() {
-  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(defaultHeroSlides);
-  const [reviews, setReviews] = useState<HomeReview[]>(defaultReviews);
+  const [heroSlides] = useState<HeroSlide[]>(defaultHeroSlides);
+  const [reviews] = useState<HomeReview[]>(defaultReviews);
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
   const [filteredNewArrivals, setFilteredNewArrivals] = useState<Product[]>([]);
   const [newArrivalsFilter, setNewArrivalsFilter] = useState('all');
@@ -217,33 +183,7 @@ export default function Home() {
     };
 
     loadHomeData();
-
-    // Load banners và reviews (giữ nguyên)
-    const loadHomepageContent = () => {
-      const storedBanners = readStoredBanners()
-        .filter((banner) => banner.type === 'slider' && banner.status === 'active' && banner.position === 'homepage')
-        .sort((first, second) => first.order - second.order);
-
-      if (storedBanners.length > 0) {
-        setHeroSlides(storedBanners.slice(0, 3).map(mapBannerToHeroSlide));
-      } else {
-        setHeroSlides(defaultHeroSlides);
-      }
-
-      const storedReviews = getHomepageReviews(readStoredReviews())
-        .sort((first, second) => new Date(second.createdAt).getTime() - new Date(first.createdAt).getTime());
-
-      if (storedReviews.length > 0) {
-        setReviews(storedReviews.slice(0, 3).map(mapReviewToHomeReview));
-      } else {
-        setReviews(defaultReviews);
-      }
-    };
-
-    loadHomepageContent();
-    window.addEventListener('storage', loadHomepageContent);
-
-    return () => window.removeEventListener('storage', loadHomepageContent);
+    // Load banners và reviews tạm giữ static (chưa cần API public)
   }, []);
 
   useEffect(() => {

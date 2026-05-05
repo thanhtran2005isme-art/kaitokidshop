@@ -99,6 +99,7 @@ function App() {
                 <Route path="dashboard" element={<Dashboard />} />
                 <Route path="products" element={<AdminProducts />} />
                 <Route path="products/add" element={<AdminProductAdd />} />
+                <Route path="products/edit/:id" element={<AdminProductAdd />} />
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="customers" element={<AdminCustomers />} />
                 <Route path="categories" element={<AdminCategories />} />

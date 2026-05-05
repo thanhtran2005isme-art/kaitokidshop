@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import AdminIcon from '../components/admin/AdminIcon';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { adminProductsApi } from '../services/api';
@@ -182,6 +183,7 @@ function getProductFlags(product: Product) {
 }
 
 export default function AdminProducts() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { confirm, notify } = useAdminUi();
   const [products, setProducts] = useState<Product[]>([]);
@@ -329,17 +331,7 @@ export default function AdminProducts() {
   };
 
   const openEdit = (product: Product) => {
-    setEditId(product.id);
-    setForm({
-      ...defaultProduct(),
-      ...product,
-      category: toCanonicalCategory(product.category) || product.category,
-      gender: toCanonicalGender(product.gender) || product.gender,
-      colors: product.colors ?? [],
-      sizes: product.sizes ?? ['S', 'M', 'L', 'XL'],
-    });
-    setFormError('');
-    setShowForm(true);
+    navigate(`/admin/products/edit/${product.id}`);
   };
 
   const handleSave = async () => {
@@ -1006,7 +998,7 @@ export default function AdminProducts() {
         </div>
       </section>
 
-      {showForm && (
+      {showForm && createPortal(
         <div className="modal active products-edit-modal" onClick={closeForm}>
           <div className="modal-dialog products-modal-dialog" onClick={(event) => event.stopPropagation()}>
             <div className="modal-content">
@@ -1287,7 +1279,8 @@ export default function AdminProducts() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

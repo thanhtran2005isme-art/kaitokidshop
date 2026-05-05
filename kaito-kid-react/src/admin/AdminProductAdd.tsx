@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAdminUi } from '../components/admin/AdminUiProvider';
 import { productService } from '../services/productService';
+import { adminProductsApi } from '../services/api';
 import { attributeApi, type AttributeDTO } from '../services/api/attributeApi';
 import { categoryApi, type CategoryDTO } from '../services/api/categoryApi';
 import { getMenuCategoryOptions, getMenuTaxonomyGroups, toCanonicalCategory, type ProductMenuKey } from '../utils/productTaxonomy';
@@ -265,6 +266,9 @@ function getColorHex(colorName: string): string {
 export default function AdminProductAdd() {
   const { notify } = useAdminUi();
   const navigate = useNavigate();
+  const { id: idParam } = useParams<{ id: string }>();
+  const editId = idParam ? Number(idParam) : null;
+  const isEditMode = editId !== null && !Number.isNaN(editId);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [imageTab, setImageTab] = useState<'upload' | 'url'>('upload');
   const [imageUrl, setImageUrl] = useState('');
@@ -327,7 +331,51 @@ export default function AdminProductAdd() {
 
     void loadAttributes();
     void loadCategories();
-  }, []);
+
+    // If in edit mode, load product data
+    if (isEditMode && editId) {
+      const loadProduct = async () => {
+        const result = await adminProductsApi.getById(editId);
+        if (result.success && result.data) {
+          const p = result.data;
+          // Determine menu from gender
+          const menuKey: ProductMenuKey | '' =
+            p.gender === 'Nu' ? 'nu' :
+            p.gender === 'Nam' ? 'nam' :
+            p.gender === 'Tre em' ? 'treem' : '';
+
+          setForm({
+            name: p.name || '',
+            shortDesc: p.shortDescription || '',
+            description: p.description || '',
+            specs: p.specs || '',
+            price: p.price || 0,
+            salePrice: p.oldPrice && p.price < p.oldPrice ? p.price : 0,
+            menu: menuKey,
+            category: p.category || '',
+            style: p.style || '',
+            ageGroup: p.ageGroup || '',
+            collection: p.collection || '',
+            status: p.status || 'active',
+            sku: p.sku || '',
+            slug: p.slug || '',
+            metaTitle: p.metaTitle || '',
+            metaDesc: p.metaDescription || '',
+            isNew: p.isNew || false,
+            isBestSeller: p.isBestSeller || false,
+          });
+          setImages(p.images && p.images.length > 0 ? p.images : (p.image ? [p.image] : []));
+          setSelectedSizes(p.sizes || []);
+          setSelectedColors(p.colors || []);
+          setAutoFields({ slug: false, metaTitle: false, metaDesc: false });
+        } else {
+          notify({ tone: 'error', message: 'Không tìm thấy sản phẩm.' });
+          navigate('/admin/products');
+        }
+      };
+      void loadProduct();
+    }
+  }, [isEditMode, editId]);
 
   // Resolved sizes/colors: use backend if available, fallback to hardcoded
   const resolvedSizes = backendSizes.length > 0 ? backendSizes : DEFAULT_SIZES;
@@ -598,7 +646,7 @@ export default function AdminProductAdd() {
     }));
   };
 
-  const handleSave = (targetStatus: Product['status']) => {
+  const handleSave = async (targetStatus: Product['status']) => {
     const trimmedName = form.name.trim();
     const draftMode = targetStatus === 'draft';
 
@@ -705,24 +753,50 @@ export default function AdminProductAdd() {
       specs: form.specs.trim() || undefined,
     };
 
-    productService.create(newProduct);
-    notify({
-      tone: 'success',
-      message:
-        targetStatus === 'draft'
-          ? 'Đã tạo bản nháp sản phẩm. Bạn có thể bổ sung media và SEO sau.'
-          : 'Đã tạo sản phẩm mới thành công trong catalog.',
-    });
-    navigate('/admin/products');
+    if (isEditMode && editId) {
+      const result = await adminProductsApi.update(editId, newProduct);
+      if (result.success) {
+        notify({
+          tone: 'success',
+          message: 'Đã cập nhật sản phẩm thành công.',
+        });
+        navigate('/admin/products');
+      } else {
+        notify({
+          tone: 'error',
+          message: result.error || 'Không thể cập nhật sản phẩm.',
+        });
+      }
+    } else {
+      const result = await adminProductsApi.create(newProduct);
+      if (result.success) {
+        notify({
+          tone: 'success',
+          message:
+            targetStatus === 'draft'
+              ? 'Đã tạo bản nháp sản phẩm. Bạn có thể bổ sung media và SEO sau.'
+              : 'Đã tạo sản phẩm mới thành công trong catalog.',
+        });
+        navigate('/admin/products');
+      } else {
+        // Fallback to local
+        productService.create(newProduct);
+        notify({
+          tone: 'success',
+          message: 'Đã tạo sản phẩm (local fallback).',
+        });
+        navigate('/admin/products');
+      }
+    }
   };
 
   return (
     <div className="product-add-page">
       <div className="page-header product-builder-header">
         <div className="product-builder-copy">
-          <span className="product-builder-eyebrow">Catalog</span>
-          <h1>{form.name.trim() || 'Thêm sản phẩm mới'}</h1>
-          <p>Nhập thông tin cần thiết để tạo sản phẩm. Các phần nâng cao có thể bổ sung sau.</p>
+          <span className="product-builder-eyebrow">{isEditMode ? 'Chỉnh sửa sản phẩm' : 'Catalog'}</span>
+          <h1>{form.name.trim() || (isEditMode ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới')}</h1>
+          <p>{isEditMode ? 'Cập nhật thông tin sản phẩm. Mọi thay đổi sẽ được lưu khi bấm nút.' : 'Nhập thông tin cần thiết để tạo sản phẩm. Các phần nâng cao có thể bổ sung sau.'}</p>
         </div>
 
         <div className="page-actions product-builder-actions">

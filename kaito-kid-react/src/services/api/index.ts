@@ -21,5 +21,6 @@ export { menuApi, type MenuDTO } from './menuApi';
 export { collectionApi, type CollectionDTO } from './collectionApi';
 export { lookbookApi, type LookbookDTO } from './lookbookApi';
 export { settingsApi, type SettingDTO, type UpsertSettingDTO } from './settingsApi';
+export { cartApi, type CartItemDTO as CartItemBackendDTO, type AddToCartPayload } from './cartApi';
 export { adminProductsApi } from './adminProductsApi';
 export { customerApi } from './customerApi';

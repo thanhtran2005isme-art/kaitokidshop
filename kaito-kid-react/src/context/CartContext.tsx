@@ -1,55 +1,107 @@
-// CartContext - thay thế cart logic rải rác ở cart-page.js, product-detail.js, auth-check.js
+// CartContext - kết nối backend API qua /api/cart
 
-import { createContext, useState, useContext, useEffect } from 'react';
+import { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { cartService } from '../services/cartService';
+import { cartApi, type CartItemBackendDTO } from '../services/api';
+import { useAuth } from './AuthContext';
 import type { CartItem, Product } from '../types';
 
 interface CartContextType {
   cart: CartItem[];
   totalItems: number;
   subtotal: number;
-  addItem: (product: Product, size: string, color: string, qty?: number) => void;
-  updateQuantity: (index: number, qty: number) => void;
-  removeItem: (index: number) => void;
-  clearCart: () => void;
+  loading: boolean;
+  addItem: (product: Product, size: string, color: string, qty?: number) => Promise<void>;
+  updateQuantity: (cartItemId: number, qty: number) => Promise<void>;
+  removeItem: (cartItemId: number) => Promise<void>;
+  clearCart: () => Promise<void>;
+  refreshCart: () => Promise<void>;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
 
+function mapDtoToCartItem(dto: CartItemBackendDTO): CartItem {
+  return {
+    id: dto.id,
+    productId: dto.productId,
+    name: dto.name,
+    price: dto.price,
+    image: dto.image,
+    size: dto.size,
+    color: dto.color,
+    quantity: dto.quantity,
+  };
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [cart, setCart] = useState<CartItem[]>(cartService.getCart());
+  const { user } = useAuth();
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Sync với localStorage mỗi khi cart thay đổi
+  const refreshCart = useCallback(async () => {
+    if (!user) {
+      setCart([]);
+      return;
+    }
+    setLoading(true);
+    const result = await cartApi.getCart();
+    if (result.success && result.data) {
+      setCart(result.data.map(mapDtoToCartItem));
+    } else {
+      setCart([]);
+    }
+    setLoading(false);
+  }, [user]);
+
+  // Load cart khi user đăng nhập
   useEffect(() => {
-    cartService.saveCart(cart);
-  }, [cart]);
+    void refreshCart();
+  }, [refreshCart]);
 
-  const addItem = (product: Product, size: string, color: string, qty = 1) => {
-    const updated = cartService.addItem(product, size, color, qty);
-    setCart([...updated]);
+  const addItem = async (product: Product, size: string, color: string, qty = 1) => {
+    if (!user) {
+      // Chưa login - không thể thêm vào cart backend
+      return;
+    }
+    const result = await cartApi.addToCart({
+      productId: product.id,
+      size,
+      color,
+      quantity: qty,
+    });
+    if (result.success) {
+      await refreshCart();
+    }
   };
 
-  const updateQuantity = (index: number, qty: number) => {
-    const updated = cartService.updateQuantity(index, qty);
-    setCart([...updated]);
+  const updateQuantity = async (cartItemId: number, qty: number) => {
+    if (qty < 1) return;
+    const result = await cartApi.updateQuantity(cartItemId, qty);
+    if (result.success) {
+      // Cập nhật local ngay để UI mượt
+      setCart((prev) => prev.map((item) => item.id === cartItemId ? { ...item, quantity: qty } : item));
+    }
   };
 
-  const removeItem = (index: number) => {
-    const updated = cartService.removeItem(index);
-    setCart([...updated]);
+  const removeItem = async (cartItemId: number) => {
+    const result = await cartApi.removeItem(cartItemId);
+    if (result.success) {
+      setCart((prev) => prev.filter((item) => item.id !== cartItemId));
+    }
   };
 
-  const clearCart = () => {
-    setCart([]);
-    cartService.clear();
+  const clearCart = async () => {
+    const result = await cartApi.clearCart();
+    if (result.success) {
+      setCart([]);
+    }
   };
 
   const totalItems = cart.reduce((sum, item) => sum + (item.quantity || 1), 0);
   const subtotal = cart.reduce((sum, item) => sum + item.price * (item.quantity || 1), 0);
 
   return (
-    <CartContext.Provider value={{ cart, totalItems, subtotal, addItem, updateQuantity, removeItem, clearCart }}>
+    <CartContext.Provider value={{ cart, totalItems, subtotal, loading, addItem, updateQuantity, removeItem, clearCart, refreshCart }}>
       {children}
     </CartContext.Provider>
   );

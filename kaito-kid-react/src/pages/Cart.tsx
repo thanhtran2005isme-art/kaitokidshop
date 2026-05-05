@@ -61,8 +61,8 @@ export default function Cart() {
           </div>
 
           {/* Cart items */}
-          {cart.map((item, index) => (
-            <div className="ivy-cart-item" key={`${item.id}_${item.size}_${item.color}`}>
+          {cart.map((item) => (
+            <div className="ivy-cart-item" key={item.id}>
               <div className="ivy-col-product">
                 <div className="ivy-item-info">
                   <Link to={`/product/${item.id}`} className="ivy-item-img">
@@ -83,14 +83,14 @@ export default function Cart() {
               </div>
               <div className="ivy-col-qty">
                 <div className="ivy-qty-control">
-                  <button onClick={() => updateQuantity(index, item.quantity - 1)}>−</button>
+                  <button onClick={() => updateQuantity(item.id, item.quantity - 1)}>−</button>
                   <input value={item.quantity} readOnly />
-                  <button onClick={() => updateQuantity(index, item.quantity + 1)}>+</button>
+                  <button onClick={() => updateQuantity(item.id, item.quantity + 1)}>+</button>
                 </div>
               </div>
               <div className="ivy-col-total">
                 <span className="ivy-item-total">{formatCurrency(item.price * item.quantity)}</span>
-                <button className="ivy-remove-btn" onClick={() => removeItem(index)} aria-label="Xóa">
+                <button className="ivy-remove-btn" onClick={() => removeItem(item.id)} aria-label="Xóa">
                   <i className="fa fa-trash-alt"></i>
                 </button>
               </div>

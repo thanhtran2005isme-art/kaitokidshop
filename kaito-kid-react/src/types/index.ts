@@ -59,7 +59,8 @@ export interface User {
 
 // Item trong giỏ hàng - từ cart-page.js
 export interface CartItem {
-  id: number;
+  id: number; // cart item ID từ backend (dùng để update/delete)
+  productId: number; // ID sản phẩm
   name: string;
   price: number;
   image: string;

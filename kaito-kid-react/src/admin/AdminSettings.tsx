@@ -271,6 +271,27 @@ export default function AdminSettings() {
     persistSettings(settings, `Đã lưu cài đặt ${sectionLabel}.`);
   };
 
+  const handleBankQrUpload = (bankId: number, file: File) => {
+    if (!file.type.startsWith('image/')) {
+      showMessage('error', 'Vui lòng chọn file ảnh hợp lệ.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      showMessage('error', 'Ảnh QR không được lớn hơn 2MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
+      updateBankAccount(bankId, 'qrImage', dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeBankQr = (bankId: number) => {
+    updateBankAccount(bankId, 'qrImage', '');
+  };
+
   const handleTestEmail = () => {
     const smtpReady =
       settings.smtpHost &&
@@ -550,9 +571,104 @@ export default function AdminSettings() {
                   {settings.codEnabled && <label className="settings-field"><span>Phụ phí COD (%)</span><input type="number" min="0" max="100" step="0.5" value={settings.codFee} onChange={(event) => updateField('codFee', Number(event.target.value))} /><small>Phí này sẽ được cộng thêm khi khách chọn COD.</small></label>}
                 </article>
                 <article className="settings-toggle-card">
-                  <div className="settings-toggle-head"><div><h4>Chuyển khoản ngân hàng</h4><p>Khi bật, checkout sẽ hiển thị danh sách tài khoản bên dưới.</p></div><label className="settings-switch"><input type="checkbox" checked={settings.bankEnabled} onChange={(event) => updateField('bankEnabled', event.target.checked)} /><span className="settings-switch-track"></span></label></div>
-                  {settings.bankEnabled && <div className="settings-bank-stack">{settings.bankAccounts.map((bankAccount, index) => <article key={bankAccount.id} className="settings-bank-card"><div className="settings-bank-head"><div><span className="settings-overline">Bank slot {index + 1}</span><h5>Tài khoản nhận tiền</h5></div>{settings.bankAccounts.length > 1 && <button type="button" className="settings-ghost-danger" onClick={() => removeBankAccount(bankAccount.id)}><AdminIcon name="fa-trash" /><span>Xóa</span></button>}</div><div className="settings-form-grid"><label className="settings-field"><span>Tên ngân hàng</span><input type="text" value={bankAccount.bankName} onChange={(event) => updateBankAccount(bankAccount.id, 'bankName', event.target.value)} /></label><label className="settings-field"><span>Chi nhánh</span><input type="text" value={bankAccount.branch} onChange={(event) => updateBankAccount(bankAccount.id, 'branch', event.target.value)} /></label><label className="settings-field"><span>Số tài khoản</span><input type="text" value={bankAccount.accountNumber} onChange={(event) => updateBankAccount(bankAccount.id, 'accountNumber', event.target.value)} /></label><label className="settings-field"><span>Chủ tài khoản</span><input type="text" value={bankAccount.accountHolder} onChange={(event) => updateBankAccount(bankAccount.id, 'accountHolder', event.target.value)} /></label></div></article>)}
-                    <button type="button" className="settings-secondary-btn" onClick={addBankAccount}><AdminIcon name="fa-plus" /><span>Thêm tài khoản</span></button></div>}
+                  <div className="settings-toggle-head">
+                    <div>
+                      <h4>Chuyển khoản ngân hàng</h4>
+                      <p>Khi bật, checkout sẽ hiển thị danh sách tài khoản bên dưới.</p>
+                    </div>
+                    <label className="settings-switch">
+                      <input type="checkbox" checked={settings.bankEnabled} onChange={(event) => updateField('bankEnabled', event.target.checked)} />
+                      <span className="settings-switch-track"></span>
+                    </label>
+                  </div>
+                  {settings.bankEnabled && (
+                    <div className="settings-bank-stack">
+                      {settings.bankAccounts.map((bankAccount, index) => (
+                        <article key={bankAccount.id} className="settings-bank-card">
+                          <div className="settings-bank-head">
+                            <div>
+                              <span className="settings-overline">Bank slot {index + 1}</span>
+                              <h5>Tài khoản nhận tiền</h5>
+                            </div>
+                            {settings.bankAccounts.length > 1 && (
+                              <button type="button" className="settings-ghost-danger" onClick={() => removeBankAccount(bankAccount.id)}>
+                                <AdminIcon name="fa-trash" /><span>Xóa</span>
+                              </button>
+                            )}
+                          </div>
+                          <div className="settings-form-grid">
+                            <label className="settings-field">
+                              <span>Tên ngân hàng</span>
+                              <input type="text" value={bankAccount.bankName} onChange={(event) => updateBankAccount(bankAccount.id, 'bankName', event.target.value)} />
+                            </label>
+                            <label className="settings-field">
+                              <span>Chi nhánh</span>
+                              <input type="text" value={bankAccount.branch} onChange={(event) => updateBankAccount(bankAccount.id, 'branch', event.target.value)} />
+                            </label>
+                            <label className="settings-field">
+                              <span>Số tài khoản</span>
+                              <input type="text" value={bankAccount.accountNumber} onChange={(event) => updateBankAccount(bankAccount.id, 'accountNumber', event.target.value)} />
+                            </label>
+                            <label className="settings-field">
+                              <span>Chủ tài khoản</span>
+                              <input type="text" value={bankAccount.accountHolder} onChange={(event) => updateBankAccount(bankAccount.id, 'accountHolder', event.target.value)} />
+                            </label>
+                          </div>
+                          <div style={{ marginTop: '16px', padding: '14px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', flexWrap: 'wrap' }}>
+                              <div style={{ flex: '0 0 auto' }}>
+                                {bankAccount.qrImage ? (
+                                  <div style={{ position: 'relative', width: '140px', height: '140px', borderRadius: '12px', overflow: 'hidden', border: '1px solid #cbd5e1', background: '#fff' }}>
+                                    <img src={bankAccount.qrImage} alt="QR" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                    <button
+                                      type="button"
+                                      onClick={() => removeBankQr(bankAccount.id)}
+                                      style={{ position: 'absolute', top: '4px', right: '4px', width: '24px', height: '24px', border: 'none', borderRadius: '50%', background: '#dc2626', color: '#fff', cursor: 'pointer', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                      title="Xóa QR"
+                                    >
+                                      ×
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <label style={{ width: '140px', height: '140px', borderRadius: '12px', border: '2px dashed #c7d2fe', background: '#f5f3ff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#4338ca', fontSize: '12px', fontWeight: 600 }}>
+                                    <AdminIcon name="fa-qrcode" />
+                                    <span style={{ marginTop: '6px' }}>Tải QR lên</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      style={{ display: 'none' }}
+                                      onChange={(event) => {
+                                        const file = event.target.files?.[0];
+                                        if (file) handleBankQrUpload(bankAccount.id, file);
+                                        event.target.value = '';
+                                      }}
+                                    />
+                                  </label>
+                                )}
+                              </div>
+                              <div style={{ flex: 1, minWidth: '200px' }}>
+                                <label className="settings-field" style={{ marginBottom: '8px' }}>
+                                  <span>Hoặc dán URL ảnh QR</span>
+                                  <input
+                                    type="text"
+                                    placeholder="https://... hoặc data:image/..."
+                                    value={bankAccount.qrImage || ''}
+                                    onChange={(event) => updateBankAccount(bankAccount.id, 'qrImage', event.target.value)}
+                                  />
+                                </label>
+                                <small style={{ color: '#64748b', fontSize: '12px', lineHeight: 1.5 }}>
+                                  QR sẽ hiển thị ở trang checkout khi khách chọn chuyển khoản. Hỗ trợ JPG/PNG, tối đa 2MB.
+                                </small>
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                      <button type="button" className="settings-secondary-btn" onClick={addBankAccount}>
+                        <AdminIcon name="fa-plus" /><span>Thêm tài khoản</span>
+                      </button>
+                    </div>
+                  )}
                 </article>
                 <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('thanh toán')}><AdminIcon name="fa-save" /><span>Lưu thanh toán</span></button></div>
               </section>

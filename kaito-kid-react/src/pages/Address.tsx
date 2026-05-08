@@ -1,77 +1,134 @@
-// Trang quản lý địa chỉ - thay thế diachi.html + address.js
+// Trang quản lý địa chỉ - kết nối backend qua /api/addresses
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-interface AddressItem {
-  id: string; fullName: string; phone: string;
-  province: string; district: string; ward: string;
-  streetAddress: string; note?: string; type: 'home' | 'office';
-  isDefault: boolean; provinceName: string; districtName: string; wardName: string;
-}
+import { addressApi, type AddressDTO } from '../services/api';
+import toast from 'react-hot-toast';
 
 const provinces = [
-  { id: 'hanoi', name: 'Hà Nội' }, { id: 'hcm', name: 'TP. Hồ Chí Minh' },
-  { id: 'danang', name: 'Đà Nẵng' }, { id: 'haiphong', name: 'Hải Phòng' },
-  { id: 'cantho', name: 'Cần Thơ' }, { id: 'binhduong', name: 'Bình Dương' },
-  { id: 'dongnai', name: 'Đồng Nai' }, { id: 'quangninh', name: 'Quảng Ninh' },
-  { id: 'thanhhoa', name: 'Thanh Hóa' }, { id: 'nghean', name: 'Nghệ An' },
+  'Hà Nội', 'TP. Hồ Chí Minh', 'Đà Nẵng', 'Hải Phòng',
+  'Cần Thơ', 'Bình Dương', 'Đồng Nai', 'Quảng Ninh',
+  'Thanh Hóa', 'Nghệ An',
 ];
+
+interface AddressFormState {
+  fullName: string;
+  phone: string;
+  province: string;
+  district: string;
+  ward: string;
+  street: string;
+  isDefault: boolean;
+}
+
+const EMPTY_FORM: AddressFormState = {
+  fullName: '', phone: '', province: '', district: '', ward: '', street: '', isDefault: false,
+};
 
 export default function Address() {
   const { user } = useAuth();
-  const [addresses, setAddresses] = useState<AddressItem[]>([]);
+  const [addresses, setAddresses] = useState<AddressDTO[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ fullName: '', phone: '', province: '', district: '', ward: '', streetAddress: '', note: '', type: 'home' as 'home' | 'office', isDefault: false });
+  const [editId, setEditId] = useState<number | null>(null);
+  const [form, setForm] = useState<AddressFormState>(EMPTY_FORM);
+  const [saving, setSaving] = useState(false);
 
-  const storageKey = `addresses_${user?.email || user?.name}`;
+  const loadAddresses = async () => {
+    setLoading(true);
+    const result = await addressApi.getAll();
+    if (result.success && result.data) {
+      setAddresses(result.data);
+    } else {
+      setAddresses([]);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    setAddresses(JSON.parse(localStorage.getItem(storageKey) || '[]'));
-  }, [storageKey]);
-
-  const save = (list: AddressItem[]) => {
-    setAddresses(list);
-    localStorage.setItem(storageKey, JSON.stringify(list));
-  };
+    if (user) {
+      void loadAddresses();
+    }
+  }, [user]);
 
   const openAdd = () => {
     setEditId(null);
-    setForm({ fullName: user?.name || '', phone: user?.phone || '', province: '', district: '', ward: '', streetAddress: '', note: '', type: 'home', isDefault: addresses.length === 0 });
+    setForm({
+      ...EMPTY_FORM,
+      fullName: user?.name || '',
+      phone: user?.phone || '',
+      isDefault: addresses.length === 0,
+    });
     setShowModal(true);
   };
 
-  const openEdit = (addr: AddressItem) => {
+  const openEdit = (addr: AddressDTO) => {
     setEditId(addr.id);
-    setForm({ fullName: addr.fullName, phone: addr.phone, province: addr.province, district: addr.district, ward: addr.ward, streetAddress: addr.streetAddress, note: addr.note || '', type: addr.type, isDefault: addr.isDefault });
+    setForm({
+      fullName: addr.fullName,
+      phone: addr.phone,
+      province: addr.province,
+      district: addr.district,
+      ward: addr.ward,
+      street: addr.street,
+      isDefault: addr.isDefault,
+    });
     setShowModal(true);
   };
 
-  const handleSave = () => {
-    if (!form.fullName || !form.phone || !form.province || !form.streetAddress) { alert('Vui lòng điền đầy đủ thông tin'); return; }
-    const prov = provinces.find(p => p.id === form.province);
-    let list = [...addresses];
-    if (form.isDefault) list = list.map(a => ({ ...a, isDefault: false }));
-    if (editId) {
-      list = list.map(a => a.id === editId ? { ...a, ...form, provinceName: prov?.name || form.province, districtName: form.district, wardName: form.ward } : a);
-    } else {
-      list.push({ id: 'addr_' + Date.now(), ...form, provinceName: prov?.name || form.province, districtName: form.district, wardName: form.ward });
+  const handleSave = async () => {
+    if (!form.fullName.trim() || !form.phone.trim() || !form.province || !form.street.trim()) {
+      toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
+      return;
     }
-    save(list);
-    setShowModal(false);
+
+    setSaving(true);
+    const payload = {
+      fullName: form.fullName.trim(),
+      phone: form.phone.trim(),
+      province: form.province,
+      district: form.district.trim(),
+      ward: form.ward.trim(),
+      street: form.street.trim(),
+      isDefault: form.isDefault,
+    };
+
+    const result = editId
+      ? await addressApi.update(editId, payload)
+      : await addressApi.create(payload);
+
+    setSaving(false);
+
+    if (result.success) {
+      toast.success(editId ? 'Đã cập nhật địa chỉ' : 'Đã thêm địa chỉ mới');
+      setShowModal(false);
+      await loadAddresses();
+    } else {
+      toast.error(result.error || 'Không thể lưu địa chỉ');
+    }
   };
 
-  const handleDelete = (id: string) => {
-    if (!confirm('Xóa địa chỉ này?')) return;
-    const list = addresses.filter(a => a.id !== id);
-    if (addresses.find(a => a.id === id)?.isDefault && list.length > 0) list[0].isDefault = true;
-    save(list);
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Xóa địa chỉ này?')) return;
+
+    const result = await addressApi.delete(id);
+    if (result.success) {
+      toast.success('Đã xóa địa chỉ');
+      await loadAddresses();
+    } else {
+      toast.error(result.error || 'Không thể xóa địa chỉ');
+    }
   };
 
-  const setDefault = (id: string) => {
-    save(addresses.map(a => ({ ...a, isDefault: a.id === id })));
+  const setDefault = async (id: number) => {
+    const result = await addressApi.setDefault(id);
+    if (result.success) {
+      toast.success('Đã đặt làm địa chỉ mặc định');
+      await loadAddresses();
+    } else {
+      toast.error(result.error || 'Không thể đặt mặc định');
+    }
   };
 
   const sidebarLinks = [
@@ -107,7 +164,11 @@ export default function Address() {
             <button className="btn-add-address" onClick={openAdd}><i className="fa fa-plus"></i> Thêm địa chỉ</button>
           </div>
 
-          {addresses.length === 0 ? (
+          {loading ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+              <i className="fa fa-spinner fa-spin"></i> Đang tải địa chỉ...
+            </div>
+          ) : addresses.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon"><i className="fa fa-map-marker-alt"></i></div>
               <h3>Chưa có địa chỉ nào</h3>
@@ -116,7 +177,7 @@ export default function Address() {
             </div>
           ) : (
             <div className="address-list">
-              {addresses.sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0)).map(addr => (
+              {[...addresses].sort((a, b) => (b.isDefault ? 1 : 0) - (a.isDefault ? 1 : 0)).map(addr => (
                 <div key={addr.id} className={`address-card ${addr.isDefault ? 'default' : ''}`}>
                   <div className="address-card-header">
                     <div className="address-user-info">
@@ -125,27 +186,28 @@ export default function Address() {
                     </div>
                     <div className="address-badges">
                       {addr.isDefault && <span className="badge badge-default">Mặc định</span>}
-                      <span className={`badge ${addr.type === 'office' ? 'badge-office' : 'badge-home'}`}>
-                        {addr.type === 'office' ? 'Văn phòng' : 'Nhà riêng'}
-                      </span>
                     </div>
                   </div>
                   <div className="address-content">
                     <div className="address-detail">
                       <i className="fa fa-map-marker-alt"></i>
-                      <span>{addr.streetAddress}, {addr.wardName}, {addr.districtName}, {addr.provinceName}</span>
+                      <span>
+                        {[addr.street, addr.ward, addr.district, addr.province].filter(Boolean).join(', ')}
+                      </span>
                     </div>
-                    {addr.note && (
-                      <div className="address-note">
-                        <i className="fa fa-sticky-note"></i>
-                        <span>{addr.note}</span>
-                      </div>
-                    )}
                   </div>
                   <div className="address-actions">
-                    <button className="btn-address-action btn-edit" onClick={() => openEdit(addr)}><i className="fa fa-edit"></i> Sửa</button>
-                    <button className="btn-address-action btn-delete" onClick={() => handleDelete(addr.id)}><i className="fa fa-trash"></i> Xóa</button>
-                    {!addr.isDefault && <button className="btn-address-action btn-set-default" onClick={() => setDefault(addr.id)}><i className="fa fa-check-circle"></i> Đặt mặc định</button>}
+                    <button className="btn-address-action btn-edit" onClick={() => openEdit(addr)}>
+                      <i className="fa fa-edit"></i> Sửa
+                    </button>
+                    <button className="btn-address-action btn-delete" onClick={() => handleDelete(addr.id)}>
+                      <i className="fa fa-trash"></i> Xóa
+                    </button>
+                    {!addr.isDefault && (
+                      <button className="btn-address-action btn-set-default" onClick={() => setDefault(addr.id)}>
+                        <i className="fa fa-check-circle"></i> Đặt mặc định
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -165,35 +227,48 @@ export default function Address() {
               </div>
               <div className="modal-body">
                 <div className="form-row">
-                  <div className="form-group"><label>Họ tên <span className="required">*</span></label><input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} /></div>
-                  <div className="form-group"><label>SĐT <span className="required">*</span></label><input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} /></div>
+                  <div className="form-group">
+                    <label>Họ tên <span className="required">*</span></label>
+                    <input value={form.fullName} onChange={e => setForm({ ...form, fullName: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>SĐT <span className="required">*</span></label>
+                    <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} />
+                  </div>
                 </div>
                 <div className="form-group">
                   <label>Tỉnh/Thành <span className="required">*</span></label>
                   <select value={form.province} onChange={e => setForm({ ...form, province: e.target.value })}>
                     <option value="">Chọn tỉnh/thành</option>
-                    {provinces.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    {provinces.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div className="form-row">
-                  <div className="form-group"><label>Quận/Huyện</label><input value={form.district} onChange={e => setForm({ ...form, district: e.target.value })} placeholder="Nhập quận/huyện" /></div>
-                  <div className="form-group"><label>Phường/Xã</label><input value={form.ward} onChange={e => setForm({ ...form, ward: e.target.value })} placeholder="Nhập phường/xã" /></div>
-                </div>
-                <div className="form-group"><label>Địa chỉ chi tiết <span className="required">*</span></label><input value={form.streetAddress} onChange={e => setForm({ ...form, streetAddress: e.target.value })} placeholder="Số nhà, tên đường" /></div>
-                <div className="form-group"><label>Ghi chú</label><textarea value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} placeholder="Ghi chú thêm"></textarea></div>
-                <div className="form-group">
-                  <label>Loại địa chỉ</label>
-                  <div className="address-type-selector">
-                    <label className="type-option"><input type="radio" checked={form.type === 'home'} onChange={() => setForm({ ...form, type: 'home' })} /><span className="type-label"><i className="fa fa-home"></i> Nhà riêng</span></label>
-                    <label className="type-option"><input type="radio" checked={form.type === 'office'} onChange={() => setForm({ ...form, type: 'office' })} /><span className="type-label"><i className="fa fa-building"></i> Văn phòng</span></label>
+                  <div className="form-group">
+                    <label>Quận/Huyện</label>
+                    <input value={form.district} onChange={e => setForm({ ...form, district: e.target.value })} placeholder="Nhập quận/huyện" />
+                  </div>
+                  <div className="form-group">
+                    <label>Phường/Xã</label>
+                    <input value={form.ward} onChange={e => setForm({ ...form, ward: e.target.value })} placeholder="Nhập phường/xã" />
                   </div>
                 </div>
+                <div className="form-group">
+                  <label>Địa chỉ chi tiết <span className="required">*</span></label>
+                  <input value={form.street} onChange={e => setForm({ ...form, street: e.target.value })} placeholder="Số nhà, tên đường" />
+                </div>
                 <div className="checkbox-group">
-                  <label className="checkbox-label"><input type="checkbox" checked={form.isDefault} onChange={e => setForm({ ...form, isDefault: e.target.checked })} /><span className="checkmark"></span> Đặt làm mặc định</label>
+                  <label className="checkbox-label">
+                    <input type="checkbox" checked={form.isDefault} onChange={e => setForm({ ...form, isDefault: e.target.checked })} />
+                    <span className="checkmark"></span> Đặt làm mặc định
+                  </label>
                 </div>
                 <div className="modal-footer">
                   <button className="btn-secondary" onClick={() => setShowModal(false)}>Hủy</button>
-                  <button className="btn-primary" onClick={handleSave}><i className="fa fa-save"></i> Lưu</button>
+                  <button className="btn-primary" onClick={handleSave} disabled={saving}>
+                    <i className={`fa ${saving ? 'fa-spinner fa-spin' : 'fa-save'}`}></i>
+                    {' '}{saving ? 'Đang lưu...' : 'Lưu'}
+                  </button>
                 </div>
               </div>
             </div>

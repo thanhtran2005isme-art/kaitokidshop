@@ -1,6 +1,6 @@
 // Header - Layout gốc: Logo + Search + Icons (hàng 1) | Menu (hàng 2)
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   PiHeartStraight,
   PiListBold,
@@ -16,10 +16,51 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { categoryApi, type CategoryDTO } from '../../services/api/categoryApi';
+
+interface CategoryNode {
+  id: number;
+  name: string;
+  parentId: number | null;
+  gioiTinh: string;
+  children: CategoryNode[];
+}
 
 export default function Header() {
   const { user, isAdmin, logout } = useAuth();
   const { totalItems } = useCart();
+  const [categories, setCategories] = useState<CategoryNode[]>([]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const data = await categoryApi.getAll();
+        const roots: CategoryNode[] = data
+          .filter((c: CategoryDTO) => !c.danhMucChaId)
+          .sort((a, b) => a.thuTu - b.thuTu)
+          .map((root) => ({
+            id: root.id,
+            name: root.tenDanhMuc,
+            parentId: null,
+            gioiTinh: root.gioiTinh || 'all',
+            children: data
+              .filter((c) => c.danhMucChaId === root.id)
+              .sort((a, b) => a.thuTu - b.thuTu)
+              .map((child) => ({
+                id: child.id,
+                name: child.tenDanhMuc,
+                parentId: root.id,
+                gioiTinh: child.gioiTinh || 'all',
+                children: [],
+              })),
+          }));
+        setCategories(roots);
+      } catch {
+        setCategories([]);
+      }
+    };
+    void loadCategories();
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
@@ -150,15 +191,15 @@ export default function Header() {
         <ul className="menu-list">
           <li className="has-mega-dropdown">
             <Link to="/women">NỮ</Link>
-            <MegaDropdownNu />
+            <DynamicMegaDropdown categories={categories} gender="nu" genderLabel="Nữ" />
           </li>
           <li className="has-mega-dropdown">
             <Link to="/men">NAM</Link>
-            <MegaDropdownNam />
+            <DynamicMegaDropdown categories={categories} gender="nam" genderLabel="Nam" />
           </li>
           <li className="has-mega-dropdown">
             <Link to="/kids">TRẺ EM</Link>
-            <MegaDropdownKids />
+            <DynamicMegaDropdown categories={categories} gender="treem" genderLabel="Trẻ em" />
           </li>
           <li><Link to="/new-in">NEW IN</Link></li>
           <li><Link to="/sale">SALE</Link></li>
@@ -175,6 +216,67 @@ function Col({ title, items }: { title: string; items: { to: string; label: stri
     <div className="mega-column">
       <h4>{title}</h4>
       <ul>{items.map((item, i) => <li key={i}><Link to={item.to}>{item.label}</Link></li>)}</ul>
+    </div>
+  );
+}
+
+interface DynamicMegaDropdownProps {
+  categories: CategoryNode[];
+  gender: 'nu' | 'nam' | 'treem';
+  genderLabel: string;
+}
+
+function DynamicMegaDropdown({ categories, gender, genderLabel }: DynamicMegaDropdownProps) {
+  // Filter root categories phù hợp với gender
+  const visibleRoots = categories.filter(
+    (root) => root.gioiTinh === 'all' || root.gioiTinh === gender,
+  );
+
+  if (visibleRoots.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mega-dropdown">
+      <div className="mega-dropdown-content">
+        <div className="mega-columns">
+          {visibleRoots.map((root) => (
+            <Col
+              key={root.id}
+              title={root.name.toUpperCase()}
+              items={
+                root.children.length > 0
+                  ? root.children.map((child) => ({
+                      to: `/products?gender=${encodeURIComponent(genderLabel)}&category=${encodeURIComponent(child.name)}`,
+                      label: child.name,
+                    }))
+                  : [
+                      {
+                        to: `/products?gender=${encodeURIComponent(genderLabel)}&category=${encodeURIComponent(root.name)}`,
+                        label: `Tất cả ${root.name}`,
+                      },
+                    ]
+              }
+            />
+          ))}
+        </div>
+        <div className="mega-featured">
+          <div className="mega-featured-item">
+            <img src="/london.png" alt="New Collection" />
+            <div className="mega-featured-text">
+              <h5>Bộ sưu tập mới</h5>
+              <Link to="/collections">Xem tất cả →</Link>
+            </div>
+          </div>
+          <div className="mega-featured-item">
+            <img src="/Nhat.png" alt="Best Sellers" />
+            <div className="mega-featured-text">
+              <h5>Bán chạy nhất</h5>
+              <Link to={`/products?gender=${encodeURIComponent(genderLabel)}`}>Xem tất cả →</Link>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

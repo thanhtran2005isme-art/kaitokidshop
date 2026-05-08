@@ -142,6 +142,11 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [countdown, setCountdown] = useState({ hours: 2, minutes: 15, seconds: 32 });
 
+  // Show all flags for each section (mặc định chỉ hiện 4 sản phẩm = 1 hàng)
+  const [showAllNewArrivals, setShowAllNewArrivals] = useState(false);
+  const [showAllSale, setShowAllSale] = useState(false);
+  const [showAllBestSellers, setShowAllBestSellers] = useState(false);
+
   useEffect(() => {
     // Load data từ API thay vì localStorage
     const loadHomeData = async () => {
@@ -316,16 +321,26 @@ export default function Home() {
 
         <div className="products-grid" id="new-arrivals-grid">
           {filteredNewArrivals.length > 0 ? (
-            filteredNewArrivals.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} />)
+            (showAllNewArrivals ? filteredNewArrivals : filteredNewArrivals.slice(0, 4)).map((product) => <ProductCard key={product.id} product={product} />)
           ) : (
             <p style={emptyStateStyle}>Sản phẩm mới sẽ được cập nhật sớm.</p>
           )}
         </div>
 
         <div className="view-all-container">
-          <Link to="/new-in" className="btn-view-all">
-            Xem tất cả
-          </Link>
+          {filteredNewArrivals.length > 4 ? (
+            <button
+              type="button"
+              className="btn-view-all"
+              onClick={() => setShowAllNewArrivals(!showAllNewArrivals)}
+            >
+              {showAllNewArrivals ? 'Thu gọn' : `Xem thêm (${filteredNewArrivals.length - 4})`}
+            </button>
+          ) : (
+            <Link to="/new-in" className="btn-view-all">
+              Xem tất cả
+            </Link>
+          )}
         </div>
       </section>
 
@@ -340,16 +355,26 @@ export default function Home() {
 
         <div className="products-grid sale-grid" id="sale-products-grid">
           {saleProducts.length > 0 ? (
-            saleProducts.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} />)
+            (showAllSale ? saleProducts : saleProducts.slice(0, 4)).map((product) => <ProductCard key={product.id} product={product} />)
           ) : (
             <p style={emptyStateStyle}>Danh sách sản phẩm sale đang được cập nhật.</p>
           )}
         </div>
 
         <div className="view-all-container">
-          <Link to="/sale" className="btn-view-all">
-            Xem tất cả
-          </Link>
+          {saleProducts.length > 4 ? (
+            <button
+              type="button"
+              className="btn-view-all"
+              onClick={() => setShowAllSale(!showAllSale)}
+            >
+              {showAllSale ? 'Thu gọn' : `Xem thêm (${saleProducts.length - 4})`}
+            </button>
+          ) : (
+            <Link to="/sale" className="btn-view-all">
+              Xem tất cả
+            </Link>
+          )}
         </div>
       </section>
 
@@ -374,16 +399,26 @@ export default function Home() {
 
         <div className="products-grid bestseller-grid" id="bestsellers-grid">
           {filteredBestSellers.length > 0 ? (
-            filteredBestSellers.slice(0, 8).map((product) => <ProductCard key={product.id} product={product} />)
+            (showAllBestSellers ? filteredBestSellers : filteredBestSellers.slice(0, 4)).map((product) => <ProductCard key={product.id} product={product} />)
           ) : (
             <p style={emptyStateStyle}>Sản phẩm bán chạy sẽ hiển thị tại đây.</p>
           )}
         </div>
 
         <div className="view-all-container">
-          <Link to="/bestseller" className="btn-view-all">
-            Xem tất cả
-          </Link>
+          {filteredBestSellers.length > 4 ? (
+            <button
+              type="button"
+              className="btn-view-all"
+              onClick={() => setShowAllBestSellers(!showAllBestSellers)}
+            >
+              {showAllBestSellers ? 'Thu gọn' : `Xem thêm (${filteredBestSellers.length - 4})`}
+            </button>
+          ) : (
+            <Link to="/bestseller" className="btn-view-all">
+              Xem tất cả
+            </Link>
+          )}
         </div>
       </section>
 

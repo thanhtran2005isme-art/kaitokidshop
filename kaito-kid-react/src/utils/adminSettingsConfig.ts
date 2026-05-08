@@ -4,6 +4,7 @@ export interface BankAccountConfig {
   accountNumber: string;
   accountHolder: string;
   branch: string;
+  qrImage?: string; // URL ảnh QR hoặc base64
 }
 
 export type EmailActivityType =
@@ -120,6 +121,7 @@ function normalizeBankAccount(rawAccount: Partial<BankAccountConfig>, fallbackId
     accountNumber: asString(rawAccount.accountNumber),
     accountHolder: asString(rawAccount.accountHolder),
     branch: asString(rawAccount.branch),
+    qrImage: asString(rawAccount.qrImage) || undefined,
   };
 }
 

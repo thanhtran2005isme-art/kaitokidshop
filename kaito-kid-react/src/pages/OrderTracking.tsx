@@ -1,42 +1,57 @@
-// Trang đơn hàng của tôi - thay thế donhang.html + order-tracking.js
+// Trang đơn hàng của tôi - kết nối backend qua JWT
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { orderService } from '../services/orderService';
+import { customerOrderApi, customerReviewApi, type CustomerOrderDTO, type CustomerOrderItemDTO } from '../services/api';
 import { formatCurrency, formatDate } from '../utils/format';
-import { readAdminSettings } from '../utils/adminSettingsConfig';
-import { readStoredReviews, saveStoredReviews, type ReviewRecord } from '../utils/reviewConfig';
 import toast from 'react-hot-toast';
-import type { Order, CartItem } from '../types';
 
 const statusMap: Record<string, string> = {
-  pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận',
-  shipping: 'Đang giao hàng', completed: 'Hoàn thành', cancelled: 'Đã huỷ',
+  pending: 'Chờ xác nhận',
+  confirmed: 'Đã xác nhận',
+  shipping: 'Đang giao hàng',
+  completed: 'Hoàn thành',
+  cancelled: 'Đã huỷ',
 };
+
+// Trạng thái cho phép user hủy đơn
+const CANCELLABLE_STATUSES = ['pending', 'confirmed'];
 
 export default function OrderTracking() {
   const { user } = useAuth();
-  const adminSettings = readAdminSettings();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [selected, setSelected] = useState<Order | null>(null);
-  const [reviewingItem, setReviewingItem] = useState<{ order: Order; item: CartItem } | null>(null);
+  const [orders, setOrders] = useState<CustomerOrderDTO[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<CustomerOrderDTO | null>(null);
+  const [reviewingItem, setReviewingItem] = useState<{ order: CustomerOrderDTO; item: CustomerOrderItemDTO } | null>(null);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
+  const [reviewedKeys, setReviewedKeys] = useState<Set<string>>(new Set());
+
+  const loadOrders = async () => {
+    setLoading(true);
+    const result = await customerOrderApi.getMyOrders();
+    if (result.success && result.data) {
+      const sorted = [...result.data].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      );
+      setOrders(sorted);
+    } else {
+      setOrders([]);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
     if (user) {
-      const userOrders = orderService.getByUser(user.phone, user.email);
-      userOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      setOrders(userOrders);
+      void loadOrders();
     }
   }, [user]);
 
-  const hasReviewed = (orderId: string, productId: number): boolean => {
-    const reviews = readStoredReviews();
-    return reviews.some(r => r.orderId === orderId && r.productId === productId);
+  const hasReviewed = (orderId: number, productId: number): boolean => {
+    return reviewedKeys.has(`${orderId}-${productId}`);
   };
 
-  const handleSubmitReview = () => {
+  const handleSubmitReview = async () => {
     if (!reviewingItem || !user) return;
 
     if (reviewForm.comment.trim().length < 10) {
@@ -44,28 +59,34 @@ export default function OrderTracking() {
       return;
     }
 
-    const reviews = readStoredReviews();
-    const newReview: ReviewRecord = {
-      id: Date.now(),
+    const result = await customerReviewApi.create({
+      productId: reviewingItem.item.productId,
       orderId: reviewingItem.order.id,
-      productId: reviewingItem.item.id,
-      productName: reviewingItem.item.name,
-      customerName: user.name,
-      customerEmail: user.email,
       rating: reviewForm.rating,
       comment: reviewForm.comment.trim(),
-      createdAt: new Date().toISOString(),
-      status: 'pending',
-      adminReply: '',
-      isHidden: false,
-      isPinned: false,
-    };
+    });
 
-    saveStoredReviews([...reviews, newReview]);
-    toast.success('Cảm ơn bạn đã đánh giá! Đánh giá của bạn đang chờ duyệt.');
-    
-    setReviewingItem(null);
-    setReviewForm({ rating: 5, comment: '' });
+    if (result.success) {
+      toast.success('Cảm ơn bạn đã đánh giá! Đánh giá của bạn đang chờ duyệt.');
+      setReviewedKeys((prev) => new Set(prev).add(`${reviewingItem.order.id}-${reviewingItem.item.productId}`));
+      setReviewingItem(null);
+      setReviewForm({ rating: 5, comment: '' });
+    } else {
+      toast.error(result.error || 'Không thể gửi đánh giá. Vui lòng thử lại.');
+    }
+  };
+
+  const handleCancelOrder = async (orderId: number) => {
+    if (!window.confirm('Bạn có chắc muốn hủy đơn hàng này?')) return;
+
+    const result = await customerOrderApi.cancel(orderId);
+    if (result.success) {
+      toast.success(result.data?.message || 'Đã hủy đơn hàng');
+      setSelected(null);
+      await loadOrders();
+    } else {
+      toast.error(result.error || 'Không thể hủy đơn hàng');
+    }
   };
 
   if (!user) {
@@ -81,19 +102,6 @@ export default function OrderTracking() {
     );
   }
 
-  if (!adminSettings.enableTracking) {
-    return (
-      <div className="order-tracking-page">
-        <div className="login-required-box">
-          <i className="fa fa-lock"></i>
-          <h3>Tracking tam thoi dang được khóa</h3>
-          <p>Vui lòng liên hệ {adminSettings.storeName} qua {adminSettings.storePhone || adminSettings.storeEmail} de được hỗ trợ đơn hàng.</p>
-          <Link to="/" className="btn-login"><i className="fa fa-phone"></i> Ve trang chu</Link>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="order-tracking-page">
       {/* User Info */}
@@ -103,7 +111,6 @@ export default function OrderTracking() {
           <div className="user-details">
             <h3>{user.name}</h3>
             <p>{user.email}</p>
-            <p>Du kien giao hang: {adminSettings.estimatedDelivery}</p>
           </div>
         </div>
       </div>
@@ -112,17 +119,22 @@ export default function OrderTracking() {
       <div className="orders-section">
         <h3><i className="fa fa-box"></i> Đơn hàng của tôi</h3>
 
-        {orders.length === 0 ? (
+        {loading ? (
+          <div className="empty-orders">
+            <i className="fa fa-spinner fa-spin"></i>
+            <p>Đang tải đơn hàng...</p>
+          </div>
+        ) : orders.length === 0 ? (
           <div className="empty-orders">
             <i className="fa fa-inbox"></i>
             <p>Chưa có đơn hàng nào</p>
           </div>
         ) : (
-          orders.map(order => (
+          orders.map((order) => (
             <div key={order.id} className="order-card">
               <div className="order-card-header">
                 <div>
-                  <span className="order-id">#{order.id}</span>
+                  <span className="order-id">#{order.orderCode || order.id}</span>
                   <span className="order-date">{formatDate(order.createdAt)}</span>
                 </div>
                 <span className={`order-status ${order.status}`}>
@@ -132,7 +144,7 @@ export default function OrderTracking() {
 
               <div className="order-items-preview">
                 {order.items.slice(0, 4).map((item, i) => (
-                  <img key={i} src={item.image} alt={item.name} />
+                  <img key={i} src={item.productImage} alt={item.productName} />
                 ))}
                 {order.items.length > 4 && <span>+{order.items.length - 4}</span>}
               </div>
@@ -143,6 +155,15 @@ export default function OrderTracking() {
                   <button className="btn-view-order" onClick={() => setSelected(order)}>
                     <i className="fa fa-eye"></i> Chi tiết
                   </button>
+                  {CANCELLABLE_STATUSES.includes(order.status) && (
+                    <button
+                      className="btn-view-order"
+                      style={{ marginLeft: 8, background: '#fee2e2', color: '#dc2626' }}
+                      onClick={() => handleCancelOrder(order.id)}
+                    >
+                      <i className="fa fa-times"></i> Hủy đơn
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -153,15 +174,15 @@ export default function OrderTracking() {
       {/* Modal chi tiết */}
       {selected && (
         <div className="modal active" onClick={() => setSelected(null)}>
-          <div className="modal-content" onClick={e => e.stopPropagation()}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Chi tiết đơn #{selected.id}</h3>
+              <h3>Chi tiết đơn #{selected.orderCode || selected.id}</h3>
               <button className="modal-close" onClick={() => setSelected(null)}>×</button>
             </div>
             <div className="modal-body">
               <div className="detail-row">
                 <span className="detail-label">Trạng thái</span>
-                <span className={`order-status ${selected.status}`}>{statusMap[selected.status]}</span>
+                <span className={`order-status ${selected.status}`}>{statusMap[selected.status] || selected.status}</span>
               </div>
               <div className="detail-row">
                 <span className="detail-label">Ngày đặt</span>
@@ -169,32 +190,34 @@ export default function OrderTracking() {
               </div>
               <div className="detail-row">
                 <span className="detail-label">Thanh toán</span>
-                <span className="detail-value">{selected.paymentMethod === 'cod' ? 'COD' : 'Chuyển khoản'}</span>
+                <span className="detail-value">{selected.paymentMethod}</span>
               </div>
-              {selected.customer.address && (
+              {selected.customerAddress && (
                 <div className="detail-row">
                   <span className="detail-label">Địa chỉ</span>
-                  <span className="detail-value">{selected.customer.address}</span>
+                  <span className="detail-value">{selected.customerAddress}</span>
                 </div>
               )}
 
               <h4 style={{ margin: '20px 0 12px' }}>Sản phẩm ({selected.items.length})</h4>
               {selected.items.map((item, i) => (
                 <div key={i} className="order-item">
-                  <img src={item.image} alt={item.name} />
+                  <img src={item.productImage} alt={item.productName} />
                   <div className="order-item-info">
-                    <div className="order-item-name">{item.name}</div>
-                    <div className="order-item-variant">{item.color} {item.size && `, ${item.size}`} × {item.quantity}</div>
+                    <div className="order-item-name">{item.productName}</div>
+                    <div className="order-item-variant">
+                      {item.color}{item.size && `, ${item.size}`} × {item.quantity}
+                    </div>
                     <div className="order-item-price">{formatCurrency(item.price)}</div>
-                    
+
                     {selected.status === 'completed' && (
                       <div style={{ marginTop: '8px' }}>
-                        {hasReviewed(selected.id, item.id) ? (
+                        {hasReviewed(selected.id, item.productId) ? (
                           <span style={{ color: '#10b981', fontSize: '14px' }}>
                             <i className="fa fa-check-circle"></i> Đã đánh giá
                           </span>
                         ) : (
-                          <button 
+                          <button
                             className="btn-review"
                             onClick={() => {
                               setReviewingItem({ order: selected, item });
@@ -210,13 +233,24 @@ export default function OrderTracking() {
                 </div>
               ))}
 
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '2px solid #eee' }}>
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: '2px solid #eee' }}>
                 <div className="summary-row"><span>Tạm tính:</span><span>{formatCurrency(selected.subtotal)}</span></div>
                 <div className="summary-row"><span>Phí ship:</span><span>{selected.shippingFee === 0 ? 'Miễn phí' : formatCurrency(selected.shippingFee)}</span></div>
-                {selected.paymentFee ? <div className="summary-row"><span>Phụ phí thanh toán:</span><span>{formatCurrency(selected.paymentFee)}</span></div> : null}
                 {selected.discount > 0 && <div className="summary-row"><span>Giảm giá:</span><span>-{formatCurrency(selected.discount)}</span></div>}
                 <div className="summary-row total"><span>Tổng:</span><span>{formatCurrency(selected.total)}</span></div>
               </div>
+
+              {CANCELLABLE_STATUSES.includes(selected.status) && (
+                <div style={{ marginTop: 20, textAlign: 'right' }}>
+                  <button
+                    className="btn-view-order"
+                    style={{ background: '#dc2626', color: '#fff' }}
+                    onClick={() => handleCancelOrder(selected.id)}
+                  >
+                    <i className="fa fa-times"></i> Hủy đơn hàng
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -225,18 +259,18 @@ export default function OrderTracking() {
       {/* Modal đánh giá sản phẩm */}
       {reviewingItem && (
         <div className="modal active" onClick={() => setReviewingItem(null)}>
-          <div className="modal-content review-modal" onClick={e => e.stopPropagation()}>
+          <div className="modal-content review-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Đánh giá sản phẩm</h3>
               <button className="modal-close" onClick={() => setReviewingItem(null)}>×</button>
             </div>
             <div className="modal-body">
               <div className="review-product-info">
-                <img src={reviewingItem.item.image} alt={reviewingItem.item.name} />
+                <img src={reviewingItem.item.productImage} alt={reviewingItem.item.productName} />
                 <div>
-                  <div className="review-product-name">{reviewingItem.item.name}</div>
+                  <div className="review-product-name">{reviewingItem.item.productName}</div>
                   <div className="review-product-variant">
-                    {reviewingItem.item.color} {reviewingItem.item.size && `, ${reviewingItem.item.size}`}
+                    {reviewingItem.item.color}{reviewingItem.item.size && `, ${reviewingItem.item.size}`}
                   </div>
                 </div>
               </div>
@@ -244,7 +278,7 @@ export default function OrderTracking() {
               <div className="review-rating-input">
                 <label>Đánh giá của bạn</label>
                 <div className="star-rating-input">
-                  {[1, 2, 3, 4, 5].map(star => (
+                  {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
                       type="button"
@@ -262,7 +296,7 @@ export default function OrderTracking() {
                 <textarea
                   placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này (tối thiểu 10 ký tự)..."
                   value={reviewForm.comment}
-                  onChange={e => setReviewForm({ ...reviewForm, comment: e.target.value })}
+                  onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
                   rows={5}
                 />
                 <div className="char-count">{reviewForm.comment.length} ký tự</div>
@@ -272,8 +306,8 @@ export default function OrderTracking() {
                 <button className="btn-cancel" onClick={() => setReviewingItem(null)}>
                   Hủy
                 </button>
-                <button 
-                  className="btn-submit-review" 
+                <button
+                  className="btn-submit-review"
                   onClick={handleSubmitReview}
                   disabled={reviewForm.comment.trim().length < 10}
                 >

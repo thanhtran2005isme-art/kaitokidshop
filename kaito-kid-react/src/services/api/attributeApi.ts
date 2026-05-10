@@ -35,6 +35,15 @@ export const attributeApi = {
   },
 
   /**
+   * Lấy thuộc tính public (không cần auth) - dùng cho bộ lọc trang sản phẩm customer
+   */
+  async getPublic(group?: string): Promise<AttributeDTO[]> {
+    const params = group ? { group } : {};
+    const response = await apiClient.get<AttributeDTO[]>('/api/attributes', { params });
+    return response.data;
+  },
+
+  /**
    * Tạo thuộc tính mới (Admin)
    */
   async create(data: CreateAttributeDTO): Promise<AttributeDTO> {

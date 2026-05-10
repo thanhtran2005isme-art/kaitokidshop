@@ -219,6 +219,24 @@
       ]
     },
     {
+      "UpstreamPathTemplate": "/api/attributes",
+      "UpstreamHttpMethod": [ "GET", "OPTIONS" ],
+      "DownstreamPathTemplate": "/api/attributes",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "localhost", "Port": 5265 }
+      ]
+    },
+    {
+      "UpstreamPathTemplate": "/api/attributes/{everything}",
+      "UpstreamHttpMethod": [ "GET", "OPTIONS" ],
+      "DownstreamPathTemplate": "/api/attributes/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "localhost", "Port": 5265 }
+      ]
+    },
+    {
       "UpstreamPathTemplate": "/api/admin/{everything}",
       "UpstreamHttpMethod": [ "GET", "POST", "PUT", "DELETE", "OPTIONS" ],
       "DownstreamPathTemplate": "/api/admin/{everything}",

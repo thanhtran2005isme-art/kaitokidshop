@@ -17,6 +17,7 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
     public DbSet<Collection> Collections => Set<Collection>();
     public DbSet<Lookbook> Lookbooks => Set<Lookbook>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<ProductAttribute> ProductAttributes => Set<ProductAttribute>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

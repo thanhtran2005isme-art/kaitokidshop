@@ -352,7 +352,9 @@ export default function AdminProductAdd() {
             price: p.price || 0,
             salePrice: p.oldPrice && p.price < p.oldPrice ? p.price : 0,
             menu: menuKey,
-            category: p.category || '',
+            // Dropdown danh mục dùng tên backend (subcategory). DB lưu category=canonical (Ao) còn subcategory=tên thật ("Áo khoác").
+            // Nếu chỉ có category thì fallback dùng category.
+            category: p.subcategory || p.category || '',
             style: p.style || '',
             ageGroup: p.ageGroup || '',
             collection: p.collection || '',
@@ -693,7 +695,9 @@ export default function AdminProductAdd() {
     }
 
     const allProducts = productService.getAll();
-    const duplicateSku = allProducts.find((product) => (product.sku || '').trim().toUpperCase() === resolvedSku);
+    const duplicateSku = allProducts.find(
+      (product) => product.id !== editId && (product.sku || '').trim().toUpperCase() === resolvedSku
+    );
 
     if (duplicateSku) {
       notify({
@@ -703,7 +707,9 @@ export default function AdminProductAdd() {
       return;
     }
 
-    const duplicateSlug = allProducts.find((product) => (product.slug || '').trim() === resolvedSlug);
+    const duplicateSlug = allProducts.find(
+      (product) => product.id !== editId && (product.slug || '').trim() === resolvedSlug
+    );
 
     if (duplicateSlug) {
       notify({

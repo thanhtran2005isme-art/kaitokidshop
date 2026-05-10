@@ -11,6 +11,7 @@ export interface ProductDTO {
   id: number;
   name: string;
   category: string;
+  subcategory?: string;
   gender: string;
   price: number;
   oldPrice: number | null;
@@ -30,7 +31,6 @@ export interface ProductDTO {
 }
 
 export interface ProductDetailDTO extends ProductDTO {
-  subcategory?: string;
   style?: string;
   ageGroup?: string;
   images: string[];
@@ -76,6 +76,7 @@ function mapProductDTOToProduct(dto: ProductDTO): Product {
     id: dto.id,
     name: dto.name,
     category: dto.category,
+    subcategory: dto.subcategory,
     gender: dto.gender,
     price: dto.price,
     oldPrice: dto.oldPrice,

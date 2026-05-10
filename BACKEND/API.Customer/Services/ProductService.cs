@@ -128,6 +128,7 @@ public class ProductService(CustomerDbContext db) : IProductService
         Id = p.Id,
         Name = p.Name,
         Category = p.Category,
+        Subcategory = p.Subcategory,
         Gender = p.Gender,
         Price = p.Price,
         OldPrice = p.OldPrice,

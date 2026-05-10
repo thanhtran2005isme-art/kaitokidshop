@@ -1,32 +1,68 @@
-// Trang thời trang trẻ em - chuyển từ sanphamtreem.html
+// Trang thời trang trẻ em - kết nối backend
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { productService } from '../services/productService';
+import { productApi, categoryApi, type CategoryDTO } from '../services/api';
 import type { Product } from '../types';
 import ProductCard from '../components/product/ProductCard';
-import { matchesProductListingCategory, PRODUCT_MENU_TAXONOMY } from '../utils/productTaxonomy';
 import '../styles/products-page.css';
 
 const PRODUCTS_PER_PAGE = 12;
-const KIDS_TAXONOMY = PRODUCT_MENU_TAXONOMY.treem;
-const KIDS_CATEGORIES: Array<{ label: string; value?: string; children?: string[] }> = [
-  { label: KIDS_TAXONOMY.allLabel, value: KIDS_TAXONOMY.allLabel },
-  ...KIDS_TAXONOMY.groups,
-];
+const ALL_LABEL = 'Tất cả sản phẩm trẻ em';
+const GENDER = 'Tre em';
+const GENDER_KEY = 'treem';
+
+interface CategoryNode {
+  id: number;
+  name: string;
+  children: CategoryNode[];
+}
 
 export default function KidsProducts() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [categoryTree, setCategoryTree] = useState<CategoryNode[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [subCategory, setSubCategory] = useState(KIDS_TAXONOMY.allLabel);
+  const [subCategory, setSubCategory] = useState(ALL_LABEL);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const products = productService.getByGender('Trẻ em');
-    setAllProducts(products);
+    const loadData = async () => {
+      setLoading(true);
+      const [productsResult, categories] = await Promise.all([
+        productApi.getAll({ gender: GENDER, pageSize: 100 }),
+        categoryApi.getAll().catch(() => [] as CategoryDTO[]),
+      ]);
+
+      if (productsResult.success && productsResult.data) {
+        setAllProducts(productsResult.data.products);
+      }
+
+      const roots = categories
+        .filter((c) => !c.danhMucChaId && (c.gioiTinh === 'all' || c.gioiTinh === GENDER_KEY))
+        .sort((a, b) => a.thuTu - b.thuTu)
+        .map<CategoryNode>((root) => ({
+          id: root.id,
+          name: root.tenDanhMuc,
+          children: categories
+            .filter((c) => c.danhMucChaId === root.id)
+            .sort((a, b) => a.thuTu - b.thuTu)
+            .map((child) => ({ id: child.id, name: child.tenDanhMuc, children: [] })),
+        }));
+      setCategoryTree(roots);
+
+      setLoading(false);
+    };
+    void loadData();
   }, []);
 
   const filtered = useMemo(() => {
-    if (subCategory === KIDS_TAXONOMY.allLabel) return allProducts;
-    return allProducts.filter((product) => matchesProductListingCategory(product, subCategory));
+    if (subCategory === ALL_LABEL) return allProducts;
+    const keyword = subCategory.trim().toLowerCase();
+    return allProducts.filter((product) => {
+      const cat = (product.category || '').trim().toLowerCase();
+      const sub = (product.subcategory || '').trim().toLowerCase();
+      // Match chính xác: subcategory hoặc category
+      return sub === keyword || cat === keyword;
+    });
   }, [allProducts, subCategory]);
 
   const totalPages = Math.ceil(filtered.length / PRODUCTS_PER_PAGE);
@@ -43,21 +79,35 @@ export default function KidsProducts() {
 
       <div className="allsanpham">
         <aside className="danhmuc">
-          <h3>Danh mục Trẻ Em</h3>
+          <h3>Danh mục Trẻ em</h3>
           <ul className="danhsach">
-            {KIDS_CATEGORIES.map((cat, idx) => (
-              <li key={idx}>
+            <li>
+              <strong
+                onClick={() => handleFilter(ALL_LABEL)}
+                style={{ cursor: 'pointer', color: subCategory === ALL_LABEL ? '#dc2626' : undefined }}
+              >
+                {ALL_LABEL}
+              </strong>
+            </li>
+            {categoryTree.map((root) => (
+              <li key={root.id}>
                 <strong
-                  onClick={() => handleFilter(cat.value || cat.label)}
-                  style={{ cursor: cat.children ? 'default' : 'pointer' }}
+                  onClick={() => handleFilter(root.name)}
+                  style={{ cursor: 'pointer', color: subCategory === root.name ? '#dc2626' : undefined }}
                 >
-                  {cat.label}
+                  {root.name}
                 </strong>
-                {cat.children && (
+                {root.children.length > 0 && (
                   <ul>
-                    {cat.children.map(child => (
-                      <li key={child}>
-                        <a href="#" onClick={e => { e.preventDefault(); handleFilter(child); }}>{child}</a>
+                    {root.children.map((child) => (
+                      <li key={child.id}>
+                        <a
+                          href="#"
+                          onClick={(e) => { e.preventDefault(); handleFilter(child.name); }}
+                          style={{ color: subCategory === child.name ? '#dc2626' : undefined, fontWeight: subCategory === child.name ? 600 : undefined }}
+                        >
+                          {child.name}
+                        </a>
                       </li>
                     ))}
                   </ul>
@@ -69,7 +119,7 @@ export default function KidsProducts() {
 
         <main className="product-area">
           <div className="header-filter">
-            <h2>{subCategory === 'Tất cả sản phẩm trẻ em' ? 'THỜI TRANG TRẺ EM' : subCategory.toUpperCase()}</h2>
+            <h2>{subCategory === ALL_LABEL ? 'THỜI TRANG TRẺ EM' : subCategory.toUpperCase()}</h2>
             <div className="filters">
               <span>Kích cỡ ▾</span>
               <span>Màu sắc ▾</span>
@@ -79,8 +129,10 @@ export default function KidsProducts() {
 
           <div className="BanChay">
             <div className="sanphams">
-              {paginatedProducts.length > 0 ? (
-                paginatedProducts.map(p => <ProductCard key={p.id} product={p} />)
+              {loading ? (
+                <p style={{ textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>Đang tải sản phẩm...</p>
+              ) : paginatedProducts.length > 0 ? (
+                paginatedProducts.map((p) => <ProductCard key={p.id} product={p} />)
               ) : (
                 <p style={{ textAlign: 'center', padding: 40, gridColumn: '1/-1' }}>Không tìm thấy sản phẩm nào</p>
               )}
@@ -91,7 +143,7 @@ export default function KidsProducts() {
             <div className="pagination">
               {currentPage > 1 && <a className="page" onClick={() => goToPage(currentPage - 1)}>&laquo;</a>}
               {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .filter(i => i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1))
+                .filter((i) => i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1))
                 .map((i, idx, arr) => (
                   <span key={i}>
                     {idx > 0 && arr[idx - 1] < i - 1 && <span className="dots">...</span>}

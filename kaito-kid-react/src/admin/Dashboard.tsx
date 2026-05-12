@@ -25,35 +25,233 @@ export default function Dashboard() {
     setTopProducts(products.slice(0, 5));
   }, []);
 
+  const selectedPeriod = PERIOD_OPTIONS.find((option) => option.value === period) || PERIOD_OPTIONS[2];
+  const selectedChartWindow = CHART_WINDOWS.find((option) => option.value === chartWindow) || CHART_WINDOWS[1];
+  const periodRange = getPeriodRange(period);
+  const chartRange = getRollingWindowRange(chartWindow);
+  const weekRange = getPeriodRange('week');
+
+  const filteredOrders = orders.filter((order) => isDateInRange(order.createdAt, periodRange.start, periodRange.end));
+  const validOrders = filteredOrders.filter((order) => order.status !== 'cancelled');
+  const periodRevenue = validOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+  const newCustomers = customers.filter((customer) =>
+    isDateInRange(customer.createdAt, periodRange.start, periodRange.end)
+  ).length;
+  const lowStockProducts = products.filter((product) => product.stock > 0 && product.stock <= 10).length;
+  const outOfStockProducts = products.filter(
+    (product) => product.stock <= 0 || product.status === 'out-of-stock'
+  ).length;
+  const inventoryIssueCount = lowStockProducts + outOfStockProducts;
+  const pendingOrders = orders.filter((order) => order.status === 'pending').length;
+  const pendingOrdersInPeriod = filteredOrders.filter((order) => order.status === 'pending').length;
+  const shippingOrdersInPeriod = filteredOrders.filter(
+    (order) => order.status === 'shipping' || order.status === 'confirmed'
+  ).length;
+  const completedOrders = filteredOrders.filter((order) => order.status === 'completed').length;
+  const cancelledOrders = filteredOrders.filter((order) => order.status === 'cancelled').length;
+  const totalUnitsSold = products.reduce((sum, product) => sum + (product.soldCount || 0), 0);
+
+  const chartOrders = orders.filter((order) => isDateInRange(order.createdAt, chartRange.start, chartRange.end));
+  const chartValidOrders = chartOrders.filter((order) => order.status !== 'cancelled');
+  const chartRevenue = chartValidOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+  const chartAverageOrderValue = chartValidOrders.length > 0 ? chartRevenue / chartValidOrders.length : 0;
+
+  const revenueSeries = buildRevenueSeries(orders, chartWindow);
+  const hasRevenueSeries = revenueSeries.some((item) => item.revenue > 0 || item.orders > 0);
+
+  const statusChartData = [
+    { name: 'Chờ xác nhận', value: filteredOrders.filter((order) => order.status === 'pending').length },
+    {
+      name: 'Đang giao',
+      value: filteredOrders.filter(
+        (order) => order.status === 'confirmed' || order.status === 'shipping'
+      ).length,
+    },
+    { name: 'Hoàn thành', value: completedOrders },
+    { name: 'Đã hủy', value: cancelledOrders },
+  ];
+  const hasStatusData = statusChartData.some((item) => item.value > 0);
+
+  const topProducts = [...products]
+    .filter((product) => product.soldCount > 0)
+    .sort((a, b) => b.soldCount - a.soldCount)
+    .slice(0, 5);
+  const recentOrders = orders.slice(0, 5);
+  const latestPendingOrder = orders.find((order) => order.status === 'pending');
+  const latestCancelledOrder = orders.find((order) => order.status === 'cancelled');
+  const latestReview = reviews[0];
+  const latestCustomer = [...customers]
+    .filter((customer) => isValidDate(customer.createdAt))
+    .sort((a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime())[0];
+  const customersThisWeek = customers.filter((customer) =>
+    isDateInRange(customer.createdAt, weekRange.start, weekRange.end)
+  ).length;
+  const lowestStockProduct = [...products]
+    .filter((product) => product.stock > 0)
+    .sort((a, b) => a.stock - b.stock)[0];
+
   const statCards = [
-    { label: 'Doanh thu hôm nay', value: formatCurrency(stats.todayRevenue), iconClass: 'revenue', icon: 'fa-dollar-sign', change: 'Cập nhật', changeType: 'positive', changeIcon: 'fa-arrow-up' },
-    { label: 'Đơn hàng mới', value: stats.pending, iconClass: 'orders', icon: 'fa-shopping-cart', change: 'Chờ xử lý', changeType: 'positive', changeIcon: 'fa-arrow-up' },
-    { label: 'Đang giao hàng', value: stats.shipping, iconClass: 'shipping', icon: 'fa-truck', change: 'Đang ship', changeType: 'neutral', changeIcon: 'fa-minus' },
-    { label: 'Tổng đơn hàng', value: stats.total, iconClass: 'alert', icon: 'fa-exclamation-triangle', change: 'Tất cả', changeType: 'positive', changeIcon: 'fa-check' },
+    {
+      eyebrow: 'Revenue pulse',
+      label: `Doanh thu ${selectedPeriod.shortLabel}`,
+      value: formatCurrency(periodRevenue),
+      iconClass: 'revenue',
+      icon: 'fa-dollar-sign',
+      change: `${validOrders.length} đơn hợp lệ`,
+      changeType: periodRevenue > 0 ? 'positive' : 'neutral',
+      changeIcon: 'fa-receipt',
+    },
+    {
+      eyebrow: 'Order flow',
+      label: `Đơn hàng ${selectedPeriod.shortLabel}`,
+      value: String(filteredOrders.length),
+      iconClass: 'orders',
+      icon: 'fa-shopping-cart',
+      change: `${pendingOrdersInPeriod} đơn chờ xử lý trong kỳ`,
+      changeType: pendingOrdersInPeriod > 0 ? 'positive' : 'neutral',
+      changeIcon: 'fa-clock',
+    },
+    {
+      eyebrow: 'Customer growth',
+      label: `Khách mới ${selectedPeriod.shortLabel}`,
+      value: String(newCustomers),
+      iconClass: 'shipping',
+      icon: 'fa-users',
+      change: `${customers.length} tài khoản`,
+      changeType: newCustomers > 0 ? 'positive' : 'neutral',
+      changeIcon: 'fa-user-plus',
+    },
+    {
+      eyebrow: 'Inventory watch',
+      label: 'SKU cần xử lý',
+      value: String(inventoryIssueCount),
+      iconClass: 'alert',
+      icon: 'fa-exclamation-triangle',
+      change:
+        inventoryIssueCount > 0
+          ? `${outOfStockProducts} hết hàng · ${lowStockProducts} sắp hết`
+          : 'Không có cảnh báo tồn kho',
+      changeType: inventoryIssueCount > 0 ? 'negative' : 'neutral',
+      changeIcon: 'fa-box-open',
+    },
   ];
 
-  const statusMap: Record<string, string> = {
-    pending: 'Chờ xác nhận', confirmed: 'Đã xác nhận',
-    shipping: 'Đang giao', completed: 'Hoàn thành', cancelled: 'Đã huỷ',
-  };
+  const notifications = [
+    adminSettings.notifyNewOrder && pendingOrders > 0
+      ? {
+          id: 'pending-orders',
+          iconClass: 'order',
+          icon: 'fa-shopping-cart',
+          text: `Có ${pendingOrders} đơn hàng đang chờ xác nhận`,
+          meta: latestPendingOrder ? `Mới nhất: #${latestPendingOrder.id}` : 'Cần xử lý sớm',
+          time: latestPendingOrder ? formatRelativeTime(latestPendingOrder.createdAt) : 'Mới cập nhật',
+          to: '/admin/orders?status=pending',
+        }
+      : null,
+    adminSettings.notifyCancelOrder && cancelledOrders > 0
+      ? {
+          id: 'cancelled-orders',
+          iconClass: 'order',
+          icon: 'fa-ban',
+          text: `${cancelledOrders} đơn hàng đã bị hủy trong kỳ đã chọn`,
+          meta: latestCancelledOrder ? `Gần nhất: #${latestCancelledOrder.id}` : 'Cần kiểm tra lý do hủy',
+          time: latestCancelledOrder ? formatRelativeTime(latestCancelledOrder.createdAt) : 'Mới cập nhật',
+          to: '/admin/orders?status=cancelled',
+        }
+      : null,
+    (adminSettings.notifyLowStock && lowStockProducts > 0) ||
+    (adminSettings.notifyOutOfStock && outOfStockProducts > 0)
+      ? {
+          id: 'inventory-alert',
+          iconClass: 'stock',
+          icon: 'fa-exclamation-triangle',
+          text: `${lowStockProducts} sản phẩm sắp hết hàng, ${outOfStockProducts} sản phẩm đã hết`,
+          meta: lowestStockProduct
+            ? `${lowestStockProduct.name} chỉ còn ${lowestStockProduct.stock} sản phẩm`
+            : 'Kiểm tra tồn kho để nhập hàng',
+          time: 'Cần kiểm tra ngay',
+          to: '/admin/inventory/alerts',
+        }
+      : null,
+    adminSettings.notifyNewReview && latestReview
+      ? {
+          id: 'latest-review',
+          iconClass: 'review',
+          icon: 'fa-star',
+          text: `Đánh giá mới từ ${latestReview.customerName}`,
+          meta: `${latestReview.productName} • ${latestReview.rating}/5 sao`,
+          time: formatRelativeTime(latestReview.createdAt),
+          to: '/admin/reviews',
+        }
+      : null,
+    adminSettings.notifyNewCustomer && customersThisWeek > 0
+      ? {
+          id: 'new-customers',
+          iconClass: 'customer',
+          icon: 'fa-user-plus',
+          text: `${customersThisWeek} khách hàng mới trong 7 ngày qua`,
+          meta: latestCustomer ? `Gần nhất: ${latestCustomer.name}` : 'Danh sách khách mới đã cập nhật',
+          time: latestCustomer ? formatRelativeTime(latestCustomer.createdAt) : 'Tuần này',
+          to: '/admin/customers',
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    id: string;
+    iconClass: string;
+    icon: string;
+    text: string;
+    meta: string;
+    time: string;
+    to: string;
+  }>;
 
   return (
-    <>
-      {/* Page Header */}
-      <div className="page-header">
-        <h1>Dashboard</h1>
-        <div className="page-actions">
-          <select className="date-filter">
-            <option>Hôm nay</option>
-            <option>7 ngày qua</option>
-            <option selected>30 ngày qua</option>
-            <option>Tháng này</option>
-            <option>Tháng trước</option>
-          </select>
+    <div className="dashboard-admin-page">
+      <div className="page-header dashboard-page-header">
+        <div className="dashboard-page-copy">
+          <span className="dashboard-page-eyebrow">Admin command center</span>
+          <h1>Dashboard</h1>
+          <p>
+            Xem nhanh tình hình cửa hàng trong <strong>{selectedPeriod.label}</strong>. Các phân tích sâu được tách sang trang báo cáo.
+          </p>
+        </div>
+
+        <div className="page-actions dashboard-page-actions">
+          <label className="dashboard-filter-shell">
+            <AdminIcon name="fa-calendar-alt" />
+            <select
+              className="date-filter"
+              value={period}
+              onChange={(event) => setPeriod(event.target.value as DashboardPeriod)}
+            >
+              {PERIOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <Link to="/admin/orders" className="dashboard-action-button subtle">
+            <AdminIcon name="fa-shopping-cart" />
+            <span>Xem đơn hàng</span>
+          </Link>
+
+          <Link to="/admin/products" className="dashboard-action-button primary">
+            <AdminIcon name="fa-box" />
+            <span>Quản lý sản phẩm</span>
+          </Link>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      <div className="dashboard-section-heading">
+        <div>
+          <span>KPI chính</span>
+          <h2>Toàn cảnh kinh doanh</h2>
+        </div>
+        <p>Các chỉ số gọn để nắm tình hình trước khi đi vào từng module chi tiết.</p>
+      </div>
+
       <div className="stats-grid">
         {statCards.map(card => (
           <div key={card.label} className="stat-card">
@@ -71,7 +269,14 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Charts Row */}
+      <div className="dashboard-section-heading">
+        <div>
+          <span>Biểu đồ</span>
+          <h2>Xu hướng nhanh</h2>
+        </div>
+        <p>Chỉ giữ biểu đồ tóm tắt, phần phân tích sâu nằm ở trang báo cáo.</p>
+      </div>
+
       <div className="charts-row">
         <div className="chart-card">
           <div className="card-header">

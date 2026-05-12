@@ -25,6 +25,7 @@ yarn.lock
 dist/
 build/
 .cache/
+.vite/
 
 # Environment variables
 .env

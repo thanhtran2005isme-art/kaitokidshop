@@ -1,34 +1,85 @@
-// Trang yêu thích - thay thế wishlist logic
+// Trang yêu thích - liên kết backend
 
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { productService } from '../services/productService';
+import { wishlistApi } from '../services/api';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
+import LoadingSpinner from '../components/LoadingSpinner';
+import toast from 'react-hot-toast';
 import type { Product } from '../types';
 
 export default function Wishlist() {
   const { addItem } = useCart();
-  const [wishlist, setWishlist] = useState<number[]>([]);
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved: number[] = JSON.parse(localStorage.getItem('wishlist') || '[]');
-    setWishlist(saved);
-    const all = productService.getAll();
-    setProducts(all.filter(p => saved.includes(p.id)));
-  }, []);
+    if (user) {
+      fetchWishlist();
+    } else {
+      setLoading(false);
+    }
+  }, [user]);
 
-  const removeFromWishlist = (id: number) => {
-    const updated = wishlist.filter(wid => wid !== id);
-    setWishlist(updated);
-    localStorage.setItem('wishlist', JSON.stringify(updated));
-    setProducts(prev => prev.filter(p => p.id !== id));
+  async function fetchWishlist() {
+    try {
+      setLoading(true);
+      const response = await wishlistApi.getWishlist();
+      if (response.success && response.data) {
+        setProducts(response.data);
+      } else {
+        toast.error(response.error || 'Không thể tải danh sách yêu thích');
+        setProducts([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch wishlist:', error);
+      setProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const removeFromWishlist = async (id: number) => {
+    try {
+      const response = await wishlistApi.removeFromWishlist(id);
+      if (response.success) {
+        setProducts(prev => prev.filter(p => p.id !== id));
+        toast.success('Đã xóa khỏi danh sách yêu thích');
+      } else {
+        toast.error(response.error || 'Không thể xóa sản phẩm');
+      }
+    } catch (error) {
+      console.error('Failed to remove from wishlist:', error);
+      toast.error('Không thể xóa sản phẩm');
+    }
   };
 
   const handleAddToCart = (product: Product) => {
     addItem(product, '', '', 1);
+    toast.success('Đã thêm vào giỏ hàng');
   };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!user) {
+    return (
+      <div className="account-page">
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <div className="empty-state">
+            <div className="empty-icon"><i className="fa fa-heart"></i></div>
+            <h3>Vui lòng đăng nhập</h3>
+            <p>Đăng nhập để xem danh sách yêu thích của bạn</p>
+            <Link to="/login" className="btn-continue-shopping"><i className="fa fa-sign-in-alt"></i> Đăng nhập</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="account-page">

@@ -27,3 +27,4 @@ export { accountApi, type AccountDTO, type UpdateAccountPayload, type ChangePass
 export { addressApi, type AddressDTO, type CreateAddressPayload } from './addressApi';
 export { adminProductsApi } from './adminProductsApi';
 export { customerApi } from './customerApi';
+export { wishlistApi, type WishlistItemDTO } from './wishlistApi';

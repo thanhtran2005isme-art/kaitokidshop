@@ -1,23 +1,53 @@
-// Trang sản phẩm giảm giá - chuyển từ samphamsale.html
+// Trang sản phẩm giảm giá - liên kết backend
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { productService } from '../services/productService';
+import { productApi } from '../services/api';
 import type { Product } from '../types';
 import ProductCard from '../components/product/ProductCard';
+import LoadingSpinner from '../components/LoadingSpinner';
+import toast from 'react-hot-toast';
 import '../styles/products-page.css';
 
 const PRODUCTS_PER_PAGE = 12;
 
 export default function Sale() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortType, setSortType] = useState('');
   const [discountFilter, setDiscountFilter] = useState('');
 
   useEffect(() => {
-    const products = productService.getActive().filter(p => p.isSale || (p.oldPrice && p.oldPrice > p.price));
-    setAllProducts(products);
+    fetchSaleProducts();
   }, []);
+
+  async function fetchSaleProducts() {
+    try {
+      setLoading(true);
+      const response = await productApi.getAll({
+        isSale: true,
+        page: 1,
+        pageSize: 100,
+      });
+
+      if (response.success && response.data) {
+        // Chỉ giữ những sản phẩm thực sự có giảm giá
+        const saleProducts = response.data.products.filter(
+          p => p.isSale || (p.oldPrice && p.oldPrice > p.price)
+        );
+        setAllProducts(saleProducts);
+      } else {
+        toast.error(response.error || 'Không thể tải sản phẩm giảm giá');
+        setAllProducts([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch sale products:', error);
+      toast.error('Không thể tải sản phẩm giảm giá');
+      setAllProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     let result = [...allProducts];
@@ -54,6 +84,10 @@ export default function Sale() {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <>

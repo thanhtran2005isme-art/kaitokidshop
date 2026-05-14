@@ -19,7 +19,7 @@ export { bannerApi, type BannerDTO } from './bannerApi';
 export { pageApi, type PageDTO } from './pageApi';
 export { menuApi, type MenuDTO } from './menuApi';
 export { collectionApi, type CollectionDTO, type PublicCollectionDTO } from './collectionApi';
-export { lookbookApi, type LookbookDTO } from './lookbookApi';
+export { lookbookApi, type LookbookDTO, type PublicLookbookDTO } from './lookbookApi';
 export { settingsApi, type SettingDTO, type UpsertSettingDTO } from './settingsApi';
 export { cartApi, type CartItemDTO as CartItemBackendDTO, type AddToCartPayload } from './cartApi';
 export { customerOrderApi, customerReviewApi, type CustomerOrderDTO, type CustomerOrderItemDTO, type CreateReviewPayload } from './customerOrderApi';

@@ -1,9 +1,11 @@
-// Trang sản phẩm bán chạy - chuyển từ bestseller.html
+// Trang sản phẩm bán chạy - liên kết backend
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { productService } from '../services/productService';
+import { productApi } from '../services/api';
 import type { Product } from '../types';
 import ProductCard from '../components/product/ProductCard';
+import LoadingSpinner from '../components/LoadingSpinner';
+import toast from 'react-hot-toast';
 import '../styles/products-page.css';
 
 type SortType = 'sold-desc' | 'price-asc' | 'price-desc' | 'newest';
@@ -13,15 +15,40 @@ const PRODUCTS_PER_PAGE = 12;
 
 export default function BestSeller() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortType, setSortType] = useState<SortType>('sold-desc');
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('Tất cả');
 
   useEffect(() => {
-    // Lấy tất cả SP active, sắp xếp theo soldCount giảm dần
-    const products = productService.getActive().sort((a, b) => (b.soldCount || 0) - (a.soldCount || 0));
-    setAllProducts(products);
+    fetchBestSellers();
   }, []);
+
+  async function fetchBestSellers() {
+    try {
+      setLoading(true);
+      // Gọi API lấy tất cả sản phẩm best seller, sort theo soldCount giảm dần
+      const response = await productApi.getAll({
+        isBestSeller: true,
+        sortBy: 'sold-desc',
+        page: 1,
+        pageSize: 100,
+      });
+
+      if (response.success && response.data) {
+        setAllProducts(response.data.products);
+      } else {
+        toast.error(response.error || 'Không thể tải sản phẩm bán chạy');
+        setAllProducts([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch best sellers:', error);
+      toast.error('Không thể tải sản phẩm bán chạy');
+      setAllProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const filtered = useMemo(() => {
     let result = [...allProducts];
@@ -69,6 +96,10 @@ export default function BestSeller() {
     if (categoryFilter === 'Tất cả') return '🏆 SẢN PHẨM BÁN CHẠY';
     return `🏆 BÁN CHẠY - ${categoryFilter.toUpperCase()}`;
   };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <>

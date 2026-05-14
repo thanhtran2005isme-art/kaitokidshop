@@ -13,6 +13,17 @@ export interface LookbookDTO {
   ngayTao: string;
 }
 
+// Public DTO (from LookbooksController)
+export interface PublicLookbookDTO {
+  id: number;
+  title: string;
+  subtitle?: string;
+  description?: string;
+  image: string;
+  link?: string;
+  sortOrder: number;
+}
+
 export interface CreateLookbookDTO {
   tieuDe: string;
   tieuDePhu?: string;
@@ -24,6 +35,19 @@ export interface CreateLookbookDTO {
 }
 
 export const lookbookApi = {
+  /**
+   * Public: Get all active lookbooks
+   * GET /api/lookbooks
+   */
+  async getPublic(): Promise<ApiResponse<PublicLookbookDTO[]>> {
+    try {
+      const response = await apiClient.get<PublicLookbookDTO[]>('/api/lookbooks');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
   async getAll(): Promise<ApiResponse<LookbookDTO[]>> {
     try {
       const response = await apiClient.get<LookbookDTO[]>('/api/admin/lookbook');

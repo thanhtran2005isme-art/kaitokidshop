@@ -1,23 +1,49 @@
-// Trang sản phẩm mới - chuyển từ samphammoi.html
+// Trang sản phẩm mới - liên kết backend
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { productService } from '../services/productService';
+import { productApi } from '../services/api';
 import type { Product } from '../types';
 import ProductCard from '../components/product/ProductCard';
+import LoadingSpinner from '../components/LoadingSpinner';
+import toast from 'react-hot-toast';
 import '../styles/products-page.css';
 
 const PRODUCTS_PER_PAGE = 12;
 
 export default function NewIn() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortType, setSortType] = useState('');
 
   useEffect(() => {
-    // Lấy SP mới (isNew === true)
-    const products = productService.getActive().filter(p => p.isNew);
-    setAllProducts(products);
+    fetchNewArrivals();
   }, []);
+
+  async function fetchNewArrivals() {
+    try {
+      setLoading(true);
+      const response = await productApi.getAll({
+        isNew: true,
+        sortBy: 'newest',
+        page: 1,
+        pageSize: 100,
+      });
+
+      if (response.success && response.data) {
+        setAllProducts(response.data.products);
+      } else {
+        toast.error(response.error || 'Không thể tải sản phẩm mới');
+        setAllProducts([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch new arrivals:', error);
+      toast.error('Không thể tải sản phẩm mới');
+      setAllProducts([]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const sorted = useMemo(() => {
     const result = [...allProducts];
@@ -36,6 +62,10 @@ export default function NewIn() {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <>

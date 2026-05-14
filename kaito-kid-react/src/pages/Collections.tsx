@@ -1,31 +1,23 @@
-// Trang bộ sưu tập - thay thế bosuutap.html + collections.js
-
+// Trang bộ sưu tập - kết nối backend (GET /api/collections)
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { collectionApi, type PublicCollectionDTO } from '../services/api';
 import { slugifyLabel } from '../utils/adminProductRelations';
 
-interface Collection {
-  id: number; name: string; description: string; image: string; productCount?: number; order?: number; status?: 'active' | 'hidden';
-}
-
 export default function Collections() {
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [collections, setCollections] = useState<PublicCollectionDTO[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const saved = JSON.parse(localStorage.getItem('collections') || '[]');
-    if (Array.isArray(saved) && saved.length > 0) {
-      setCollections(
-        saved
-          .filter((collection: Collection) => collection.status !== 'hidden')
-          .sort((leftCollection: Collection, rightCollection: Collection) => Number(leftCollection.order || 999) - Number(rightCollection.order || 999))
-      );
-    } else {
-      setCollections([
-        { id: 1, name: 'Xuân Hè 2025', description: 'Bộ sưu tập mới nhất cho mùa xuân hè', image: '/images/slide_1.jpg', productCount: 24 },
-        { id: 2, name: 'Thu Đông 2024', description: 'Phong cách ấm áp cho mùa thu đông', image: '/images/slide_2.jpg', productCount: 18 },
-        { id: 3, name: 'Streetwear', description: 'Thời trang đường phố năng động', image: '/images/slide_3.jpg', productCount: 32 },
-      ]);
-    }
+    const load = async () => {
+      setLoading(true);
+      const result = await collectionApi.getPublic();
+      if (result.success && result.data) {
+        setCollections([...result.data].sort((a, b) => a.sortOrder - b.sortOrder));
+      }
+      setLoading(false);
+    };
+    void load();
   }, []);
 
   return (
@@ -35,23 +27,33 @@ export default function Collections() {
         <p>Khám phá các bộ sưu tập thời trang mới nhất</p>
       </div>
       <div className="collections-container">
-        <div className="collections-grid">
-          {collections.map(col => (
-            <div key={col.id} className="collection-card">
-              <div className="collection-image">
-                <img src={col.image} alt={col.name} />
-                <div className="collection-overlay">
-                  <Link to={`/products?collection=${slugifyLabel(col.name)}`} className="btn-view">Xem bộ sưu tập</Link>
+        {loading ? (
+          <p style={{ textAlign: 'center', padding: 60, fontSize: 16, color: '#999' }}>Đang tải bộ sưu tập...</p>
+        ) : collections.length === 0 ? (
+          <p style={{ textAlign: 'center', padding: 60, fontSize: 16, color: '#999' }}>Chưa có bộ sưu tập nào.</p>
+        ) : (
+          <div className="collections-grid">
+            {collections.map((col) => (
+              <div key={col.id} className="collection-card">
+                <div className="collection-image">
+                  <img src={col.image || '/images/slide_1.jpg'} alt={col.name} />
+                  <div className="collection-overlay">
+                    <Link
+                      to={`/products?collection=${col.slug || slugifyLabel(col.name)}`}
+                      className="btn-view"
+                    >
+                      Xem bộ sưu tập
+                    </Link>
+                  </div>
+                </div>
+                <div className="collection-info">
+                  <h3>{col.name}</h3>
+                  {col.description && <p>{col.description}</p>}
                 </div>
               </div>
-              <div className="collection-info">
-                <h3>{col.name}</h3>
-                <p>{col.description}</p>
-                {col.productCount && <span className="product-count">{col.productCount} sản phẩm</span>}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

@@ -12,6 +12,16 @@ export interface CollectionDTO {
   ngayTao: string;
 }
 
+/** Public collection (không cần auth, dùng cho customer page) */
+export interface PublicCollectionDTO {
+  id: number;
+  name: string;
+  slug?: string;
+  description?: string;
+  image?: string;
+  sortOrder: number;
+}
+
 export interface CreateCollectionDTO {
   tenBoSuuTap: string;
   slug?: string;
@@ -25,6 +35,16 @@ export const collectionApi = {
   async getAll(): Promise<ApiResponse<CollectionDTO[]>> {
     try {
       const response = await apiClient.get<CollectionDTO[]>('/api/admin/collections');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Lấy collections public (không cần auth) cho trang customer */
+  async getPublic(): Promise<ApiResponse<PublicCollectionDTO[]>> {
+    try {
+      const response = await apiClient.get<PublicCollectionDTO[]>('/api/collections');
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: getErrorMessage(error) };

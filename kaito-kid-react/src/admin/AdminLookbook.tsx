@@ -56,7 +56,7 @@ export default function AdminLookbook() {
           description: dto.moTa || '',
           image: dto.hinhAnh || '',
           products: dto.lienKet ? dto.lienKet.split(',').map(Number).filter((n) => n > 0) : [],
-          status: dto.trangThai === 'active' ? 'active' : 'hidden',
+          status: dto.trangThai === 'active' ? 'active' : 'inactive',
           totalPrice: 0,
         }));
         setLookbooks(mapped);
@@ -209,7 +209,7 @@ export default function AdminLookbook() {
           description: dto.moTa || '',
           image: dto.hinhAnh || '',
           products: dto.lienKet ? dto.lienKet.split(',').map(Number).filter((n) => n > 0) : [],
-          status: dto.trangThai === 'active' ? 'active' : 'hidden',
+          status: dto.trangThai === 'active' ? 'active' : 'inactive',
           totalPrice: 0,
         }));
         setLookbooks(mapped);

@@ -64,6 +64,7 @@ export interface UpdateStatusPayload {
 function mapDonHangToOrder(dto: DonHangDTO): Order {
   const items: CartItem[] = dto.chiTiet.map((ct) => ({
     id: ct.sanPhamId,
+    productId: ct.sanPhamId,
     name: ct.tenSanPham,
     price: ct.donGia,
     image: ct.hinhAnhSP,

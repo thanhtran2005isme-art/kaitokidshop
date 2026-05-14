@@ -44,7 +44,7 @@ export default function AdminMenus() {
             ...current,
             about: {
               ...current.about,
-              links: footerMenus.map((m) => ({ label: m.tenMenu, href: m.lienKet, id: m.id })),
+              links: footerMenus.map((m) => ({ label: m.tenMenu, href: m.lienKet, id: m.id, target: '_self' })),
             },
           }));
         }

@@ -17,6 +17,8 @@ export interface BannerItem {
   order: number;
   status: BannerStatus;
   type: BannerType;
+  startDate?: string;
+  endDate?: string;
 }
 
 const STORAGE_KEY = 'banners';

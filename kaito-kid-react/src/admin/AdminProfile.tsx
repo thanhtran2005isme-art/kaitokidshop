@@ -85,12 +85,15 @@ export default function AdminProfile() {
   const { user, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // Build profile from JWT user data instead of localStorage
+  const baseProfile = readAdminProfile();
   const initialProfile: AdminProfileRecord = {
-    ...readAdminProfile(),
-    name: user?.name || readAdminProfile().name,
-    email: user?.email || readAdminProfile().email,
-    phone: user?.phone || readAdminProfile().phone,
-    role: user?.role || 'admin',
+    ...baseProfile,
+    basic: {
+      ...baseProfile.basic,
+      fullName: user?.name || baseProfile.basic.fullName,
+      email: user?.email || baseProfile.basic.email,
+      phone: user?.phone || baseProfile.basic.phone,
+    },
   };
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
   const [editingSection, setEditingSection] = useState<EditableSection>(null);

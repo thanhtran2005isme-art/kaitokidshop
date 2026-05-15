@@ -1,18 +1,21 @@
-// Trang chi tiết sản phẩm - thay the chitietsanpham.html + product-detail.js
+// Trang chi tiết sản phẩm - liên kết backend
 
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { productService } from '../services/productService';
+import { productApi } from '../services/api';
 import { useCart } from '../context/CartContext';
 import type { Product } from '../types';
 import { formatCurrency } from '../utils/format';
-import { getProductDisplayCategory, normalizeTaxonomyValue } from '../utils/productTaxonomy';
+import { trackProductView } from '../utils/viewedTracker';
 import ProductCard from '../components/product/ProductCard';
+import LoadingSpinner from '../components/LoadingSpinner';
+import toast from 'react-hot-toast';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const { addItem } = useCart();
   const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
   const [quantity, setQuantity] = useState(1);
@@ -21,22 +24,50 @@ export default function ProductDetail() {
 
   useEffect(() => {
     if (id) {
-      const p = productService.getById(Number(id));
-      setProduct(p || null);
-      if (p) {
-        const currentCategory = normalizeTaxonomyValue(getProductDisplayCategory(p));
-        const related = productService.getAll()
-          .filter(
-            (relatedProduct) =>
-              normalizeTaxonomyValue(getProductDisplayCategory(relatedProduct)) === currentCategory &&
-              relatedProduct.id !== p.id &&
-              relatedProduct.status === 'active'
-          )
-          .slice(0, 4);
-        setRelatedProducts(related);
-      }
+      fetchProduct(Number(id));
     }
   }, [id]);
+
+  async function fetchProduct(productId: number) {
+    try {
+      setLoading(true);
+      // Fetch product detail and related products in parallel
+      const [productRes, relatedRes] = await Promise.all([
+        productApi.getById(productId),
+        productApi.getRelated(productId, 4),
+      ]);
+
+      if (productRes.success && productRes.data) {
+        setProduct(productRes.data);
+        // Track lịch sử xem sản phẩm để dùng cho gợi ý cá nhân hóa
+        trackProductView({
+          id: productRes.data.id,
+          name: productRes.data.name,
+          category: productRes.data.category,
+          gender: productRes.data.gender,
+        });
+      } else {
+        toast.error(productRes.error || 'Không tìm thấy sản phẩm');
+        setProduct(null);
+      }
+
+      if (relatedRes.success && relatedRes.data) {
+        setRelatedProducts(relatedRes.data);
+      } else {
+        setRelatedProducts([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch product detail:', error);
+      toast.error('Không thể tải chi tiết sản phẩm');
+      setProduct(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (loading) {
+    return <LoadingSpinner />;
+  }
 
   if (!product) {
     return (
@@ -48,8 +79,18 @@ export default function ProductDetail() {
   }
 
   const handleAddToCart = () => {
+    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+      toast.error('Vui lòng chọn size');
+      return;
+    }
+    if (product.colors && product.colors.length > 0 && !selectedColor) {
+      toast.error('Vui lòng chọn màu sắc');
+      return;
+    }
+
     addItem(product, selectedSize, selectedColor, quantity);
     setAdded(true);
+    toast.success('Đã thêm vào giỏ hàng');
     setTimeout(() => setAdded(false), 2000);
   };
 
@@ -108,7 +149,7 @@ export default function ProductDetail() {
               <input value={quantity} readOnly />
               <button className="qty-btn" onClick={() => setQuantity(quantity + 1)}>+</button>
             </div>
-            <button className="btn-add-cart" onClick={handleAddToCart}>
+            <button className="btn-add-cart" onClick={handleAddToCart} disabled={product.stock === 0}>
               <i className="fa fa-shopping-cart"></i> {added ? 'Đã thêm vào giỏ!' : 'Thêm vào giỏ hàng'}
             </button>
           </div>
@@ -123,7 +164,15 @@ export default function ProductDetail() {
           {product.description && (
             <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #e5e7eb' }}>
               <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Mô tả sản phẩm</h3>
-              <p style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.6 }}>{product.description}</p>
+              <p style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{product.description}</p>
+            </div>
+          )}
+
+          {/* Specs */}
+          {product.specs && (
+            <div style={{ marginTop: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Thông số kỹ thuật</h3>
+              <p style={{ fontSize: 14, color: '#4b5563', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{product.specs}</p>
             </div>
           )}
         </div>

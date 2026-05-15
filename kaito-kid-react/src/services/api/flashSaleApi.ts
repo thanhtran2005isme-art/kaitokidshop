@@ -28,7 +28,43 @@ export interface CreateFlashSaleDTO {
   chiTiet: FlashSaleItemDTO[];
 }
 
+// Public DTO cho trang chủ
+export interface PublicFlashSaleItem {
+  id: number;
+  productId: number;
+  name: string;
+  image: string;
+  originalPrice: number;
+  flashPrice: number;
+  stockLimit: number;
+  sold: number;
+  category: string;
+  gender: string;
+}
+
+export interface PublicFlashSale {
+  active: boolean;
+  id?: number;
+  name?: string;
+  startDate?: string;
+  endDate?: string;
+  items?: PublicFlashSaleItem[];
+}
+
 export const flashSaleApi = {
+  /**
+   * Lấy chương trình flash sale đang chạy (public)
+   * Nếu không có chương trình → { active: false }
+   */
+  async getActive(): Promise<ApiResponse<PublicFlashSale>> {
+    try {
+      const response = await apiClient.get<PublicFlashSale>('/api/flash-sales/active');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
   async getAll(): Promise<ApiResponse<FlashSaleDTO[]>> {
     try {
       const response = await apiClient.get<FlashSaleDTO[]>('/api/admin/flash-sales');

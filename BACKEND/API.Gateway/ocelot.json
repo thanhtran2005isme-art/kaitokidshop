@@ -253,6 +253,15 @@
       "DownstreamHostAndPorts": [
         { "Host": "localhost", "Port": 5089 }
       ]
+    },
+    {
+      "UpstreamPathTemplate": "/api/flash-sales/{everything}",
+      "UpstreamHttpMethod": [ "GET", "OPTIONS" ],
+      "DownstreamPathTemplate": "/api/flash-sales/{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        { "Host": "localhost", "Port": 5089 }
+      ]
     }
   ],
   "GlobalConfiguration": {

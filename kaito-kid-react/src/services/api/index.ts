@@ -11,7 +11,7 @@ export { attributeApi, type AttributeDTO } from './attributeApi';
 export { inventoryApi, type InventoryAdjustPayload, type InventoryAdjustmentType, type InventoryHistoryDTO } from './inventoryApi';
 export { couponApi, type CouponDTO, type CouponValidateRequest, type CouponValidateResult } from './couponApi';
 export { promotionApi, type PromotionDTO } from './promotionApi';
-export { flashSaleApi, type FlashSaleDTO, type FlashSaleItemDTO } from './flashSaleApi';
+export { flashSaleApi, type FlashSaleDTO, type FlashSaleItemDTO, type PublicFlashSale, type PublicFlashSaleItem } from './flashSaleApi';
 export { reviewApi, type ReviewDTO, type ReviewListResponse } from './reviewApi';
 export { reportApi, type RevenueDataPoint, type TopProductItem, type OrderStatItem, type DashboardData } from './reportApi';
 export { homepageApi, type HomepageSectionDTO } from './homepageApi';

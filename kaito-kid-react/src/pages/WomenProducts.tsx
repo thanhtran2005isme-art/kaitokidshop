@@ -9,7 +9,7 @@ import '../styles/products-page.css';
 
 const PRODUCTS_PER_PAGE = 12;
 const ALL_LABEL = 'Tất cả sản phẩm nữ';
-const GENDER = 'Nữ';
+const GENDER = 'Nu';
 const GENDER_KEY = 'nu';
 
 interface CategoryNode {

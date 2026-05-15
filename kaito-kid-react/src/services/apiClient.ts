@@ -52,7 +52,13 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Bỏ qua redirect khi đang ở trang /login hoặc khi đó là request login/register/refresh
+    const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';
+    const isAuthRequest = originalRequest.url?.includes('/api/auth/login') ||
+                          originalRequest.url?.includes('/api/auth/register') ||
+                          originalRequest.url?.includes('/api/auth/refresh');
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -74,7 +80,11 @@ apiClient.interceptors.response.use(
       const refreshToken = tokenStorage.getRefreshToken();
       if (!refreshToken) {
         tokenStorage.clearAll();
-        window.location.href = '/login';
+        // Chỉ redirect nếu không đang ở trang login
+        if (!isAuthPage) {
+          window.location.href = '/login';
+        }
+        isRefreshing = false;
         return Promise.reject(error);
       }
 
@@ -99,7 +109,10 @@ apiClient.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError as Error, null);
         tokenStorage.clearAll();
-        window.location.href = '/login';
+        // Chỉ redirect nếu không đang ở trang login
+        if (!isAuthPage) {
+          window.location.href = '/login';
+        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

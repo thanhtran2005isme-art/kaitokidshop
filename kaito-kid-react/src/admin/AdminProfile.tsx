@@ -1,8 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { productService } from '../services/productService';
-import { orderService } from '../services/orderService';
+import { accountApi, adminApi } from '../services/api';
 import { formatDate } from '../utils/format';
 import {
   pushSecurityActivity,
@@ -16,17 +15,12 @@ import {
   syncAdminProfileToSession,
   type AdminProfileRecord,
 } from '../utils/adminProfileConfig';
-import { readStoredReviews } from '../utils/reviewConfig';
 import AdminIcon from '../components/admin/AdminIcon';
-
+import LoadingSpinner from '../components/LoadingSpinner';
+import toast from 'react-hot-toast';
 
 type ProfileTab = 'overview' | 'security';
 type EditableSection = 'basic' | 'work' | null;
-
-interface FlashMessage {
-  type: 'success' | 'error';
-  text: string;
-}
 
 interface PasswordFormState {
   currentPassword: string;
@@ -49,42 +43,11 @@ function formatDateTime(value?: string) {
   }
 }
 
-function buildProfileMetrics() {
-  const orders = orderService.getAll();
-  const products = productService.getAll();
-  const reviews = readStoredReviews();
-  const securityActivities = readSecurityActivities();
-
-  return [
-    {
-      label: 'Don cần theo dõi',
-      value: String(
-        orders.filter((order) => order.status === 'pending' || order.status === 'confirmed' || order.status === 'shipping').length,
-      ),
-      detail: `${orders.length} tong đơn hàng`,
-    },
-    {
-      label: 'Sản phẩm đang bán',
-      value: String(products.filter((product) => product.status === 'active').length),
-      detail: `${products.length} sản phẩm trong hệ thống`,
-    },
-    {
-      label: 'Review đã duyệt',
-      value: String(reviews.filter((review) => review.status === 'approved').length),
-      detail: `${reviews.filter((review) => review.status !== 'pending').length} review da moderation`,
-    },
-    {
-      label: 'Lan đăng nhập admin',
-      value: String(securityActivities.filter((activity) => activity.type === 'admin-login').length),
-      detail: securityActivities[0] ? `Gan nhat ${formatDateTime(securityActivities[0].createdAt)}` : 'Chưa có audit log',
-    },
-  ];
-}
-
 export default function AdminProfile() {
   const { user, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  // Build profile from JWT user data instead of localStorage
+
+  // Build profile from JWT user data
   const baseProfile = readAdminProfile();
   const initialProfile: AdminProfileRecord = {
     ...baseProfile,
@@ -95,12 +58,15 @@ export default function AdminProfile() {
       phone: user?.phone || baseProfile.basic.phone,
     },
   };
+
   const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
   const [editingSection, setEditingSection] = useState<EditableSection>(null);
   const [savedProfile, setSavedProfile] = useState<AdminProfileRecord>(initialProfile);
   const [profile, setProfile] = useState<AdminProfileRecord>(initialProfile);
-  const [message, setMessage] = useState<FlashMessage | null>(null);
-  const [metrics, setMetrics] = useState(() => buildProfileMetrics());
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingPassword, setSavingPassword] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [metrics, setMetrics] = useState<Array<{ label: string; value: string; detail: string }>>([]);
   const [securityActivities, setSecurityActivities] = useState(() => readSecurityActivities().slice(0, 6));
   const [securityOptions, setSecurityOptions] = useState({
     enable2FA: false,
@@ -116,13 +82,70 @@ export default function AdminProfile() {
   const profilePosition = profile.work.position || 'Administrator';
   const avatarFallback = adminName.charAt(0).toUpperCase();
 
-  const showMessage = (type: FlashMessage['type'], text: string) => {
-    setMessage({ type, text });
-    window.setTimeout(() => setMessage(null), 3200);
-  };
+  useEffect(() => {
+    fetchProfile();
+    fetchDashboardMetrics();
+  }, []);
+
+  async function fetchProfile() {
+    try {
+      setLoadingProfile(true);
+      const response = await accountApi.getProfile();
+      if (response.success && response.data) {
+        const updatedProfile: AdminProfileRecord = {
+          ...profile,
+          basic: {
+            ...profile.basic,
+            fullName: response.data.name,
+            email: response.data.email,
+            phone: response.data.phone || '',
+            avatar: response.data.avatar || profile.basic.avatar,
+          },
+        };
+        setProfile(updatedProfile);
+        setSavedProfile(updatedProfile);
+      }
+    } catch (error) {
+      console.error('Failed to fetch profile:', error);
+    } finally {
+      setLoadingProfile(false);
+    }
+  }
+
+  async function fetchDashboardMetrics() {
+    try {
+      const response = await adminApi.getDashboardStats();
+      if (response.success && response.data) {
+        const stats = response.data;
+        setMetrics([
+          {
+            label: 'Đơn cần theo dõi',
+            value: String(stats.pendingOrders || 0),
+            detail: `${stats.totalOrders || 0} tổng đơn hàng`,
+          },
+          {
+            label: 'Sản phẩm đang bán',
+            value: String(stats.activeProducts || 0),
+            detail: `${stats.totalProducts || 0} sản phẩm trong hệ thống`,
+          },
+          {
+            label: 'Doanh thu hôm nay',
+            value: new Intl.NumberFormat('vi-VN').format(stats.todayRevenue || 0),
+            detail: 'VND',
+          },
+          {
+            label: 'Khách hàng',
+            value: String(stats.totalCustomers || 0),
+            detail: 'Tổng số khách hàng',
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard metrics:', error);
+    }
+  }
 
   const refreshDerivedState = () => {
-    setMetrics(buildProfileMetrics());
     setSecurityActivities(readSecurityActivities().slice(0, 6));
     const latestSettings = readAdminSettings();
     setSecurityOptions({
@@ -131,21 +154,10 @@ export default function AdminProfile() {
     });
   };
 
-  const persistProfile = (nextProfile: AdminProfileRecord, successText: string) => {
-    const saved = saveAdminProfile(nextProfile);
-    syncAdminProfileToSession(saved);
-    setSavedProfile(saved);
-    setProfile(saved);
-    refreshUser();
-    refreshDerivedState();
-    showMessage('success', successText);
-  };
-
   const handleCancelEdit = (section: EditableSection) => {
     if (!section) {
       return;
     }
-
     setProfile((currentProfile) => ({
       ...currentProfile,
       [section]: savedProfile[section],
@@ -153,48 +165,89 @@ export default function AdminProfile() {
     setEditingSection(null);
   };
 
-  const handleSaveBasic = (event: React.FormEvent) => {
+  const handleSaveBasic = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!/\S+@\S+\.\S+/.test(profile.basic.email)) {
-      showMessage('error', 'Email admin không hợp lệ.');
+      toast.error('Email admin không hợp lệ.');
       return;
     }
 
-    persistProfile(profile, 'Đã lưu thông tin ca nhan admin.');
-    setEditingSection(null);
+    try {
+      setSavingProfile(true);
+      const response = await accountApi.updateProfile({
+        name: profile.basic.fullName,
+        phone: profile.basic.phone,
+        avatar: profile.basic.avatar,
+      });
+
+      if (response.success && response.data) {
+        // Save local extended profile (display name, gender, birthday)
+        const saved = saveAdminProfile(profile);
+        syncAdminProfileToSession(saved);
+        setSavedProfile(saved);
+        setProfile(saved);
+        refreshUser();
+        toast.success('Đã lưu thông tin cá nhân admin.');
+        setEditingSection(null);
+      } else {
+        toast.error(response.error || 'Không thể lưu thông tin.');
+      }
+    } catch (error) {
+      console.error('Failed to save profile:', error);
+      toast.error('Không thể lưu thông tin.');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleSaveWork = (event: React.FormEvent) => {
     event.preventDefault();
-    persistProfile(profile, 'Đã lưu thông tin cong viec admin.');
+    // Work info still uses local config (position, department, joinedAt)
+    const saved = saveAdminProfile(profile);
+    syncAdminProfileToSession(saved);
+    setSavedProfile(saved);
+    setProfile(saved);
+    toast.success('Đã lưu thông tin công việc admin.');
     setEditingSection(null);
   };
 
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      showMessage('error', 'Vui lòng chọn file anh hợp lệ.');
+      toast.error('Vui lòng chọn file ảnh hợp lệ.');
       return;
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const avatar = typeof reader.result === 'string' ? reader.result : '';
-      const nextProfile = {
-        ...profile,
-        basic: {
-          ...profile.basic,
-          avatar,
-        },
-      };
 
-      persistProfile(nextProfile, 'Đã cập nhật avatar admin.');
+      try {
+        const response = await accountApi.updateProfile({ avatar });
+        if (response.success) {
+          const nextProfile = {
+            ...profile,
+            basic: {
+              ...profile.basic,
+              avatar,
+            },
+          };
+          const saved = saveAdminProfile(nextProfile);
+          syncAdminProfileToSession(saved);
+          setSavedProfile(saved);
+          setProfile(saved);
+          refreshUser();
+          toast.success('Đã cập nhật avatar admin.');
+        } else {
+          toast.error(response.error || 'Không thể cập nhật avatar.');
+        }
+      } catch (error) {
+        console.error('Failed to upload avatar:', error);
+        toast.error('Không thể cập nhật avatar.');
+      }
     };
     reader.readAsDataURL(file);
     event.target.value = '';
@@ -208,61 +261,60 @@ export default function AdminProfile() {
       loginNotification: securityOptions.loginNotification,
     });
     refreshDerivedState();
-    showMessage('success', 'Da động bo tùy chọn bảo mật voi Admin Settings.');
+    toast.success('Đã đồng bộ tùy chọn bảo mật với Admin Settings.');
   };
 
-  const handlePasswordSubmit = (event: React.FormEvent) => {
+  const handlePasswordSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const adminCredentials = JSON.parse(localStorage.getItem('adminCredentials') || '{}');
-
-    if (passwordForm.currentPassword !== adminCredentials.password) {
-      showMessage('error', 'Mật khẩu hien tai không dung.');
-      return;
-    }
 
     if (passwordForm.nextPassword.length < 6) {
-      showMessage('error', 'Mật khẩu mới cần ít nhất 6 ky tu.');
+      toast.error('Mật khẩu mới cần ít nhất 6 ký tự.');
       return;
     }
 
     if (passwordForm.nextPassword !== passwordForm.confirmPassword) {
-      showMessage('error', 'Mật khẩu xac nhan không khop.');
+      toast.error('Mật khẩu xác nhận không khớp.');
       return;
     }
 
-    localStorage.setItem(
-      'adminCredentials',
-      JSON.stringify({
-        ...adminCredentials,
-        password: passwordForm.nextPassword,
-        email: profile.basic.email,
-      }),
-    );
+    try {
+      setSavingPassword(true);
+      const response = await accountApi.changePassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.nextPassword,
+      });
 
-    pushSecurityActivity({
-      type: 'password-change',
-      title: 'Mật khẩu admin da được thay đổi',
-      detail: 'Cập nhật tu trang Hồ sơ Admin.',
-    });
+      if (response.success) {
+        pushSecurityActivity({
+          type: 'password-change',
+          title: 'Mật khẩu admin đã được thay đổi',
+          detail: 'Cập nhật từ trang Hồ sơ Admin.',
+        });
 
-    setPasswordForm({
-      currentPassword: '',
-      nextPassword: '',
-      confirmPassword: '',
-    });
-    refreshDerivedState();
-    showMessage('success', 'Da doi mật khẩu admin thành công.');
+        setPasswordForm({
+          currentPassword: '',
+          nextPassword: '',
+          confirmPassword: '',
+        });
+        refreshDerivedState();
+        toast.success('Đã đổi mật khẩu admin thành công.');
+      } else {
+        toast.error(response.error || 'Mật khẩu hiện tại không đúng.');
+      }
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      toast.error('Không thể đổi mật khẩu.');
+    } finally {
+      setSavingPassword(false);
+    }
   };
+
+  if (loadingProfile) {
+    return <LoadingSpinner />;
+  }
 
   return (
     <div className="admin-profile-page">
-      {message && (
-        <div className={`alert alert-${message.type === 'error' ? 'danger' : 'success'}`}>
-          <AdminIcon name={message.type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle'} />
-          <span>{message.text}</span>
-        </div>
-      )}
-
       <section className="admin-profile-hero">
         <div className="admin-profile-cover"></div>
         <div className="admin-profile-hero-content">
@@ -295,13 +347,13 @@ export default function AdminProfile() {
               <AdminIcon name="fa fa-envelope" /> {profile.basic.email}
             </p>
             <p className="admin-profile-meta">
-              <AdminIcon name="fa fa-calendar-alt" /> Tham gia tu {formatDate(profile.work.joinedAt)}
+              <AdminIcon name="fa fa-calendar-alt" /> Tham gia từ {formatDate(profile.work.joinedAt)}
             </p>
           </div>
 
           <div className="admin-profile-hero-actions">
             <Link to="/admin/settings" className="btn btn-outline btn-sm">
-              <AdminIcon name="fa fa-cog" /> Động bo voi Settings
+              <AdminIcon name="fa fa-cog" /> Đồng bộ với Settings
             </Link>
           </div>
         </div>
@@ -339,18 +391,18 @@ export default function AdminProfile() {
           <section className="admin-profile-card">
             <div className="admin-profile-card-header">
               <div>
-                <h3><AdminIcon name="fa fa-id-card" /> Thông tin ca nhan</h3>
-                <p>Dữ liệu này được sync sang thanh admin và session đăng nhập hien tai.</p>
+                <h3><AdminIcon name="fa fa-id-card" /> Thông tin cá nhân</h3>
+                <p>Dữ liệu này được sync với backend và session đăng nhập hiện tại.</p>
               </div>
               <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSection('basic')}>
-                <AdminIcon name="fa fa-edit" /> Chinh sửa
+                <AdminIcon name="fa fa-edit" /> Chỉnh sửa
               </button>
             </div>
 
             <form onSubmit={handleSaveBasic}>
               <div className="admin-profile-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Ho và ten</label>
+                  <label className="form-label">Họ và tên</label>
                   <input
                     className="form-control"
                     value={profile.basic.fullName}
@@ -364,7 +416,7 @@ export default function AdminProfile() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Ten hiển thị</label>
+                  <label className="form-label">Tên hiển thị</label>
                   <input
                     className="form-control"
                     value={profile.basic.displayName}
@@ -386,13 +438,7 @@ export default function AdminProfile() {
                     className="form-control"
                     type="email"
                     value={profile.basic.email}
-                    onChange={(event) =>
-                      setProfile((currentProfile) => ({
-                        ...currentProfile,
-                        basic: { ...currentProfile.basic, email: event.target.value },
-                      }))
-                    }
-                    disabled={editingSection !== 'basic'}
+                    disabled
                   />
                 </div>
                 <div className="form-group">
@@ -413,7 +459,7 @@ export default function AdminProfile() {
 
               <div className="admin-profile-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Ngay sinh</label>
+                  <label className="form-label">Ngày sinh</label>
                   <input
                     className="form-control"
                     type="date"
@@ -444,7 +490,7 @@ export default function AdminProfile() {
                     disabled={editingSection !== 'basic'}
                   >
                     <option value="male">Nam</option>
-                    <option value="female">Nu</option>
+                    <option value="female">Nữ</option>
                     <option value="other">Khác</option>
                   </select>
                 </div>
@@ -453,10 +499,10 @@ export default function AdminProfile() {
               {editingSection === 'basic' && (
                 <div className="admin-profile-actions">
                   <button type="button" className="btn btn-outline btn-sm" onClick={() => handleCancelEdit('basic')}>
-                    Huy
+                    Hủy
                   </button>
-                  <button type="submit" className="btn btn-primary btn-sm">
-                    <AdminIcon name="fa fa-save" /> Lưu thông tin
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={savingProfile}>
+                    <AdminIcon name="fa fa-save" /> {savingProfile ? 'Đang lưu...' : 'Lưu thông tin'}
                   </button>
                 </div>
               )}
@@ -466,18 +512,18 @@ export default function AdminProfile() {
           <section className="admin-profile-card">
             <div className="admin-profile-card-header">
               <div>
-                <h3><AdminIcon name="fa fa-briefcase" /> Thông tin cong viec</h3>
-                <p>Hiển thị xuyen suot trong sidebar, dropdown admin và cac log van hanh.</p>
+                <h3><AdminIcon name="fa fa-briefcase" /> Thông tin công việc</h3>
+                <p>Hiển thị xuyên suốt trong sidebar, dropdown admin và các log vận hành.</p>
               </div>
               <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditingSection('work')}>
-                <AdminIcon name="fa fa-edit" /> Chinh sửa
+                <AdminIcon name="fa fa-edit" /> Chỉnh sửa
               </button>
             </div>
 
             <form onSubmit={handleSaveWork}>
               <div className="admin-profile-form-grid">
                 <div className="form-group">
-                  <label className="form-label">Vi tri</label>
+                  <label className="form-label">Vị trí</label>
                   <input
                     className="form-control"
                     value={profile.work.position}
@@ -491,7 +537,7 @@ export default function AdminProfile() {
                   />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Phong ban</label>
+                  <label className="form-label">Phòng ban</label>
                   <input
                     className="form-control"
                     value={profile.work.department}
@@ -507,7 +553,7 @@ export default function AdminProfile() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Mô tả cong viec</label>
+                <label className="form-label">Mô tả công việc</label>
                 <textarea
                   className="form-control"
                   rows={4}
@@ -523,7 +569,7 @@ export default function AdminProfile() {
               </div>
 
               <div className="form-group">
-                <label className="form-label">Ngay tham gia</label>
+                <label className="form-label">Ngày tham gia</label>
                 <input
                   className="form-control"
                   type="date"
@@ -541,10 +587,10 @@ export default function AdminProfile() {
               {editingSection === 'work' && (
                 <div className="admin-profile-actions">
                   <button type="button" className="btn btn-outline btn-sm" onClick={() => handleCancelEdit('work')}>
-                    Huy
+                    Hủy
                   </button>
                   <button type="submit" className="btn btn-primary btn-sm">
-                    <AdminIcon name="fa fa-save" /> Lưu cong viec
+                    <AdminIcon name="fa fa-save" /> Lưu công việc
                   </button>
                 </div>
               )}
@@ -555,7 +601,7 @@ export default function AdminProfile() {
             <div className="admin-profile-card-header">
               <div>
                 <h3><AdminIcon name="fa fa-wave-square" /> Hoạt động gần đây</h3>
-                <p>Lấy từ audit log và dữ liệu van hanh that trong hệ thống.</p>
+                <p>Lấy từ audit log nội bộ.</p>
               </div>
             </div>
 
@@ -576,7 +622,7 @@ export default function AdminProfile() {
               ) : (
                 <div className="admin-profile-empty-state">
                   <AdminIcon name="fa fa-inbox" />
-                  <p>Chưa có hoạt động admin nào được ghi nhan.</p>
+                  <p>Chưa có hoạt động admin nào được ghi nhận.</p>
                 </div>
               )}
             </div>
@@ -589,14 +635,14 @@ export default function AdminProfile() {
           <section className="admin-profile-card">
             <div className="admin-profile-card-header">
               <div>
-                <h3><AdminIcon name="fa fa-key" /> Doi mật khẩu</h3>
-                <p>Cập nhật truc tiep vào adminCredentials và ghi audit log.</p>
+                <h3><AdminIcon name="fa fa-key" /> Đổi mật khẩu</h3>
+                <p>Cập nhật mật khẩu trực tiếp với backend qua API.</p>
               </div>
             </div>
 
             <form onSubmit={handlePasswordSubmit}>
               <div className="form-group">
-                <label className="form-label">Mật khẩu hien tai</label>
+                <label className="form-label">Mật khẩu hiện tại</label>
                 <input
                   className="form-control"
                   type="password"
@@ -614,7 +660,7 @@ export default function AdminProfile() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label">Xac nhan mật khẩu mới</label>
+                <label className="form-label">Xác nhận mật khẩu mới</label>
                 <input
                   className="form-control"
                   type="password"
@@ -623,8 +669,8 @@ export default function AdminProfile() {
                 />
               </div>
               <div className="admin-profile-actions">
-                <button type="submit" className="btn btn-primary btn-sm">
-                  <AdminIcon name="fa fa-lock" /> Doi mật khẩu
+                <button type="submit" className="btn btn-primary btn-sm" disabled={savingPassword}>
+                  <AdminIcon name="fa fa-lock" /> {savingPassword ? 'Đang đổi...' : 'Đổi mật khẩu'}
                 </button>
               </div>
             </form>
@@ -634,15 +680,15 @@ export default function AdminProfile() {
             <div className="admin-profile-card-header">
               <div>
                 <h3><AdminIcon name="fa fa-shield-alt" /> Tùy chọn bảo mật</h3>
-                <p>Động bo truc tiep voi Admin Settings de dung cung một policy.</p>
+                <p>Đồng bộ trực tiếp với Admin Settings để dùng cùng một policy.</p>
               </div>
             </div>
 
             <div className="admin-profile-toggle-list">
               <label className="admin-profile-toggle-row">
                 <div>
-                  <strong>Chinh sach 2FA</strong>
-                  <span>Danh dau policy cho tai khoan admin o cac man quản trị.</span>
+                  <strong>Chính sách 2FA</strong>
+                  <span>Đánh dấu policy cho tài khoản admin ở các màn quản trị.</span>
                 </div>
                 <input
                   type="checkbox"
@@ -659,7 +705,7 @@ export default function AdminProfile() {
               <label className="admin-profile-toggle-row">
                 <div>
                   <strong>Audit login</strong>
-                  <span>Tu động ghi lại mới lan admin đăng nhập thành công.</span>
+                  <span>Tự động ghi lại mỗi lần admin đăng nhập thành công.</span>
                 </div>
                 <input
                   type="checkbox"
@@ -679,7 +725,7 @@ export default function AdminProfile() {
                 <AdminIcon name="fa fa-save" /> Lưu tùy chọn
               </button>
               <Link to="/admin/settings" className="btn btn-outline btn-sm">
-                <AdminIcon name="fa fa-cog" /> Mo Settings
+                <AdminIcon name="fa fa-cog" /> Mở Settings
               </Link>
             </div>
           </section>
@@ -688,7 +734,7 @@ export default function AdminProfile() {
             <div className="admin-profile-card-header">
               <div>
                 <h3><AdminIcon name="fa fa-history" /> Audit timeline</h3>
-                <p>Thông tin này được dung chung voi trang Admin Settings.</p>
+                <p>Thông tin này được dùng chung với trang Admin Settings.</p>
               </div>
             </div>
 

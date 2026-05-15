@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { productApi } from '../services/api';
+import { trackSearch } from '../utils/viewedTracker';
 import type { Product } from '../types';
 import ProductCard from '../components/product/ProductCard';
 
@@ -37,11 +38,15 @@ export default function Search() {
 
       if (result.success && result.data) {
         setResults(result.data.products);
+        // Track lịch sử tìm kiếm để dùng cho gợi ý cá nhân hóa
+        if (result.data.products.length > 0) {
+          trackSearch(trimmed);
+        }
       } else {
         setResults([]);
       }
       setLoading(false);
-    }, 300);
+    }, 600);
 
     return () => {
       cancelled = true;

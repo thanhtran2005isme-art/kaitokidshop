@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import type { Product } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import { useCart } from '../../context/CartContext';
+import ProductVariantModal from './ProductVariantModal';
 
 interface ProductCardProps {
   product: Product;
@@ -28,6 +29,7 @@ function toggleWishlistInStorage(id: number): boolean {
 
 export default function ProductCard({ product, onToggleWishlist, isWishlisted }: ProductCardProps) {
   const [wishlisted, setWishlisted] = useState(() => isWishlisted ?? getWishlist().includes(product.id));
+  const [variantModalOpen, setVariantModalOpen] = useState(false);
   const { addItem } = useCart();
 
   const handleWishlist = useCallback(() => {
@@ -39,8 +41,13 @@ export default function ProductCard({ product, onToggleWishlist, isWishlisted }:
     }
   }, [onToggleWishlist, product.id]);
 
+  // Mở modal chọn biến thể (size + màu + số lượng)
   const handleAddToCart = () => {
-    addItem(product, product.sizes?.[0] || 'M', product.colors?.[0] || '', 1);
+    setVariantModalOpen(true);
+  };
+
+  const handleConfirmAddCart = async (size: string, color: string, quantity: number) => {
+    await addItem(product, size, color, quantity);
   };
 
   return (
@@ -90,6 +97,13 @@ export default function ProductCard({ product, onToggleWishlist, isWishlisted }:
           <PiShoppingBagOpenFill aria-hidden="true" />
         </button>
       </div>
+
+      <ProductVariantModal
+        product={product}
+        open={variantModalOpen}
+        onClose={() => setVariantModalOpen(false)}
+        onConfirm={handleConfirmAddCart}
+      />
     </div>
   );
 }

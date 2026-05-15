@@ -28,3 +28,4 @@ export { addressApi, type AddressDTO, type CreateAddressPayload } from './addres
 export { adminProductsApi } from './adminProductsApi';
 export { customerApi } from './customerApi';
 export { wishlistApi, type WishlistItemDTO } from './wishlistApi';
+export { locationApi, type Province, type District, type Ward } from './locationApi';

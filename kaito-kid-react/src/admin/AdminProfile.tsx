@@ -125,12 +125,12 @@ export default function AdminProfile() {
           },
           {
             label: 'Sản phẩm đang bán',
-            value: String(stats.activeProducts || 0),
-            detail: `${stats.totalProducts || 0} sản phẩm trong hệ thống`,
+            value: String(stats.totalProducts || 0),
+            detail: `${stats.lowStockProducts || 0} SP sắp hết hàng`,
           },
           {
-            label: 'Doanh thu hôm nay',
-            value: new Intl.NumberFormat('vi-VN').format(stats.todayRevenue || 0),
+            label: 'Doanh thu',
+            value: new Intl.NumberFormat('vi-VN').format(stats.totalRevenue || 0),
             detail: 'VND',
           },
           {

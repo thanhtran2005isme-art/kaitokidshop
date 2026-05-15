@@ -1,7 +1,9 @@
+// Trang Tồn kho - chỉ là dashboard theo dõi sau khi có Phiếu nhập + NCC riêng
+// Không nhập/xuất trực tiếp ở đây nữa - phải qua phiếu nhập (ChiTietPhieuNhap) hoặc đơn hàng
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AdminIcon from '../components/admin/AdminIcon';
-import { inventoryApi } from '../services/api';
+import { inventoryApi, variantStockApi, type ProductVariantSummary } from '../services/api';
 import {
   INVENTORY_UPDATED_EVENT,
   inventoryService,
@@ -9,24 +11,16 @@ import {
 } from '../services/inventoryService';
 import type { Product } from '../types';
 
-interface ToastState {
-  type: 'success' | 'error';
-  message: string;
-}
-
 type StockLevel = 'out' | 'low' | 'watch' | 'stable';
-type StockFilter = 'all' | StockLevel | 'direct' | 'variant';
+type StockFilter = 'all' | StockLevel;
 
 function formatDateTime(value?: string): string {
   if (!value) return 'Chưa cập nhật';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Chưa cập nhật';
   return new Intl.DateTimeFormat('vi-VN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
   }).format(date);
 }
 
@@ -39,16 +33,11 @@ function getStockLevel(stock: number, settings: InventoryAlertSettings): StockLe
 
 function getStockBadge(stock: number, settings: InventoryAlertSettings): { label: string; className: StockLevel } {
   const level = getStockLevel(stock, settings);
-
   switch (level) {
-    case 'out':
-      return { label: 'Hết hàng', className: level };
-    case 'low':
-      return { label: 'Sắp hết', className: level };
-    case 'watch':
-      return { label: 'Cần theo dõi', className: level };
-    default:
-      return { label: 'Ổn định', className: level };
+    case 'out': return { label: 'Hết hàng', className: level };
+    case 'low': return { label: 'Sắp hết', className: level };
+    case 'watch': return { label: 'Cần theo dõi', className: level };
+    default: return { label: 'Ổn định', className: level };
   }
 }
 
@@ -62,382 +51,80 @@ export default function AdminInventory() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [stockFilter, setStockFilter] = useState<StockFilter>('all');
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [showRestockModal, setShowRestockModal] = useState(false);
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [showBulkModal, setShowBulkModal] = useState(false);
-  const [activeProduct, setActiveProduct] = useState<Product | null>(null);
-  const [restockQuantity, setRestockQuantity] = useState(10);
-  const [restockNote, setRestockNote] = useState('');
-  const [exportQuantity, setExportQuantity] = useState(1);
-  const [exportNote, setExportNote] = useState('');
-  const [bulkQuantity, setBulkQuantity] = useState(10);
-  const [bulkNote, setBulkNote] = useState('');
   const [alertSettings, setAlertSettings] = useState<InventoryAlertSettings>(
     inventoryService.getAlertSettings(),
   );
-  const [toast, setToast] = useState<ToastState | null>(null);
+
+  // Modal xem biến thể
+  const [showVariantsFor, setShowVariantsFor] = useState<Product | null>(null);
+  const [variantsData, setVariantsData] = useState<ProductVariantSummary | null>(null);
+  const [loadingVariants, setLoadingVariants] = useState(false);
 
   const loadInventory = async () => {
     setLoading(true);
     setAlertSettings(inventoryService.getAlertSettings());
-
     const result = await inventoryApi.getAll();
-    if (result.success && result.data) {
-      setProducts(result.data);
-    } else {
-      setToast({
-        type: 'error',
-        message: result.error || 'Không thể tải danh sách tồn kho từ backend.',
-      });
-    }
+    if (result.success && result.data) setProducts(result.data);
     setLoading(false);
   };
 
   useEffect(() => {
     void loadInventory();
-
-    const handleInventoryUpdated = () => void loadInventory();
-    window.addEventListener(INVENTORY_UPDATED_EVENT, handleInventoryUpdated);
-
-    return () => {
-      window.removeEventListener(INVENTORY_UPDATED_EVENT, handleInventoryUpdated);
-    };
+    const handler = () => void loadInventory();
+    window.addEventListener(INVENTORY_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(INVENTORY_UPDATED_EVENT, handler);
   }, []);
-
-  useEffect(() => {
-    if (!toast) return undefined;
-
-    const timeoutId = window.setTimeout(() => setToast(null), 3200);
-    return () => window.clearTimeout(timeoutId);
-  }, [toast]);
-
-  const inventoryProfiles = useMemo(
-    () =>
-      new Map(
-        products.map((product) => [product.id, inventoryService.getStockControlProfile(product)]),
-      ),
-    [products],
-  );
-
-  useEffect(() => {
-    setSelectedIds((current) => {
-      const next = current.filter((id) => inventoryProfiles.get(id)?.canManageDirectly);
-      return next.length === current.length ? current : next;
-    });
-  }, [inventoryProfiles]);
 
   const filteredProducts = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-
     return products.filter((product) => {
-      const profile = inventoryProfiles.get(product.id);
-      if (!profile) return false;
+      const fields = [
+        product.name, product.sku, product.category,
+        product.gender, product.subcategory,
+      ].filter((f): f is string => typeof f === 'string' && f.length > 0);
 
-      const searchableFields = [
-        product.name,
-        product.sku,
-        product.category,
-        product.gender,
-        product.subcategory,
-      ].filter((field): field is string => typeof field === 'string' && field.length > 0);
-
-      const matchesKeyword =
-        !keyword ||
-        searchableFields.some((field) => field.toLowerCase().includes(keyword));
-
-      const matchesFilter =
-        stockFilter === 'all'
-          ? true
-          : stockFilter === 'direct'
-            ? profile.canManageDirectly
-            : stockFilter === 'variant'
-              ? !profile.canManageDirectly
-              : getStockLevel(product.stock, alertSettings) === stockFilter;
+      const matchesKeyword = !keyword || fields.some((f) => f.toLowerCase().includes(keyword));
+      const matchesFilter = stockFilter === 'all'
+        ? true
+        : getStockLevel(product.stock, alertSettings) === stockFilter;
 
       return matchesKeyword && matchesFilter;
     });
-  }, [alertSettings, inventoryProfiles, products, search, stockFilter]);
+  }, [alertSettings, products, search, stockFilter]);
 
-  const stockSummary = useMemo(() => {
-    const totalStock = products.reduce((sum, product) => sum + (product.stock || 0), 0);
-    const outOfStock = products.filter((product) => getStockLevel(product.stock, alertSettings) === 'out').length;
-    const lowStock = products.filter((product) => getStockLevel(product.stock, alertSettings) === 'low').length;
-    const watchList = products.filter((product) => getStockLevel(product.stock, alertSettings) === 'watch').length;
-    const directCount = products.filter((product) => inventoryProfiles.get(product.id)?.canManageDirectly).length;
-    const variantCount = products.filter((product) => inventoryProfiles.get(product.id)?.mode === 'variant').length;
+  const summary = useMemo(() => {
+    const totalStock = products.reduce((s, p) => s + (p.stock || 0), 0);
+    const outOfStock = products.filter((p) => getStockLevel(p.stock, alertSettings) === 'out').length;
+    const lowStock = products.filter((p) => getStockLevel(p.stock, alertSettings) === 'low').length;
+    const watchList = products.filter((p) => getStockLevel(p.stock, alertSettings) === 'watch').length;
+    const totalProducts = products.length;
+    return { totalProducts, totalStock, outOfStock, lowStock, watchList };
+  }, [alertSettings, products]);
 
-    return {
-      totalStock,
-      outOfStock,
-      lowStock,
-      watchList,
-      directCount,
-      restrictedCount: variantCount,
-    };
-  }, [alertSettings, inventoryProfiles, products]);
-
-  const selectedProducts = useMemo(
-    () => products.filter((product) => selectedIds.includes(product.id)),
-    [products, selectedIds],
-  );
-
-  const visibleSelectableProducts = useMemo(
-    () => filteredProducts.filter((product) => inventoryProfiles.get(product.id)?.canManageDirectly),
-    [filteredProducts, inventoryProfiles],
-  );
-
-  const selectedCount = selectedIds.length;
-  const visibleRestrictedCount = filteredProducts.length - visibleSelectableProducts.length;
-  const allVisibleSelected =
-    visibleSelectableProducts.length > 0 &&
-    visibleSelectableProducts.every((product) => selectedIds.includes(product.id));
-
-  const activeProductProfile = useMemo(() => {
-    if (!activeProduct) return null;
-    return inventoryProfiles.get(activeProduct.id) || inventoryService.getStockControlProfile(activeProduct);
-  }, [activeProduct, inventoryProfiles]);
-
-  const toggleSelectAllVisible = () => {
-    if (allVisibleSelected) {
-      const visibleIds = new Set(visibleSelectableProducts.map((product) => product.id));
-      setSelectedIds((current) => current.filter((id) => !visibleIds.has(id)));
-      return;
-    }
-
-    setSelectedIds((current) =>
-      Array.from(new Set([...current, ...visibleSelectableProducts.map((product) => product.id)])),
-    );
+  const openVariantsModal = async (product: Product) => {
+    setShowVariantsFor(product);
+    setVariantsData(null);
+    setLoadingVariants(true);
+    const r = await variantStockApi.getByProduct(product.id);
+    if (r.success && r.data) setVariantsData(r.data);
+    setLoadingVariants(false);
   };
 
-  const toggleSelection = (productId: number) => {
-    const product = products.find((entry) => entry.id === productId);
-    const profile = product ? inventoryProfiles.get(product.id) : null;
-
-    if (!profile?.canManageDirectly) {
-      setToast({
-        type: 'error',
-        message: profile?.note || 'Sản phẩm này cần quản lý tồn kho theo màu / size, không thể chọn nhập trực tiếp.',
-      });
-      return;
-    }
-
-    setSelectedIds((current) =>
-      current.includes(productId)
-        ? current.filter((id) => id !== productId)
-        : [...current, productId],
-    );
-  };
-
-  const openRestockModal = (product: Product) => {
-    const profile = inventoryProfiles.get(product.id) || inventoryService.getStockControlProfile(product);
-
-    if (!profile.canManageDirectly) {
-      setToast({
-        type: 'error',
-        message: profile.note,
-      });
-      return;
-    }
-
-    setActiveProduct(product);
-    setRestockQuantity(Math.max(alertSettings.watchThreshold - product.stock, 1));
-    setRestockNote(`Phiếu nhập bổ sung cho ${product.name}`);
-    setShowRestockModal(true);
-  };
-
-  const closeRestockModal = () => {
-    setActiveProduct(null);
-    setRestockQuantity(10);
-    setRestockNote('');
-    setShowRestockModal(false);
-  };
-
-  const openExportModal = (product: Product) => {
-    const profile = inventoryProfiles.get(product.id) || inventoryService.getStockControlProfile(product);
-
-    if (!profile.canManageDirectly) {
-      setToast({ type: 'error', message: profile.note });
-      return;
-    }
-
-    setActiveProduct(product);
-    setExportQuantity(1);
-    setExportNote(`Phiếu xuất cho ${product.name}`);
-    setShowExportModal(true);
-  };
-
-  const closeExportModal = () => {
-    setActiveProduct(null);
-    setExportQuantity(1);
-    setExportNote('');
-    setShowExportModal(false);
-  };
-
-  const handleExportSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!activeProduct || !activeProductProfile?.canManageDirectly) {
-      setToast({
-        type: 'error',
-        message: activeProductProfile?.note || 'Sản phẩm này không thể xuất trực tiếp trên trang tồn kho.',
-      });
-      return;
-    }
-
-    if (exportQuantity <= 0) {
-      setToast({ type: 'error', message: 'Số lượng xuất phải lớn hơn 0.' });
-      return;
-    }
-
-    if (exportQuantity > activeProduct.stock) {
-      setToast({
-        type: 'error',
-        message: `Không đủ tồn kho. Hiện có ${activeProduct.stock}, yêu cầu xuất ${exportQuantity}.`,
-      });
-      return;
-    }
-
-    const result = await inventoryApi.adjust({
-      sanPhamId: activeProduct.id,
-      soLuong: exportQuantity,
-      loaiThayDoi: 'export',
-      ghiChu: exportNote.trim() || `Phiếu xuất cho ${activeProduct.name}`,
-    });
-
-    if (!result.success || !result.data) {
-      setToast({ type: 'error', message: result.error || 'Không thể xuất kho. Kiểm tra lại số lượng tồn.' });
-      return;
-    }
-
-    setToast({
-      type: 'success',
-      message: `Đã ghi nhận xuất ${exportQuantity} sản phẩm cho ${activeProduct.name}.`,
-    });
-    closeExportModal();
-    await loadInventory();
-  };
-
-  const handleRestockSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!activeProduct || !activeProductProfile?.canManageDirectly) {
-      setToast({
-        type: 'error',
-        message: activeProductProfile?.note || 'Sản phẩm này không thể nhập trực tiếp trên trang tồn kho.',
-      });
-      return;
-    }
-
-    if (restockQuantity <= 0) {
-      setToast({
-        type: 'error',
-        message: 'Số lượng nhập phải lớn hơn 0.',
-      });
-      return;
-    }
-
-    const result = await inventoryApi.adjust({
-      sanPhamId: activeProduct.id,
-      soLuong: restockQuantity,
-      loaiThayDoi: 'import',
-      ghiChu: restockNote.trim() || `Phiếu nhập bổ sung cho ${activeProduct.name}`,
-    });
-
-    if (!result.success || !result.data) {
-      setToast({
-        type: 'error',
-        message: result.error || activeProductProfile.note,
-      });
-      return;
-    }
-
-    setToast({
-      type: 'success',
-      message: `Đã ghi nhận nhập ${restockQuantity} sản phẩm cho ${activeProduct.name}.`,
-    });
-    closeRestockModal();
-    await loadInventory();
-  };
-
-  const openBulkModal = () => {
-    if (selectedCount === 0) {
-      setToast({
-        type: 'error',
-        message: 'Hãy chọn ít nhất một sản phẩm đủ điều kiện nhập trực tiếp.',
-      });
-      return;
-    }
-
-    setBulkQuantity(10);
-    setBulkNote(`Phiếu nhập nhanh cho ${selectedCount} sản phẩm`);
-    setShowBulkModal(true);
-  };
-
-  const closeBulkModal = () => {
-    setBulkQuantity(10);
-    setBulkNote('');
-    setShowBulkModal(false);
-  };
-
-  const handleBulkSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (selectedCount === 0) {
-      setToast({
-        type: 'error',
-        message: 'Hãy chọn ít nhất một sản phẩm đủ điều kiện nhập trực tiếp.',
-      });
-      return;
-    }
-
-    if (bulkQuantity <= 0) {
-      setToast({
-        type: 'error',
-        message: 'Số lượng nhập phải lớn hơn 0.',
-      });
-      return;
-    }
-
-    const note = bulkNote.trim() || `Phiếu nhập nhanh cho ${selectedCount} sản phẩm`;
-    const results = await Promise.all(
-      selectedProducts.map((product) =>
-        inventoryApi.adjust({
-          sanPhamId: product.id,
-          soLuong: bulkQuantity,
-          loaiThayDoi: 'import',
-          ghiChu: note,
-        }),
-      ),
-    );
-    const successfulResults = results.filter((result) => result.success);
-
-    if (successfulResults.length === 0) {
-      setToast({
-        type: 'error',
-        message: results.find((result) => result.error)?.error || 'Không có sản phẩm nào được cập nhật. Hãy kiểm tra lại mô hình tồn kho của sản phẩm.',
-      });
-      return;
-    }
-
-    setToast({
-      type: 'success',
-      message: `Đã ghi nhận phiếu nhập cho ${successfulResults.length} sản phẩm đủ điều kiện.`,
-    });
-    setSelectedIds([]);
-    closeBulkModal();
-    await loadInventory();
+  const closeVariantsModal = () => {
+    setShowVariantsFor(null);
+    setVariantsData(null);
   };
 
   return (
     <div className="inventory-shell inventory-ops-page">
+      {/* HERO */}
       <section className="inventory-ops-hero">
         <div className="inventory-ops-hero-copy">
-          <span className="inventory-ops-overline">Inventory policy</span>
-          <h1>Quản lý tồn kho</h1>
+          <span className="inventory-ops-overline">Inventory tracking</span>
+          <h1>Theo dõi tồn kho</h1>
           <p>
-            Trang này ghi nhận phiếu nhập và phiếu xuất cho tất cả sản phẩm. Tồn kho được quản lý theo tổng.
-            Mọi thao tác đều được ghi lịch sử đầy đủ.
+            Xem nhanh tình trạng tồn kho của tất cả sản phẩm. Để nhập hàng → tạo <strong>Phiếu nhập</strong>.
+            Để điều chỉnh khi kiểm kê → mở chi tiết biến thể.
           </p>
         </div>
 
@@ -447,69 +134,74 @@ export default function AdminInventory() {
             <span>Lịch sử nhập / xuất</span>
           </Link>
           <Link to="/admin/inventory/alerts" className="inventory-ops-link is-outline">
-            <AdminIcon name="fa-exclamation-triangle" />
-            <span>Cảnh báo tồn kho</span>
+            <AdminIcon name="fa-triangle-exclamation" />
+            <span>Cảnh báo hết hàng</span>
+          </Link>
+          <Link to="/admin/suppliers" className="inventory-ops-link is-outline">
+            <AdminIcon name="fa-truck" />
+            <span>Nhà cung cấp</span>
+          </Link>
+          <Link to="/admin/stock-receipts/new" className="inventory-ops-link is-primary">
+            <AdminIcon name="fa-plus" />
+            <span>Tạo phiếu nhập</span>
           </Link>
         </div>
-
-        <div className="inventory-ops-threshold-card">
-          <span className="inventory-ops-overline">Ngưỡng cảnh báo</span>
-          <strong>Sắp hết ≤ {alertSettings.criticalThreshold} • Cần theo dõi ≤ {alertSettings.watchThreshold}</strong>
-          <p>
-            Sản phẩm nhiều biến thể vẫn nhập/xuất theo tồn tổng. Cảnh báo dựa trên tồn tổng để phát hiện rủi ro nhanh.
-          </p>
-        </div>
       </section>
 
-      <section className="inventory-ops-kpi-grid">
-        <article className="inventory-ops-kpi-card">
-          <div className="inventory-ops-kpi-icon"><AdminIcon name="fa-boxes" /></div>
-          <div><span>Tổng sản phẩm</span><strong>{products.length}</strong></div>
+      {/* SUMMARY CARDS */}
+      <section className="inventory-ops-summary-grid">
+        <article className="inventory-ops-summary-card">
+          <div className="inventory-ops-summary-icon"><AdminIcon name="fa-cubes" /></div>
+          <div>
+            <span>Tổng sản phẩm</span>
+            <strong>{summary.totalProducts}</strong>
+          </div>
         </article>
-        <article className="inventory-ops-kpi-card">
-          <div className="inventory-ops-kpi-icon is-positive"><AdminIcon name="fa-cubes" /></div>
-          <div><span>Tổng đơn vị tồn</span><strong>{stockSummary.totalStock}</strong></div>
+        <article className="inventory-ops-summary-card">
+          <div className="inventory-ops-summary-icon"><AdminIcon name="fa-warehouse" /></div>
+          <div>
+            <span>Tổng đơn vị tồn</span>
+            <strong>{summary.totalStock}</strong>
+          </div>
         </article>
-        <article className="inventory-ops-kpi-card">
-          <div className="inventory-ops-kpi-icon is-neutral"><AdminIcon name="fa-cube" /></div>
-          <div><span>Nhập trực tiếp được</span><strong>{stockSummary.directCount}</strong></div>
+        <article className="inventory-ops-summary-card watch">
+          <div className="inventory-ops-summary-icon"><AdminIcon name="fa-eye" /></div>
+          <div>
+            <span>Cần theo dõi</span>
+            <strong>{summary.watchList}</strong>
+          </div>
         </article>
-        <article className="inventory-ops-kpi-card">
-          <div className="inventory-ops-kpi-icon is-warning"><AdminIcon name="fa-layer-group" /></div>
-          <div><span>Nhiều biến thể</span><strong>{stockSummary.restrictedCount}</strong></div>
+        <article className="inventory-ops-summary-card low">
+          <div className="inventory-ops-summary-icon"><AdminIcon name="fa-triangle-exclamation" /></div>
+          <div>
+            <span>Sắp hết hàng</span>
+            <strong>{summary.lowStock}</strong>
+          </div>
         </article>
-        <article className="inventory-ops-kpi-card">
-          <div className="inventory-ops-kpi-icon is-danger"><AdminIcon name="fa-times-circle" /></div>
-          <div><span>Hết hàng / sắp hết</span><strong>{stockSummary.outOfStock + stockSummary.lowStock}</strong></div>
+        <article className="inventory-ops-summary-card out">
+          <div className="inventory-ops-summary-icon"><AdminIcon name="fa-circle-xmark" /></div>
+          <div>
+            <span>Hết hàng</span>
+            <strong>{summary.outOfStock}</strong>
+          </div>
         </article>
       </section>
 
-      {(stockSummary.outOfStock > 0 || stockSummary.lowStock > 0 || stockSummary.watchList > 0 || stockSummary.restrictedCount > 0) && (
-        <section className="inventory-ops-warning-strip">
-          <AdminIcon name="fa-exclamation-triangle" />
-          <span>
-            {stockSummary.outOfStock} hết hàng, {stockSummary.lowStock} sắp hết, {stockSummary.watchList} cần
-            theo dõi và {stockSummary.restrictedCount} sản phẩm đang quản lý tồn theo tổng (nhiều biến thể).
-          </span>
-        </section>
-      )}
-
-      <section className="inventory-ops-workspace">
+      {/* TABLE */}
+      <section className="inventory-ops-board">
         <header className="inventory-ops-toolbar">
           <div className="inventory-ops-search">
             <AdminIcon name="fa-search" />
             <input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Tìm theo tên, SKU, danh mục hoặc giới tính..."
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Tìm theo tên, SKU, danh mục..."
             />
           </div>
 
           <div className="inventory-ops-controls">
-            <select value={stockFilter} onChange={(event) => setStockFilter(event.target.value as StockFilter)}>
+            <select value={stockFilter} onChange={(e) => setStockFilter(e.target.value as StockFilter)}>
               <option value="all">Tất cả trạng thái</option>
-              <option value="direct">Nhập trực tiếp được</option>
-              <option value="variant">Nhiều biến thể (tồn tổng)</option>
               <option value="out">Hết hàng</option>
               <option value="low">Sắp hết</option>
               <option value="watch">Cần theo dõi</option>
@@ -518,436 +210,178 @@ export default function AdminInventory() {
             <button
               type="button"
               className="inventory-ops-btn is-ghost"
-              onClick={() => {
-                setSearch('');
-                setStockFilter('all');
-                setSelectedIds([]);
-              }}
+              onClick={() => { setSearch(''); setStockFilter('all'); void loadInventory(); }}
             >
               <AdminIcon name="fa-rotate-left" />
               <span>Làm mới</span>
             </button>
-            <button
-              type="button"
-              className="inventory-ops-btn is-primary"
-              onClick={openBulkModal}
-              disabled={selectedCount === 0}
-            >
-              <AdminIcon name="fa-layer-group" />
-              <span>Tạo phiếu nhập nhanh</span>
-            </button>
           </div>
         </header>
 
-        {(selectedCount > 0 || visibleRestrictedCount > 0) && (
-          <div className="inventory-ops-selection-bar">
-            <div className="inventory-ops-selection-copy">
-              <span>
-                Đã chọn <strong>{selectedCount}</strong> sản phẩm.
-              </span>
-              {visibleRestrictedCount > 0 && (
-                <small>
-                  {visibleRestrictedCount} sản phẩm trong danh sách hiện tại có nhiều biến thể — tồn đang quản lý theo tổng.
-                </small>
-              )}
-            </div>
-            {selectedCount > 0 && (
-              <button
-                type="button"
-                className="inventory-ops-btn is-ghost is-small"
-                onClick={() => setSelectedIds([])}
-              >
-                Bỏ chọn
-              </button>
-            )}
-          </div>
-        )}
-
         <div className="inventory-ops-table-wrap">
-          <table className="inventory-ops-table">
-            <thead>
-              <tr>
-                <th className="inventory-ops-col-select">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    onChange={toggleSelectAllVisible}
-                    aria-label="Chọn tất cả sản phẩm có thể nhập trực tiếp"
-                  />
-                </th>
-                <th>Sản phẩm</th>
-                <th>SKU</th>
-                <th>Mô hình kho</th>
-                <th>Tồn tổng</th>
-                <th>Trạng thái</th>
-                <th>Cập nhật gần nhất</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProducts.map((product) => {
-                const badge = getStockBadge(product.stock, alertSettings);
-                const progress = getStockProgress(product.stock, alertSettings);
-                const profile = inventoryProfiles.get(product.id) || inventoryService.getStockControlProfile(product);
-                const actionHint = profile.canManageDirectly
-                  ? 'Nhập bằng phiếu, không cộng trừ tay.'
-                  : 'Khóa nhập trực tiếp vì cần tồn theo màu / size.';
+          {loading ? (
+            <p style={{ textAlign: 'center', padding: 40 }}>Đang tải dữ liệu tồn kho...</p>
+          ) : filteredProducts.length === 0 ? (
+            <p style={{ textAlign: 'center', padding: 40, color: '#64748b' }}>Không tìm thấy sản phẩm nào.</p>
+          ) : (
+            <table className="inventory-ops-table">
+              <thead>
+                <tr>
+                  <th>Sản phẩm</th>
+                  <th>SKU</th>
+                  <th>Tồn tổng</th>
+                  <th>Biến thể</th>
+                  <th>Trạng thái</th>
+                  <th>Cập nhật gần nhất</th>
+                  <th style={{ textAlign: 'right' }}>Theo dõi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map((product) => {
+                  const badge = getStockBadge(product.stock, alertSettings);
+                  const progress = getStockProgress(product.stock, alertSettings);
+                  const variantCount =
+                    (product.colors?.length || 0) * (product.sizes?.length || 0);
 
-                return (
-                  <tr
-                    key={product.id}
-                    className={`inventory-ops-row level-${badge.className} ${
-                      selectedIds.includes(product.id) ? 'is-selected' : ''
-                    } ${profile.canManageDirectly ? '' : 'is-locked'}`}
-                  >
-                    <td className="inventory-ops-col-select">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(product.id)}
-                        disabled={!profile.canManageDirectly}
-                        onChange={() => toggleSelection(product.id)}
-                        title={profile.canManageDirectly ? 'Chọn sản phẩm để tạo phiếu nhập nhanh' : profile.note}
-                        aria-label={`Chọn sản phẩm ${product.name}`}
-                      />
-                    </td>
-                    <td>
-                      <div className="inventory-ops-product-cell">
-                        <img src={product.image} alt={product.name} className="inventory-ops-product-image" />
-                        <div className="inventory-ops-product-copy">
-                          <strong>{product.name}</strong>
-                          <span>{product.subcategory || product.category} • {product.gender}</span>
-                          <small>{profile.canManageDirectly ? profile.note : profile.detail}</small>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <code>{product.sku}</code>
-                    </td>
-                    <td>
-                      <div className="inventory-ops-model-cell">
-                        <span className={`inventory-ops-mode-badge is-${profile.mode}`}>{profile.label}</span>
-                        <small>{profile.detail}</small>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="inventory-ops-stock-cell">
-                        <strong className={`inventory-ops-stock-number ${badge.className}`}>{product.stock}</strong>
-                        <div className="inventory-ops-stock-meter">
-                          <span style={{ width: `${progress}%` }} />
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`inventory-ops-status ${badge.className}`}>
-                        <AdminIcon name="fa-circle" />
-                        {badge.label}
-                      </span>
-                    </td>
-                    <td>{formatDateTime(product.updatedAt || product.createdAt)}</td>
-                    <td>
-                      <div className="inventory-ops-row-actions">
-                        {profile.canManageDirectly ? (
-                          <div className="inventory-ops-btn-group">
-                            <button
-                              type="button"
-                              className="inventory-ops-btn is-secondary is-small"
-                              onClick={() => openRestockModal(product)}
-                              title="Ghi nhận phiếu nhập"
-                            >
-                              <AdminIcon name="fa-truck-loading" />
-                              <span>Nhập</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="inventory-ops-btn is-danger-outline is-small"
-                              onClick={() => openExportModal(product)}
-                              title="Ghi nhận phiếu xuất"
-                              disabled={product.stock <= 0}
-                            >
-                              <AdminIcon name="fa-truck" />
-                              <span>Xuất</span>
-                            </button>
+                  return (
+                    <tr key={product.id} className={`inventory-ops-row level-${badge.className}`}>
+                      <td>
+                        <div className="inventory-ops-product-cell">
+                          <img src={product.image} alt={product.name} className="inventory-ops-product-image" />
+                          <div className="inventory-ops-product-copy">
+                            <strong>{product.name}</strong>
+                            <span>{product.subcategory || product.category} • {product.gender}</span>
                           </div>
-                        ) : (
-                          <button
-                            type="button"
-                            className="inventory-ops-btn is-ghost is-small"
-                            onClick={() =>
-                              setToast({
-                                type: 'error',
-                                message: profile.note,
-                              })
-                            }
-                            title={profile.note}
-                          >
-                            <AdminIcon name="fa-circle-info" />
-                            <span>Cần tách màu / size</span>
-                          </button>
-                        )}
-                        <span className={`inventory-ops-action-hint ${profile.canManageDirectly ? '' : 'is-danger'}`}>
-                          {actionHint}
+                        </div>
+                      </td>
+                      <td><code>{product.sku}</code></td>
+                      <td>
+                        <div className="inventory-ops-stock-cell">
+                          <strong className={`inventory-ops-stock-number ${badge.className}`}>{product.stock}</strong>
+                          <div className="inventory-ops-stock-meter">
+                            <span style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ fontSize: 13, color: '#64748b' }}>
+                        {variantCount > 0
+                          ? `${(product.sizes?.length || 0)} size × ${(product.colors?.length || 0)} màu`
+                          : 'SKU đơn'}
+                      </td>
+                      <td>
+                        <span className={`inventory-ops-status ${badge.className}`}>
+                          <AdminIcon name="fa-circle" />
+                          {badge.label}
                         </span>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-
-          {loading && (
-            <div className="inventory-ops-empty">
-              <div className="inventory-ops-empty-icon">
-                <AdminIcon name="fa-spinner" />
-              </div>
-              <h3>Đang tải tồn kho</h3>
-              <p>Đang lấy danh sách tồn kho từ backend.</p>
-            </div>
-          )}
-
-          {!loading && filteredProducts.length === 0 && (
-            <div className="inventory-ops-empty">
-              <div className="inventory-ops-empty-icon">
-                <AdminIcon name="fa-box-open" />
-              </div>
-              <h3>Không tìm thấy sản phẩm phù hợp</h3>
-              <p>Thử đổi từ khóa hoặc bộ lọc để xem lại danh sách tồn kho theo trạng thái và mô hình quản lý.</p>
-            </div>
+                      </td>
+                      <td style={{ fontSize: 13, color: '#64748b' }}>
+                        {formatDateTime(product.updatedAt || product.createdAt)}
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          type="button"
+                          className="inventory-ops-btn is-secondary is-small"
+                          onClick={() => openVariantsModal(product)}
+                          title="Xem tồn theo size/màu"
+                        >
+                          <AdminIcon name="fa-layer-group" />
+                          <span>Biến thể</span>
+                        </button>
+                        <Link
+                          to={`/admin/inventory/history?productId=${product.id}`}
+                          className="inventory-ops-btn is-ghost is-small"
+                          style={{ marginLeft: 6 }}
+                          title="Xem lịch sử nhập/xuất"
+                        >
+                          <AdminIcon name="fa-history" />
+                          <span>Lịch sử</span>
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       </section>
 
-      {showRestockModal && activeProduct && activeProductProfile && (
-        <div className="inventory-ops-overlay" onClick={closeRestockModal}>
-          <div className="inventory-ops-dialog" onClick={(event) => event.stopPropagation()}>
-            <div className="inventory-ops-modal-head">
-              <h3>Ghi nhận phiếu nhập</h3>
-              <button type="button" className="inventory-ops-close" onClick={closeRestockModal}>
-                <AdminIcon name="fa-times" />
-              </button>
+      {/* MODAL: Biến thể */}
+      {showVariantsFor && (
+        <div onClick={closeVariantsModal} style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999,
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: '#fff', borderRadius: 12, padding: 20, maxWidth: 720, width: '90%',
+            maxHeight: '85vh', overflowY: 'auto',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <h3 style={{ margin: 0 }}>Tồn kho theo biến thể</h3>
+              <button onClick={closeVariantsModal} className="btn-ghost"><AdminIcon name="fa-xmark" /></button>
             </div>
 
-            <form onSubmit={handleRestockSubmit} className="inventory-ops-modal-body">
-              <div className="inventory-ops-product-preview">
-                <img src={activeProduct.image} alt={activeProduct.name} />
-                <div>
-                  <strong>{activeProduct.name}</strong>
-                  <span>{activeProduct.sku}</span>
-                </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8 }}>
+              <img src={showVariantsFor.image} alt={showVariantsFor.name} style={{ width: 64, height: 64, borderRadius: 6, objectFit: 'cover' }} />
+              <div>
+                <strong style={{ fontSize: 15 }}>{showVariantsFor.name}</strong>
+                <div style={{ fontSize: 13, color: '#64748b' }}>SKU: {showVariantsFor.sku} · Tồn tổng: {showVariantsFor.stock}</div>
               </div>
-
-              <div className="inventory-ops-inline-note">
-                <span className={`inventory-ops-mode-badge is-${activeProductProfile.mode}`}>{activeProductProfile.label}</span>
-                <p>{activeProductProfile.note}</p>
-              </div>
-
-              <label className="inventory-ops-field">
-                <span>Số lượng nhập thêm</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={restockQuantity}
-                  onChange={(event) => setRestockQuantity(Number(event.target.value))}
-                />
-                <small>Chỉ dùng cho sản phẩm không gây mơ hồ về màu và size.</small>
-              </label>
-
-              <label className="inventory-ops-field">
-                <span>Ghi chú / mã phiếu</span>
-                <textarea
-                  rows={4}
-                  value={restockNote}
-                  onChange={(event) => setRestockNote(event.target.value)}
-                  placeholder="Ví dụ: PN-2603-01 / nhập bổ sung từ nhà cung cấp cho đợt bán mới"
-                />
-              </label>
-
-              <div className="inventory-ops-preview">
-                <div>
-                  <span>Tồn hiện tại</span>
-                  <strong>{activeProduct.stock}</strong>
-                </div>
-                <AdminIcon name="fa-arrow-right" />
-                <div>
-                  <span>Sau khi nhập</span>
-                  <strong>{activeProduct.stock + Math.max(restockQuantity, 0)}</strong>
-                </div>
-              </div>
-
-              <div className="inventory-ops-modal-actions">
-                <button type="button" className="inventory-ops-btn is-ghost" onClick={closeRestockModal}>
-                  Hủy
-                </button>
-                <button type="submit" className="inventory-ops-btn is-primary">
-                  <AdminIcon name="fa-save" />
-                  <span>Lưu phiếu nhập</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showExportModal && activeProduct && activeProductProfile && (
-        <div className="inventory-ops-overlay" onClick={closeExportModal}>
-          <div className="inventory-ops-dialog" onClick={(event) => event.stopPropagation()}>
-            <div className="inventory-ops-modal-head">
-              <h3>Ghi nhận phiếu xuất</h3>
-              <button type="button" className="inventory-ops-close" onClick={closeExportModal}>
-                <AdminIcon name="fa-times" />
-              </button>
             </div>
 
-            <form onSubmit={handleExportSubmit} className="inventory-ops-modal-body">
-              <div className="inventory-ops-product-preview">
-                <img src={activeProduct.image} alt={activeProduct.name} />
-                <div>
-                  <strong>{activeProduct.name}</strong>
-                  <span>{activeProduct.sku}</span>
+            {loadingVariants ? (
+              <p style={{ textAlign: 'center', padding: 20, color: '#64748b' }}>Đang tải biến thể...</p>
+            ) : !variantsData || variantsData.variants.length === 0 ? (
+              <div style={{
+                padding: 20, background: '#fef3c7', borderRadius: 8,
+                fontSize: 13, color: '#92400e', textAlign: 'center',
+              }}>
+                <AdminIcon name="fa-info-circle" />{' '}
+                Sản phẩm này chưa có biến thể nào trong kho. Hãy tạo <Link to="/admin/stock-receipts/new" style={{ color: '#dc2626', fontWeight: 600 }}>phiếu nhập</Link> để nhập hàng theo size/màu.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13 }}>
+                  <span>Số biến thể: <strong>{variantsData.soBienThe}</strong></span>
+                  <span>Tổng từ biến thể: <strong>{variantsData.tongTuBienThe}</strong></span>
+                  <span style={{ color: variantsData.tongTuBienThe !== variantsData.tonKhoTong ? '#dc2626' : '#16a34a' }}>
+                    {variantsData.tongTuBienThe === variantsData.tonKhoTong ? '✓ Khớp tồn tổng' : '⚠ Lệch với tồn tổng'}
+                  </span>
                 </div>
-              </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={{ padding: 10, textAlign: 'left', fontSize: 13 }}>Size</th>
+                      <th style={{ padding: 10, textAlign: 'left', fontSize: 13 }}>Màu</th>
+                      <th style={{ padding: 10, textAlign: 'center', fontSize: 13 }}>Tồn</th>
+                      <th style={{ padding: 10, textAlign: 'center', fontSize: 13 }}>Đã bán</th>
+                      <th style={{ padding: 10, textAlign: 'right', fontSize: 13 }}>Giá vốn TB</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variantsData.variants.map((v) => (
+                      <tr key={v.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: 10, fontSize: 13, fontWeight: 600 }}>{v.kichCo}</td>
+                        <td style={{ padding: 10, fontSize: 13 }}>{v.mauSac}</td>
+                        <td style={{ padding: 10, textAlign: 'center', fontSize: 14, fontWeight: 700, color: v.soLuong === 0 ? '#dc2626' : v.soLuong < 5 ? '#f59e0b' : '#16a34a' }}>
+                          {v.soLuong}
+                        </td>
+                        <td style={{ padding: 10, textAlign: 'center', fontSize: 13, color: '#64748b' }}>{v.soLuongDaBan}</td>
+                        <td style={{ padding: 10, textAlign: 'right', fontSize: 13, color: '#475569' }}>
+                          {v.giaVonTrungBinh ? new Intl.NumberFormat('vi-VN').format(v.giaVonTrungBinh) + 'đ' : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
+            )}
 
-              <div className="inventory-ops-inline-note is-export">
-                <span className={`inventory-ops-mode-badge is-${activeProductProfile.mode}`}>{activeProductProfile.label}</span>
-                <p>Xuất kho sẽ trừ tồn. Số lượng xuất không được vượt quá tồn hiện tại ({activeProduct.stock}).</p>
-              </div>
-
-              <label className="inventory-ops-field">
-                <span>Số lượng xuất</span>
-                <input
-                  type="number"
-                  min="1"
-                  max={activeProduct.stock}
-                  value={exportQuantity}
-                  onChange={(event) => setExportQuantity(Number(event.target.value))}
-                />
-                {exportQuantity > activeProduct.stock && (
-                  <small className="inventory-ops-field-error">Vượt quá tồn kho hiện tại ({activeProduct.stock})</small>
-                )}
-              </label>
-
-              <label className="inventory-ops-field">
-                <span>Ghi chú / lý do xuất</span>
-                <textarea
-                  rows={4}
-                  value={exportNote}
-                  onChange={(event) => setExportNote(event.target.value)}
-                  placeholder="Ví dụ: PX-2603-01 / hàng hỏng, trả nhà cung cấp, điều chuyển kho..."
-                />
-              </label>
-
-              <div className="inventory-ops-preview">
-                <div>
-                  <span>Tồn hiện tại</span>
-                  <strong>{activeProduct.stock}</strong>
-                </div>
-                <AdminIcon name="fa-arrow-right" />
-                <div>
-                  <span>Sau khi xuất</span>
-                  <strong>{Math.max(0, activeProduct.stock - Math.max(exportQuantity, 0))}</strong>
-                </div>
-              </div>
-
-              <div className="inventory-ops-modal-actions">
-                <button type="button" className="inventory-ops-btn is-ghost" onClick={closeExportModal}>
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="inventory-ops-btn is-danger"
-                  disabled={exportQuantity <= 0 || exportQuantity > activeProduct.stock}
-                >
-                  <AdminIcon name="fa-save" />
-                  <span>Lưu phiếu xuất</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showBulkModal && (
-        <div className="inventory-ops-overlay" onClick={closeBulkModal}>
-          <div className="inventory-ops-dialog" onClick={(event) => event.stopPropagation()}>
-            <div className="inventory-ops-modal-head">
-              <h3>Tạo phiếu nhập nhanh</h3>
-              <button type="button" className="inventory-ops-close" onClick={closeBulkModal}>
-                <AdminIcon name="fa-times" />
-              </button>
+            <div style={{ marginTop: 16, padding: 12, background: '#eff6ff', borderRadius: 8, fontSize: 13, color: '#1e3a8a' }}>
+              <AdminIcon name="fa-info-circle" />{' '}
+              Để bổ sung tồn cho biến thể nào → tạo <Link to="/admin/stock-receipts/new" style={{ color: '#2563eb', fontWeight: 600 }}>phiếu nhập mới</Link>.
             </div>
-
-            <form onSubmit={handleBulkSubmit} className="inventory-ops-modal-body">
-              <div className="inventory-ops-bulk-note">
-                <strong>{selectedCount}</strong> sản phẩm đủ điều kiện sẽ được cộng cùng một lượng nhập.
-              </div>
-
-              <div className="inventory-ops-inline-note is-soft">
-                <span className="inventory-ops-mode-badge is-simple">Chỉ sản phẩm đơn</span>
-                <p>Các sản phẩm nhiều biến thể đã bị loại khỏi phiếu nhập nhanh để tránh cộng nhầm tồn cho sai màu hoặc size.</p>
-              </div>
-
-              <label className="inventory-ops-field">
-                <span>Số lượng nhập cho mỗi sản phẩm</span>
-                <input
-                  type="number"
-                  min="1"
-                  value={bulkQuantity}
-                  onChange={(event) => setBulkQuantity(Number(event.target.value))}
-                />
-              </label>
-
-              <label className="inventory-ops-field">
-                <span>Ghi chú chung / mã phiếu</span>
-                <textarea
-                  rows={4}
-                  value={bulkNote}
-                  onChange={(event) => setBulkNote(event.target.value)}
-                  placeholder="Ví dụ: PN-2603-FAST / nhập nhanh cho lô hàng đồng loạt"
-                />
-              </label>
-
-              <div className="inventory-ops-preview">
-                <div>
-                  <span>Sản phẩm</span>
-                  <strong>{selectedCount}</strong>
-                </div>
-                <AdminIcon name="fa-arrow-right" />
-                <div>
-                  <span>Tổng lượng ghi nhận</span>
-                  <strong>{selectedCount * Math.max(bulkQuantity, 0)}</strong>
-                </div>
-              </div>
-
-              <div className="inventory-ops-chip-list">
-                {selectedProducts.map((product) => {
-                  const profile = inventoryProfiles.get(product.id) || inventoryService.getStockControlProfile(product);
-
-                  return (
-                    <span key={product.id} className="inventory-ops-chip">
-                      {product.name} • {profile.label}
-                    </span>
-                  );
-                })}
-              </div>
-
-              <div className="inventory-ops-modal-actions">
-                <button type="button" className="inventory-ops-btn is-ghost" onClick={closeBulkModal}>
-                  Hủy
-                </button>
-                <button type="submit" className="inventory-ops-btn is-primary">
-                  <AdminIcon name="fa-layer-group" />
-                  <span>Lưu phiếu nhập nhanh</span>
-                </button>
-              </div>
-            </form>
           </div>
-        </div>
-      )}
-
-      {toast && (
-        <div className={`inventory-ops-toast is-${toast.type}`}>
-          <AdminIcon name={toast.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'} />
-          <span>{toast.message}</span>
         </div>
       )}
     </div>

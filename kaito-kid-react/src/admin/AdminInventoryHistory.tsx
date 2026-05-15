@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   INVENTORY_UPDATED_EVENT,
   type InventoryHistoryItem,
@@ -127,7 +127,12 @@ function mapHistoryDtoToItem(dto: InventoryHistoryDTO): InventoryHistoryItem {
 }
 
 export default function AdminInventoryHistory() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const productIdParam = searchParams.get('productId');
+  const filterByProductId = productIdParam ? Number(productIdParam) : null;
+
   const [history, setHistory] = useState<InventoryHistoryItem[]>([]);
+  const [filteredProductName, setFilteredProductName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -136,10 +141,19 @@ export default function AdminInventoryHistory() {
 
   const loadHistory = async () => {
     setLoading(true);
-    const result = await inventoryApi.getHistory({ page: 1, pageSize: 200 });
+    // Nếu có productId trên URL → chỉ lấy lịch sử của SP đó
+    const result = await inventoryApi.getHistory({
+      page: 1,
+      pageSize: 200,
+      ...(filterByProductId ? { sanPhamId: filterByProductId } : {}),
+    });
     if (result.success && result.data) {
       const mapped = result.data.items.map(mapHistoryDtoToItem);
       setHistory(mapped);
+      // Lấy tên SP đầu tiên để hiển thị banner
+      if (filterByProductId && mapped.length > 0) {
+        setFilteredProductName(mapped[0].productName);
+      }
     } else {
       setHistory([]);
     }
@@ -155,7 +169,14 @@ export default function AdminInventoryHistory() {
     return () => {
       window.removeEventListener(INVENTORY_UPDATED_EVENT, handleInventoryUpdated);
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterByProductId]);
+
+  const clearProductFilter = () => {
+    searchParams.delete('productId');
+    setSearchParams(searchParams);
+    setFilteredProductName('');
+  };
 
   const filteredHistory = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -316,11 +337,23 @@ export default function AdminInventoryHistory() {
       <section className="inventory-history-hero">
         <div className="inventory-history-hero-copy">
           <span className="inventory-history-overline">Stock movement journal</span>
-          <h1>Lịch sử xuất nhập kho</h1>
+          <h1>{filterByProductId ? `Lịch sử kho của ${filteredProductName || 'sản phẩm #' + filterByProductId}` : 'Lịch sử xuất nhập kho'}</h1>
           <p>
-            Tập trung mọi chuyển động tồn kho vào một màn hình dễ quét: lọc nhanh theo loại phiếu, truy vết
-            theo ngày và xem ngay biến động cũ → mới của từng thao tác.
+            {filterByProductId
+              ? `Đang xem riêng các giao dịch nhập/xuất/đặt lại tồn của sản phẩm này.`
+              : 'Tập trung mọi chuyển động tồn kho vào một màn hình dễ quét: lọc nhanh theo loại phiếu, truy vết theo ngày và xem ngay biến động cũ → mới của từng thao tác.'}
           </p>
+          {filterByProductId && (
+            <button
+              type="button"
+              onClick={clearProductFilter}
+              className="inventory-history-btn is-ghost is-small"
+              style={{ marginTop: 12 }}
+            >
+              <AdminIcon name="fa-xmark" />
+              <span>Bỏ lọc theo sản phẩm - xem toàn bộ</span>
+            </button>
+          )}
         </div>
 
         <div className="inventory-history-hero-actions">

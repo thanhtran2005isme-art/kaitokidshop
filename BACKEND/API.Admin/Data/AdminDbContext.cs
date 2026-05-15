@@ -25,6 +25,10 @@ public class AdminDbContext(DbContextOptions<AdminDbContext> options) : DbContex
     public DbSet<CauHinhCuaHang> CauHinhCuaHang => Set<CauHinhCuaHang>();
     public DbSet<CauHinhTrangChu> CauHinhTrangChu => Set<CauHinhTrangChu>();
     public DbSet<NhatKyHoatDong> NhatKyHoatDong => Set<NhatKyHoatDong>();
+    public DbSet<NhaCungCap> NhaCungCap => Set<NhaCungCap>();
+    public DbSet<PhieuNhap> PhieuNhap => Set<PhieuNhap>();
+    public DbSet<ChiTietPhieuNhap> ChiTietPhieuNhap => Set<ChiTietPhieuNhap>();
+    public DbSet<TonKhoBienThe> TonKhoBienThe => Set<TonKhoBienThe>();
 
     protected override void OnModelCreating(ModelBuilder m)
     {

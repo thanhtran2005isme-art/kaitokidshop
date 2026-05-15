@@ -29,3 +29,6 @@ export { adminProductsApi } from './adminProductsApi';
 export { customerApi } from './customerApi';
 export { wishlistApi, type WishlistItemDTO } from './wishlistApi';
 export { locationApi, type Province, type District, type Ward } from './locationApi';
+export { supplierApi, type SupplierDTO, type CreateSupplierPayload } from './supplierApi';
+export { stockReceiptApi, type StockReceiptDTO, type StockReceiptItemDTO, type StockReceiptListItem, type CreateStockReceiptPayload, type CreateStockReceiptItemPayload } from './stockReceiptApi';
+export { variantStockApi, type VariantStockDTO, type ProductVariantSummary } from './variantStockApi';

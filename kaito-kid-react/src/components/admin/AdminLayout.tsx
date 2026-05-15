@@ -79,6 +79,8 @@ const menuItems: MenuItem[] = [
       { path: '/admin/inventory', label: 'Tồn kho' },
       { path: '/admin/inventory/history', label: 'Lịch sử nhập/xuất' },
       { path: '/admin/inventory/alerts', label: 'Cảnh báo hết hàng' },
+      { path: '/admin/stock-receipts', label: 'Phiếu nhập kho' },
+      { path: '/admin/suppliers', label: 'Nhà cung cấp' },
     ],
   },
   { path: '/admin/customers', icon: 'fa-users', label: 'Khách hàng' },

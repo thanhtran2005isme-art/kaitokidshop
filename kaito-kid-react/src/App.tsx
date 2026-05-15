@@ -44,6 +44,10 @@ import AdminAttributes from './admin/AdminAttributes';
 import AdminInventory from './admin/AdminInventory';
 import AdminInventoryHistory from './admin/AdminInventoryHistory';
 import AdminInventoryAlerts from './admin/AdminInventoryAlerts';
+import AdminSuppliers from './admin/AdminSuppliers';
+import AdminStockReceipts from './admin/AdminStockReceipts';
+import AdminStockReceiptNew from './admin/AdminStockReceiptNew';
+import AdminStockReceiptDetail from './admin/AdminStockReceiptDetail';
 import AdminCoupons from './admin/AdminCoupons';
 import AdminFlashSales from './admin/AdminFlashSales';
 import AdminPromotions from './admin/AdminPromotions';
@@ -108,6 +112,10 @@ function App() {
                 <Route path="inventory" element={<AdminInventory />} />
                 <Route path="inventory/history" element={<AdminInventoryHistory />} />
                 <Route path="inventory/alerts" element={<AdminInventoryAlerts />} />
+                <Route path="suppliers" element={<AdminSuppliers />} />
+                <Route path="stock-receipts" element={<AdminStockReceipts />} />
+                <Route path="stock-receipts/new" element={<AdminStockReceiptNew />} />
+                <Route path="stock-receipts/:id" element={<AdminStockReceiptDetail />} />
                 <Route path="coupons" element={<AdminCoupons />} />
                 <Route path="promotions" element={<AdminPromotions />} />
                 <Route path="flash-sales" element={<AdminFlashSales />} />

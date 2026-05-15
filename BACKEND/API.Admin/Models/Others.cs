@@ -213,3 +213,74 @@ public class NhatKyHoatDong
 // v1.1: Them FlashSale, ChiTietFlashSale, KhuyenMai, TrangTinh
 // v1.2: Them MenuDieuHuong, ThuocTinhSanPham, TonKhoLichSu, CauHinh, NhatKy
 // v1.3: Them TenSanPham vao TonKhoLichSu de khong can join
+
+
+// =====================================================
+// NGHIỆP VỤ KHO HÀNG NÂNG CAO
+// =====================================================
+
+[Table("NhaCungCap")]
+public class NhaCungCap
+{
+    public int Id { get; set; }
+    public string TenNhaCungCap { get; set; } = string.Empty;
+    public string? MaNhaCungCap { get; set; }
+    public string? NguoiLienHe { get; set; }
+    public string? SoDienThoai { get; set; }
+    public string? Email { get; set; }
+    public string? DiaChi { get; set; }
+    public string? MaSoThue { get; set; }
+    public string? GhiChu { get; set; }
+    public bool TrangThai { get; set; } = true;
+    public DateTime NgayTao { get; set; } = DateTime.UtcNow;
+    public DateTime? NgayCapNhat { get; set; }
+}
+
+[Table("PhieuNhap")]
+public class PhieuNhap
+{
+    public int Id { get; set; }
+    public string MaPhieu { get; set; } = string.Empty;
+    public int? NhaCungCapId { get; set; }
+    public string? TenNhaCungCap { get; set; }
+    public DateTime NgayNhap { get; set; } = DateTime.UtcNow;
+    public string? NguoiNhap { get; set; }
+    [Column(TypeName = "decimal(18,0)")] public decimal TongGiaTri { get; set; }
+    public string? GhiChu { get; set; }
+    /// <summary>draft | done | cancelled</summary>
+    public string TrangThai { get; set; } = "done";
+    public DateTime NgayTao { get; set; } = DateTime.UtcNow;
+    public DateTime? NgayCapNhat { get; set; }
+    public ICollection<ChiTietPhieuNhap> ChiTiet { get; set; } = [];
+}
+
+[Table("ChiTietPhieuNhap")]
+public class ChiTietPhieuNhap
+{
+    public int Id { get; set; }
+    public int PhieuNhapId { get; set; }
+    public int SanPhamId { get; set; }
+    public string TenSanPham { get; set; } = string.Empty;
+    public string? KichCo { get; set; }
+    public string? MauSac { get; set; }
+    public int SoLuong { get; set; }
+    [Column(TypeName = "decimal(18,0)")] public decimal DonGiaNhap { get; set; }
+    [Column(TypeName = "decimal(18,0)")] public decimal ThanhTien { get; set; }
+    public string? GhiChu { get; set; }
+    public PhieuNhap? PhieuNhap { get; set; }
+}
+
+[Table("TonKhoBienThe")]
+public class TonKhoBienThe
+{
+    public int Id { get; set; }
+    public int SanPhamId { get; set; }
+    public string KichCo { get; set; } = string.Empty;
+    public string MauSac { get; set; } = string.Empty;
+    public int SoLuong { get; set; }
+    public int SoLuongDaBan { get; set; }
+    [Column(TypeName = "decimal(18,0)")] public decimal? GiaVonTrungBinh { get; set; }
+    public DateTime NgayTao { get; set; } = DateTime.UtcNow;
+    public DateTime? NgayCapNhat { get; set; }
+}
+// v1.4: Them NhaCungCap, PhieuNhap, ChiTietPhieuNhap, TonKhoBienThe

@@ -12,7 +12,7 @@ import {
 } from 'react-icons/pi';
 import { Link } from 'react-router-dom';
 import ProductCard from '../components/product/ProductCard';
-import { productApi, customerOrderApi, flashSaleApi, publicBannerApi, newsletterApi, type PublicFlashSale, type PublicBannerDTO } from '../services/api';
+import { productApi, customerOrderApi, flashSaleApi, type PublicFlashSale } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   getViewedProducts,
@@ -21,7 +21,6 @@ import {
   getSearchHistory,
 } from '../utils/viewedTracker';
 import type { Product } from '../types';
-import toast from 'react-hot-toast';
 import { matchesProductCategory, matchesProductGender } from '../utils/productTaxonomy';
 
 interface HeroSlide {
@@ -140,12 +139,7 @@ function matchesCategory(product: Product, filter: string) {
 
 export default function Home() {
   const { user } = useAuth();
-  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(defaultHeroSlides);
-  const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
-  const [newsletterEmail, setNewsletterEmail] = useState('');
-  const [newsletterSubmitting, setNewsletterSubmitting] = useState(false);
-  const [newsletterSuccess, setNewsletterSuccess] = useState<{ code: string; expiresAt: string } | null>(null);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [heroSlides] = useState<HeroSlide[]>(defaultHeroSlides);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [recommendReason, setRecommendReason] = useState<string>('Sản phẩm bán chạy mà bạn có thể thích');
   const [newArrivals, setNewArrivals] = useState<Product[]>([]);
@@ -164,77 +158,81 @@ export default function Home() {
   const [showAllSale, setShowAllSale] = useState(false);
   const [showAllBestSellers, setShowAllBestSellers] = useState(false);
 
-  // Gộp toàn bộ load ban đầu thành 1 Promise.all — giảm waterfall, tăng tốc page load
   useEffect(() => {
-    let cancelled = false;
+    // Load data từ API thay vì localStorage
+    const loadHomeData = async () => {
+      try {
+        // Load song song bằng Promise.all
+        const [newArrivalsResult, saleResult, bestSellersResult] = await Promise.all([
+          productApi.getNewArrivals(8),
+          productApi.getSaleProducts(8),
+          productApi.getBestSellers(8),
+        ]);
 
-    const loadAll = async () => {
-      setInitialLoading(true);
-      const [bannersR, newArrR, saleR, bestR, flashR] = await Promise.all([
-        publicBannerApi.getActive('homepage', 'slider').catch(() => null),
-        productApi.getNewArrivals(8),
-        productApi.getSaleProducts(8),
-        productApi.getBestSellers(8),
-        flashSaleApi.getActive(),
-      ]);
-      if (cancelled) return;
-
-      // Hero slides — ưu tiên banner từ DB, fallback default
-      if (bannersR?.success && bannersR.data && bannersR.data.length > 0) {
-        const slides: HeroSlide[] = bannersR.data.map((b: PublicBannerDTO) => ({
-          image: b.image,
-          alt: b.title,
-          tagline: b.subtitle || '',
-          title: b.title,
-          subtitle: b.description || '',
-          primaryAction: { label: b.primaryButton || 'Xem ngay', to: b.link || '/products' },
-          secondaryAction: { label: b.secondaryButton || 'Khám phá', to: b.secondLink || '/collections' },
-        }));
-        setHeroSlides(slides);
-      }
-
-      setNewArrivals(newArrR.success && newArrR.data ? newArrR.data : []);
-      setSaleProducts(saleR.success && saleR.data ? saleR.data : []);
-      setBestSellers(bestR.success && bestR.data ? bestR.data : []);
-
-      if (flashR.success && flashR.data && flashR.data.active) {
-        setFlashSale(flashR.data);
-        if (flashR.data.endDate) {
-          const diff = Math.max(0, new Date(flashR.data.endDate).getTime() - Date.now());
-          setCountdown({
-            hours: Math.floor(diff / 3_600_000),
-            minutes: Math.floor((diff % 3_600_000) / 60_000),
-            seconds: Math.floor((diff % 60_000) / 1000),
-          });
+        // Set new arrivals
+        if (newArrivalsResult.success && newArrivalsResult.data) {
+          setNewArrivals(newArrivalsResult.data);
+        } else {
+          setNewArrivals([]);
         }
-      }
 
-      setInitialLoading(false);
+        // Set sale products
+        if (saleResult.success && saleResult.data) {
+          setSaleProducts(saleResult.data);
+        } else {
+          setSaleProducts([]);
+        }
+
+        // Set best sellers
+        if (bestSellersResult.success && bestSellersResult.data) {
+          setBestSellers(bestSellersResult.data);
+        } else {
+          setBestSellers([]);
+        }
+      } catch (error) {
+        console.error('Error loading home data:', error);
+        // Fallback to empty arrays
+        setNewArrivals([]);
+        setSaleProducts([]);
+        setBestSellers([]);
+      }
     };
 
-    void loadAll();
-    return () => { cancelled = true; };
+    loadHomeData();
+    // Load banners và reviews tạm giữ static (chưa cần API public)
   }, []);
 
-  // Sản phẩm đã xem gần đây — fetch chi tiết từ DB để có thông tin đầy đủ
+  // Load flash sale đang chạy
   useEffect(() => {
-    const viewed = getViewedProducts().slice(0, 8);
-    if (viewed.length === 0) {
-      setRecentlyViewed([]);
-      return;
-    }
-    void Promise.all(viewed.map((v) => productApi.getById(v.id))).then((results) => {
-      const products = results
-        .filter((r) => r.success && r.data)
-        .map((r) => r.data as Product);
-      setRecentlyViewed(products);
-    });
+    const loadFlashSale = async () => {
+      const result = await flashSaleApi.getActive();
+      if (result.success && result.data && result.data.active) {
+        setFlashSale(result.data);
+
+        // Tính countdown từ endDate
+        if (result.data.endDate) {
+          const endTime = new Date(result.data.endDate).getTime();
+          const now = Date.now();
+          const diff = Math.max(0, endTime - now);
+
+          const hours = Math.floor(diff / (1000 * 60 * 60));
+          const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+          setCountdown({ hours, minutes, seconds });
+        }
+      } else {
+        setFlashSale(null);
+      }
+    };
+    loadFlashSale();
   }, []);
 
-  // Recommendations dựa vào hành vi user (giữ nguyên logic cũ)
+  // Load gợi ý sản phẩm cho khách hàng (giống Shopee)
   useEffect(() => {
     const loadRecommendations = async () => {
       try {
+        // Tổng hợp dữ liệu hành vi từ localStorage
         const viewedProducts = getViewedProducts();
         const interestedCategories = getInterestedCategories(3);
         const interestedGender = getInterestedGender();
@@ -244,6 +242,7 @@ export default function Home() {
         const wishlistIds = new Set<number>();
         const viewedIds = new Set<number>(viewedProducts.map((p) => p.id));
 
+        // Lấy đơn hàng đã mua (nếu đăng nhập)
         if (user) {
           const ordersResult = await customerOrderApi.getMyOrders().catch(() => null);
           if (ordersResult?.success && ordersResult.data) {
@@ -255,62 +254,133 @@ export default function Home() {
           }
         }
 
-        // Strategy 1: dựa trên category đã xem
+        // Lấy wishlist
+        try {
+          const wishlist: number[] = JSON.parse(localStorage.getItem('wishlist') || '[]');
+          wishlist.forEach((id) => wishlistIds.add(id));
+        } catch {
+          // ignore
+        }
+
+        // Strategy 1: Đã từng xem sp → lấy related từ sp xem gần nhất
+        if (viewedProducts.length > 0) {
+          const latestViewed = viewedProducts[0];
+          const relatedResult = await productApi.getRelated(latestViewed.id, 8);
+
+          if (relatedResult.success && relatedResult.data && relatedResult.data.length > 0) {
+            const filtered = relatedResult.data.filter(
+              (p) =>
+                !purchasedProductIds.has(p.id) &&
+                !viewedIds.has(p.id) &&
+                !wishlistIds.has(p.id)
+            );
+
+            if (filtered.length >= 3) {
+              setRecommendations(filtered.slice(0, 4));
+              setRecommendReason(
+                latestViewed.name
+                  ? `Tương tự "${latestViewed.name}" bạn vừa xem`
+                  : 'Tương tự sản phẩm bạn vừa xem'
+              );
+              return;
+            }
+          }
+        }
+
+        // Strategy 2: Từ category quan tâm nhất (xem nhiều) + gender quan tâm
         if (interestedCategories.length > 0) {
-          const allResult = await productApi.getAll({ pageSize: 50 });
-          if (allResult.success && allResult.data) {
-            const filtered = allResult.data.products.filter((p: Product) => {
-              if (purchasedProductIds.has(p.id)) return false;
-              if (viewedIds.has(p.id)) return false;
-              return interestedCategories.some((cat) => matchesProductCategory(p.category, cat));
-            }).slice(0, 8);
-            if (filtered.length > 0) {
-              setRecommendations(filtered);
-              setRecommendReason(`Dành cho bạn yêu thích ${interestedCategories[0].toLowerCase()}`);
+          const result = await productApi.getAll({
+            category: interestedCategories[0],
+            gender: interestedGender || undefined,
+            pageSize: 12,
+          });
+
+          if (result.success && result.data) {
+            const filtered = result.data.products.filter(
+              (p) =>
+                !purchasedProductIds.has(p.id) &&
+                !viewedIds.has(p.id)
+            );
+
+            if (filtered.length >= 3) {
+              setRecommendations(filtered.slice(0, 4));
+              setRecommendReason(`Dành cho bạn yêu thích ${interestedCategories[0]}`);
               return;
             }
           }
         }
 
-        // Strategy 2: gender
-        if (interestedGender) {
-          const allResult = await productApi.getAll({ pageSize: 50 });
-          if (allResult.success && allResult.data) {
-            const filtered = allResult.data.products.filter((p: Product) => {
-              if (purchasedProductIds.has(p.id)) return false;
-              return matchesProductGender(p.gender, interestedGender);
-            }).slice(0, 8);
-            if (filtered.length > 0) {
-              setRecommendations(filtered);
-              setRecommendReason(`Sản phẩm dành cho ${interestedGender === 'Nu' ? 'nữ' : interestedGender === 'Nam' ? 'nam' : 'bạn'}`);
-              return;
-            }
-          }
-        }
-
-        // Strategy 3: search history
+        // Strategy 3: Từ keyword tìm kiếm gần nhất
         if (searchHistory.length > 0) {
-          const result = await productApi.getAll({ search: searchHistory[0].keyword, pageSize: 8 });
+          const latestSearch = searchHistory[0];
+          const result = await productApi.getAll({
+            search: latestSearch.keyword,
+            pageSize: 8,
+          });
+
           if (result.success && result.data && result.data.products.length > 0) {
-            setRecommendations(result.data.products);
-            setRecommendReason(`Liên quan đến tìm kiếm "${searchHistory[0].keyword}"`);
-            return;
+            const filtered = result.data.products.filter(
+              (p) => !purchasedProductIds.has(p.id) && !viewedIds.has(p.id)
+            );
+
+            if (filtered.length >= 3) {
+              setRecommendations(filtered.slice(0, 4));
+              setRecommendReason(`Liên quan đến "${latestSearch.keyword}" bạn đã tìm`);
+              return;
+            }
           }
         }
 
-        // Fallback: best sellers
-        const bestResult = await productApi.getBestSellers(8);
-        if (bestResult.success && bestResult.data) {
-          setRecommendations(bestResult.data);
+        // Strategy 4: Sản phẩm đã mua → gợi ý related
+        if (purchasedProductIds.size > 0) {
+          const firstId = Array.from(purchasedProductIds)[0];
+          const relatedResult = await productApi.getRelated(firstId, 8);
+
+          if (relatedResult.success && relatedResult.data && relatedResult.data.length > 0) {
+            const filtered = relatedResult.data.filter(
+              (p) => !purchasedProductIds.has(p.id)
+            );
+
+            if (filtered.length > 0) {
+              setRecommendations(filtered.slice(0, 4));
+              setRecommendReason('Dựa trên đơn hàng đã mua');
+              return;
+            }
+          }
+        }
+
+        // Strategy 5: Wishlist → gợi ý related
+        if (wishlistIds.size > 0) {
+          const firstId = Array.from(wishlistIds)[0];
+          const relatedResult = await productApi.getRelated(firstId, 8);
+
+          if (relatedResult.success && relatedResult.data && relatedResult.data.length > 0) {
+            const filtered = relatedResult.data.filter(
+              (p) => !wishlistIds.has(p.id)
+            );
+
+            if (filtered.length > 0) {
+              setRecommendations(filtered.slice(0, 4));
+              setRecommendReason('Dựa trên sản phẩm bạn yêu thích');
+              return;
+            }
+          }
+        }
+
+        // Fallback: sản phẩm bán chạy
+        const fallback = await productApi.getBestSellers(4);
+        if (fallback.success && fallback.data) {
+          setRecommendations(fallback.data);
           setRecommendReason('Sản phẩm bán chạy mà bạn có thể thích');
         }
       } catch (error) {
         console.error('Error loading recommendations:', error);
+        setRecommendations([]);
       }
     };
+
     loadRecommendations();
   }, [user]);
-
 
   useEffect(() => {
     setCurrentSlide(0);
@@ -695,24 +765,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Sản phẩm đã xem gần đây — chỉ hiện khi có data */}
-      {recentlyViewed.length > 0 && (
-        <section className="recently-viewed-section" style={{ padding: '60px 20px', background: '#fff' }}>
-          <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 24 }}>
-              <h2 style={{ fontSize: 22, fontWeight: 600, color: '#0f172a', margin: 0 }}>
-                <i className="fa fa-history" style={{ color: '#6366f1', marginRight: 10 }}></i>
-                Bạn đã xem gần đây
-              </h2>
-              <span style={{ fontSize: 13, color: '#94a3b8' }}>{recentlyViewed.length} sản phẩm</span>
-            </div>
-            <div className="sanphams">
-              {recentlyViewed.map((p) => <ProductCard key={p.id} product={p} />)}
-            </div>
-          </div>
-        </section>
-      )}
-
       <section className="reviews-section recommendations-section">
         <div className="section-header">
           <h2>
@@ -730,11 +782,7 @@ export default function Home() {
               <ProductCard key={product.id} product={product} />
             ))
           ) : (
-            <>
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={`sk-${i}`} className="pd-loading-shimmer" style={{ aspectRatio: '4/5', borderRadius: 8 }} />
-              ))}
-            </>
+            <p style={emptyStateStyle}>Đang tải gợi ý...</p>
           )}
         </div>
 
@@ -763,23 +811,7 @@ export default function Home() {
             <h3>Nhận ưu đãi & tin mới nhất</h3>
             <p>Đăng ký email để nhận voucher 10% cho đơn đầu tiên</p>
 
-            <form className="newsletter-form" onSubmit={async (event) => {
-              event.preventDefault();
-              if (!newsletterEmail.trim() || !newsletterEmail.includes('@')) {
-                toast.error('Vui lòng nhập email hợp lệ');
-                return;
-              }
-              setNewsletterSubmitting(true);
-              const r = await newsletterApi.subscribe(newsletterEmail.trim().toLowerCase());
-              setNewsletterSubmitting(false);
-              if (r.success && r.data) {
-                setNewsletterSuccess({ code: r.data.code, expiresAt: r.data.expiresAt });
-                setNewsletterEmail('');
-                toast.success(r.data.message);
-              } else {
-                toast.error(r.error || 'Đăng ký thất bại');
-              }
-            }}>
+            <form className="newsletter-form" onSubmit={(event) => event.preventDefault()}>
               <input type="email" placeholder="Email của bạn" required />
               <button type="submit">
                 <PiPaperPlaneTiltFill aria-hidden="true" />

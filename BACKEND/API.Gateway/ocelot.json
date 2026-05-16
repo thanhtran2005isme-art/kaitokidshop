@@ -605,6 +605,21 @@
                                                           "Port":  5265
                                                       }
                                                   ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/banners",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/banners",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
                    }
                ],
     "GlobalConfiguration":  {

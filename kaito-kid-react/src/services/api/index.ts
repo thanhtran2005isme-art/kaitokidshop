@@ -41,3 +41,5 @@ export { ghnLocationApi, type GhnProvince as GhnProvinceItem2, type GhnDistrict 
 export { paymentApi, type PaymentStatus } from './paymentApi';
 
 export { newsletterApi, type NewsletterSubscribeResult } from './newsletterApi';
+
+export { publicBannerApi, type PublicBannerDTO } from './publicBannerApi';

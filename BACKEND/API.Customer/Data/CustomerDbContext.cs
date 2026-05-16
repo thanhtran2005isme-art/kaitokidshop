@@ -22,6 +22,7 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
     public DbSet<StoreSetting> StoreSettings => Set<StoreSetting>();
     public DbSet<PointsHistory> PointsHistories => Set<PointsHistory>();
     public DbSet<NewsletterSubscriber> NewsletterSubscribers => Set<NewsletterSubscriber>();
+    public DbSet<Banner> Banners => Set<Banner>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

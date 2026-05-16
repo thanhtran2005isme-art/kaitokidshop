@@ -18,6 +18,10 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
     public DbSet<Lookbook> Lookbooks => Set<Lookbook>();
     public DbSet<User> Users => Set<User>();
     public DbSet<ProductAttribute> ProductAttributes => Set<ProductAttribute>();
+    public DbSet<ShippingHistory> ShippingHistories => Set<ShippingHistory>();
+    public DbSet<StoreSetting> StoreSettings => Set<StoreSetting>();
+    public DbSet<PointsHistory> PointsHistories => Set<PointsHistory>();
+    public DbSet<NewsletterSubscriber> NewsletterSubscribers => Set<NewsletterSubscriber>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,6 +35,7 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
         {
             e.HasIndex(o => o.OrderCode).IsUnique();
             e.HasMany(o => o.Items).WithOne(i => i.Order).HasForeignKey(i => i.OrderId);
+            e.HasMany(o => o.ShippingHistories).WithOne(h => h.Order).HasForeignKey(h => h.OrderId);
         });
 
         modelBuilder.Entity<WishlistItem>(e =>
@@ -47,6 +52,12 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
         {
             e.HasIndex(c => c.Code).IsUnique();
         });
+
+        modelBuilder.Entity<ShippingHistory>(e =>
+        {
+            e.HasIndex(h => h.OrderId);
+        });
     }
 }
 // v1.1: Them indexes cho Slug, Status, OrderCode, Wishlist
+// v1.2: Them ShippingHistories cho luong van chuyen

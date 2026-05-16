@@ -4,16 +4,21 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { StaffAuthProvider } from './context/StaffAuthContext';
 
 // Layouts
 import MainLayout from './components/layout/MainLayout';
 import AdminLayout from './components/admin/AdminLayout';
 import { AdminUiProvider } from './components/admin/AdminUiProvider';
 import ProtectedRoute from './components/ProtectedRoute';
+import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
 
 // Customer Pages
 import Home from './pages/Home';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
 import Cart from './pages/Cart';
@@ -60,6 +65,8 @@ import AdminMenus from './admin/AdminMenus';
 import AdminLookbook from './admin/AdminLookbook';
 import AdminProfile from './admin/AdminProfile';
 import AdminSettings from './admin/AdminSettings';
+import AdminLogin from './admin/AdminLogin';
+import AdminShipping from './admin/AdminShipping';
 
 import './App.css';
 
@@ -67,12 +74,16 @@ function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <BrowserRouter>
+        <StaffAuthProvider>
+          <BrowserRouter>
           <Routes>
             {/* Trang khách hàng - dùng chung Header + Footer */}
             <Route element={<MainLayout />}>
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/products" element={<Products />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/cart" element={<Cart />} />
@@ -96,8 +107,11 @@ function App() {
               </Route>
             </Route>
 
-            {/* Trang Admin - dùng Sidebar riêng */}
-            <Route element={<ProtectedRoute requireAdmin />}>
+            {/* Admin login - không qua MainLayout/AdminLayout */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+
+            {/* Trang Admin - dùng Sidebar riêng + StaffAuth */}
+            <Route element={<AdminProtectedRoute />}>
               <Route path="/admin" element={<AdminUiProvider><AdminLayout /></AdminUiProvider>}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<Dashboard />} />
@@ -127,11 +141,13 @@ function App() {
                 <Route path="menus" element={<AdminMenus />} />
                 <Route path="lookbook" element={<AdminLookbook />} />
                 <Route path="profile" element={<AdminProfile />} />
+                <Route path="shipping" element={<AdminShipping />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
             </Route>
           </Routes>
         </BrowserRouter>
+        </StaffAuthProvider>
       </CartProvider>
     </AuthProvider>
   );

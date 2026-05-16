@@ -10,7 +10,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (identifier: string, password: string, recaptchaToken?: string) => Promise<{ success: boolean; error?: string; requireTwoFactor?: boolean; identifier?: string; password?: string }>;
   register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
@@ -42,8 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const result = await authApi.login(email, password);
+  const login = async (identifier: string, password: string, recaptchaToken?: string) => {
+    const result = await authApi.login(identifier, password, recaptchaToken);
     if (result.success && result.user) {
       setUser(result.user);
     }

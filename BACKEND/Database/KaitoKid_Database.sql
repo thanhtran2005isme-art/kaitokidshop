@@ -639,6 +639,98 @@ GO
 CREATE NONCLUSTERED INDEX IX_NhatKy_NgayTao ON NhatKyHoatDong(NgayTao DESC);
 CREATE NONCLUSTERED INDEX IX_NhatKy_DoiTuong ON NhatKyHoatDong(DoiTuong, DoiTuongId);
 GO
+-- Tạo các bảng nâng cao cho nghiệp vụ kho
+USE KaitoKid;
+GO
+
+-- 1. Nhà cung cấp
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'NhaCungCap')
+BEGIN
+    CREATE TABLE NhaCungCap (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        TenNhaCungCap NVARCHAR(255) NOT NULL DEFAULT '',
+        MaNhaCungCap NVARCHAR(50) NULL,
+        NguoiLienHe NVARCHAR(100) NULL,
+        SoDienThoai NVARCHAR(20) NULL,
+        Email NVARCHAR(100) NULL,
+        DiaChi NVARCHAR(500) NULL,
+        MaSoThue NVARCHAR(50) NULL,
+        GhiChu NVARCHAR(500) NULL,
+        TrangThai BIT NOT NULL DEFAULT 1,
+        NgayTao DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        NgayCapNhat DATETIME2 NULL
+    );
+    PRINT 'Created NhaCungCap';
+END
+GO
+
+-- 2. Phiếu nhập
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PhieuNhap')
+BEGIN
+    CREATE TABLE PhieuNhap (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        MaPhieu NVARCHAR(50) NOT NULL DEFAULT '',
+        NhaCungCapId INT NULL,
+        TenNhaCungCap NVARCHAR(255) NULL,
+        NgayNhap DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        NguoiNhap NVARCHAR(100) NULL,
+        TongGiaTri DECIMAL(18,0) NOT NULL DEFAULT 0,
+        GhiChu NVARCHAR(1000) NULL,
+        TrangThai NVARCHAR(20) NOT NULL DEFAULT 'done',
+        NgayTao DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        NgayCapNhat DATETIME2 NULL
+    );
+    CREATE INDEX IX_PhieuNhap_NgayNhap ON PhieuNhap(NgayNhap DESC);
+    CREATE UNIQUE INDEX IX_PhieuNhap_MaPhieu ON PhieuNhap(MaPhieu);
+    PRINT 'Created PhieuNhap';
+END
+GO
+
+-- 3. Chi tiết phiếu nhập
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ChiTietPhieuNhap')
+BEGIN
+    CREATE TABLE ChiTietPhieuNhap (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        PhieuNhapId INT NOT NULL,
+        SanPhamId INT NOT NULL,
+        TenSanPham NVARCHAR(255) NOT NULL DEFAULT '',
+        KichCo NVARCHAR(20) NULL,
+        MauSac NVARCHAR(50) NULL,
+        SoLuong INT NOT NULL DEFAULT 0,
+        DonGiaNhap DECIMAL(18,0) NOT NULL DEFAULT 0,
+        ThanhTien DECIMAL(18,0) NOT NULL DEFAULT 0,
+        GhiChu NVARCHAR(500) NULL,
+        CONSTRAINT FK_ChiTietPhieuNhap_PhieuNhap FOREIGN KEY (PhieuNhapId)
+            REFERENCES PhieuNhap(Id) ON DELETE CASCADE
+    );
+    CREATE INDEX IX_ChiTietPhieuNhap_PhieuNhapId ON ChiTietPhieuNhap(PhieuNhapId);
+    CREATE INDEX IX_ChiTietPhieuNhap_SanPhamId ON ChiTietPhieuNhap(SanPhamId);
+    PRINT 'Created ChiTietPhieuNhap';
+END
+GO
+
+-- 4. Tồn kho biến thể (size + màu)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'TonKhoBienThe')
+BEGIN
+    CREATE TABLE TonKhoBienThe (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        SanPhamId INT NOT NULL,
+        KichCo NVARCHAR(20) NOT NULL DEFAULT '',
+        MauSac NVARCHAR(50) NOT NULL DEFAULT '',
+        SoLuong INT NOT NULL DEFAULT 0,
+        SoLuongDaBan INT NOT NULL DEFAULT 0,
+        GiaVonTrungBinh DECIMAL(18,0) NULL,
+        NgayTao DATETIME2 NOT NULL DEFAULT GETUTCDATE(),
+        NgayCapNhat DATETIME2 NULL
+    );
+    CREATE INDEX IX_TonKhoBienThe_SanPhamId ON TonKhoBienThe(SanPhamId);
+    CREATE UNIQUE INDEX IX_TonKhoBienThe_Variant ON TonKhoBienThe(SanPhamId, KichCo, MauSac);
+    PRINT 'Created TonKhoBienThe';
+END
+GO
+
+PRINT 'All inventory advanced tables created successfully.';
+
 
 -- ================================================================
 -- ================================================================

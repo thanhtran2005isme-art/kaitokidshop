@@ -1,262 +1,686 @@
-// Trang tài khoản - kết nối backend qua /api/account và /api/auth/change-password
+// Trang tài khoản — Gamification edition
+// Hiển thị: cấp bậc, điểm thưởng, lộ trình tiến tier, đổi điểm, voucher cá nhân, lịch sử
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  PiCrownSimpleFill,
+  PiCoinsFill,
+  PiCalendarBlankFill,
+  PiPhoneFill,
+  PiEnvelopeSimple,
+  PiUserCircleFill,
+  PiPackageFill,
+  PiTrendUpBold,
+  PiGiftFill,
+  PiTicketFill,
+  PiClockClockwiseBold,
+  PiSignOut,
+  PiPencilSimpleLineFill,
+  PiCheckCircleFill,
+  PiCopyBold,
+} from 'react-icons/pi';
 import { useAuth } from '../context/AuthContext';
-import { accountApi } from '../services/api';
+import { accountApi, type AccountDTO, type PointsHistoryDTO, type PersonalVoucher } from '../services/api';
+import { authApi } from '../services/api/authApi';
+import { PiShieldCheckBold, PiClockCounterClockwiseBold as PiClockHistory, PiQrCodeBold } from 'react-icons/pi';
+import { formatCurrency, formatDate } from '../utils/format';
+import toast from 'react-hot-toast';
+
+type TabKey = 'overview' | 'profile' | 'orders' | 'points' | 'vouchers' | 'security';
+
+const TIER_META: Record<string, { color: string; bg: string; icon: string; perks: string[] }> = {
+  Member:  { color: '#475569', bg: 'linear-gradient(135deg, #cbd5e1 0%, #94a3b8 100%)', icon: '🥉', perks: ['Tích điểm 1%', 'Sinh nhật giảm 5%'] },
+  Silver:  { color: '#0f172a', bg: 'linear-gradient(135deg, #94a3b8 0%, #475569 100%)', icon: '🥈', perks: ['Tích điểm 1.5%', 'Sinh nhật giảm 10%', 'Freeship đơn từ 399k'] },
+  Gold:    { color: '#7c2d12', bg: 'linear-gradient(135deg, #fde047 0%, #ca8a04 100%)', icon: '🥇', perks: ['Tích điểm 2%', 'Sinh nhật giảm 15%', 'Freeship đơn từ 299k', 'Tặng quà sinh nhật'] },
+  Diamond: { color: '#1e3a8a', bg: 'linear-gradient(135deg, #93c5fd 0%, #6366f1 100%)', icon: '💎', perks: ['Tích điểm 3%', 'Sinh nhật giảm 20%', 'Freeship toàn bộ đơn', 'Quà sinh nhật + Black card', 'Hotline VIP 24/7'] },
+};
+
+const REDEEM_TIERS = [
+  { points: 100, value: 10_000 },
+  { points: 300, value: 35_000 },
+  { points: 500, value: 60_000 },
+  { points: 1000, value: 130_000 },
+];
 
 export default function Account() {
-  const { user, isAdmin, refreshUser } = useAuth();
-  const [editing, setEditing] = useState(false);
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [avatar, setAvatar] = useState('');
-  const [msg, setMsg] = useState('');
-  const [msgType, setMsgType] = useState<'success' | 'error'>('success');
+  const { user, logout } = useAuth();
+  const [profile, setProfile] = useState<AccountDTO | null>(null);
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
   const [loading, setLoading] = useState(true);
+
+  const [editForm, setEditForm] = useState({ name: '', phone: '', birthday: '' });
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [curPwd, setCurPwd] = useState('');
-  const [newPwd, setNewPwd] = useState('');
-  const [confirmPwd, setConfirmPwd] = useState('');
-  const [pwdMsg, setPwdMsg] = useState('');
-  const [pwdMsgType, setPwdMsgType] = useState<'success' | 'error'>('success');
-  const [changingPwd, setChangingPwd] = useState(false);
+  const [history, setHistory] = useState<PointsHistoryDTO[]>([]);
+  const [vouchers, setVouchers] = useState<PersonalVoucher[]>([]);
+  const [redeemingPoints, setRedeemingPoints] = useState<number | null>(null);
 
-  // Load profile từ backend
+  const loadProfile = useCallback(async () => {
+    setLoading(true);
+    const r = await accountApi.getProfile();
+    if (r.success && r.data) {
+      setProfile(r.data);
+      setEditForm({
+        name: r.data.name || '',
+        phone: r.data.phone || '',
+        birthday: r.data.birthday ? r.data.birthday.split('T')[0] : '',
+      });
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void loadProfile(); }, [loadProfile]);
+
   useEffect(() => {
-    const loadProfile = async () => {
-      setLoading(true);
-      const result = await accountApi.getProfile();
-      if (result.success && result.data) {
-        setName(result.data.name || '');
-        setEmail(result.data.email || '');
-        setPhone(result.data.phone || '');
-        setAvatar(result.data.avatar || '');
-      } else if (user) {
-        // Fallback to user from auth context
-        setName(user.name || '');
-        setEmail(user.email || '');
-        setPhone(user.phone || '');
-      }
-      setLoading(false);
-    };
-    void loadProfile();
-  }, [user]);
+    if (activeTab === 'points') {
+      void accountApi.getPointsHistory().then((r) => r.success && r.data && setHistory(r.data));
+    } else if (activeTab === 'vouchers') {
+      void accountApi.getMyVouchers().then((r) => r.success && r.data && setVouchers(r.data));
+    }
+  }, [activeTab]);
 
-  const showMsg = (text: string, type: 'success' | 'error' = 'success') => {
-    setMsg(text);
-    setMsgType(type);
-    window.setTimeout(() => setMsg(''), 3000);
-  };
-
-  const showPwdMsg = (text: string, type: 'success' | 'error' = 'success') => {
-    setPwdMsg(text);
-    setPwdMsgType(type);
-    window.setTimeout(() => setPwdMsg(''), 3000);
-  };
-
-  const saveProfile = async () => {
-    if (!name.trim()) { showMsg('Vui lòng nhập họ tên', 'error'); return; }
-
+  const handleSave = async () => {
     setSaving(true);
-    const result = await accountApi.updateProfile({
-      name: name.trim(),
-      phone: phone.trim(),
-      avatar: avatar || undefined,
+    const r = await accountApi.updateProfile({
+      name: editForm.name || undefined,
+      phone: editForm.phone || undefined,
+      birthday: editForm.birthday || undefined,
     });
     setSaving(false);
-
-    if (result.success) {
-      showMsg('Đã cập nhật thành công!');
+    if (r.success && r.data) {
+      setProfile(r.data);
       setEditing(false);
-      // Sync với auth context
-      await refreshUser();
+      toast.success('Đã cập nhật thông tin');
     } else {
-      showMsg(result.error || 'Không thể cập nhật. Vui lòng thử lại.', 'error');
+      toast.error(r.error || 'Cập nhật thất bại');
     }
   };
 
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      showMsg('Vui lòng chọn file ảnh hợp lệ', 'error');
+  const handleRedeem = async (points: number) => {
+    if (!profile || profile.loyaltyPoints < points) {
+      toast.error('Bạn không đủ điểm');
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      showMsg('Ảnh không được lớn hơn 2MB', 'error');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = typeof reader.result === 'string' ? reader.result : '';
-      setAvatar(dataUrl);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const changePassword = async () => {
-    if (!curPwd) { showPwdMsg('Nhập mật khẩu hiện tại', 'error'); return; }
-    if (newPwd.length < 6) { showPwdMsg('Mật khẩu mới ít nhất 6 ký tự', 'error'); return; }
-    if (newPwd !== confirmPwd) { showPwdMsg('Mật khẩu xác nhận không khớp', 'error'); return; }
-
-    setChangingPwd(true);
-    const result = await accountApi.changePassword({
-      currentPassword: curPwd,
-      newPassword: newPwd,
-    });
-    setChangingPwd(false);
-
-    if (result.success) {
-      showPwdMsg('Đổi mật khẩu thành công!');
-      setCurPwd(''); setNewPwd(''); setConfirmPwd('');
+    if (!confirm(`Đổi ${points} điểm để lấy voucher giảm ${formatCurrency(points * 100)}?`)) return;
+    setRedeemingPoints(points);
+    const r = await accountApi.redeemPoints(points);
+    setRedeemingPoints(null);
+    if (r.success && r.data) {
+      toast.success(`Đã tạo voucher ${r.data.couponCode} — giảm ${formatCurrency(r.data.discountValue)}`);
+      void loadProfile();
+      void accountApi.getMyVouchers().then((vr) => vr.success && vr.data && setVouchers(vr.data));
+      setActiveTab('vouchers');
     } else {
-      showPwdMsg(result.error || 'Không thể đổi mật khẩu', 'error');
+      toast.error(r.error || 'Đổi điểm thất bại');
     }
   };
 
-  const sidebarLinks = [
-    { to: '/account', icon: 'fa-user', label: 'Thông tin tài khoản', active: true },
-    { to: '/orders', icon: 'fa-box', label: 'Đơn hàng của tôi' },
-    { to: '/wishlist', icon: 'fa-heart', label: 'Sản phẩm yêu thích' },
-    { to: '/address', icon: 'fa-location-dot', label: 'Địa chỉ giao hàng' },
-  ];
+  if (loading || !profile) {
+    return <div style={{ padding: 80, textAlign: 'center', color: '#64748b' }}>Đang tải tài khoản...</div>;
+  }
+
+  const tier = TIER_META[profile.memberTier] || TIER_META.Member;
+  const tierPct = profile.nextTierAt > 0
+    ? Math.min(100, Math.round((profile.totalSpent / profile.nextTierAt) * 100))
+    : 100;
 
   return (
-    <div className="account-page">
-      <div className="account-container">
-        {/* Sidebar */}
-        <div className="account-sidebar">
-          <div className="user-profile-card">
-            <div className="user-avatar">
-              {avatar ? (
-                <img src={avatar} alt={name} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-              ) : (
-                name?.charAt(0)?.toUpperCase() || 'U'
-              )}
-            </div>
-            <h3>{name || user?.name}</h3>
-            <p>{email || user?.email}</p>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px 20px 60px' }}>
+      {/* HEADER CARD */}
+      <div style={{
+        background: tier.bg,
+        borderRadius: 16,
+        padding: '28px 32px',
+        color: tier.color,
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: -40, right: -40, fontSize: 200, opacity: 0.15 }}>{tier.icon}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20, position: 'relative' }}>
+          <div style={{
+            width: 80, height: 80, borderRadius: '50%',
+            background: 'rgba(255,255,255,0.3)', backdropFilter: 'blur(8px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 36, fontWeight: 700, color: '#fff',
+          }}>
+            {(profile.name || 'K').charAt(0).toUpperCase()}
           </div>
-          <nav className="account-nav">
-            {sidebarLinks.map(link => (
-              <Link key={link.to} to={link.to} className={`nav-item ${link.active ? 'active' : ''}`}>
-                <i className={`fa ${link.icon}`}></i> {link.label}
-              </Link>
-            ))}
-            {isAdmin && (
-              <>
-                <div className="nav-divider"></div>
-                <Link to="/admin/dashboard" className="nav-item">
-                  <i className="fa fa-shield-alt"></i> Trang quản trị
-                </Link>
-              </>
-            )}
-          </nav>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 500, opacity: 0.85 }}>
+              {tier.icon} Thành viên {profile.memberTier}
+            </div>
+            <div style={{ fontSize: 26, fontWeight: 700, marginTop: 2 }}>
+              Xin chào, {profile.name}!
+            </div>
+            <div style={{ fontSize: 13, marginTop: 4, opacity: 0.85 }}>
+              Đã cùng KaitoKid {Math.floor((Date.now() - new Date(profile.createdAt).getTime()) / (1000 * 60 * 60 * 24))} ngày
+            </div>
+          </div>
+          <button
+            onClick={() => { logout(); window.location.href = '/'; }}
+            style={{
+              background: 'rgba(0,0,0,0.15)', color: '#fff', border: 'none',
+              padding: '8px 16px', borderRadius: 8, cursor: 'pointer',
+              fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <PiSignOut /> Đăng xuất
+          </button>
         </div>
 
-        {/* Main Content */}
-        <div className="account-main">
-          <div className="account-header">
-            <h1>Thông tin tài khoản</h1>
-            <p>Quản lý thông tin cá nhân của bạn</p>
-          </div>
-
-          {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
-              <i className="fa fa-spinner fa-spin"></i> Đang tải thông tin...
+        {/* Tier progress */}
+        {profile.amountToNextTier > 0 && profile.nextTier !== profile.memberTier && (
+          <div style={{ marginTop: 24, position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
+              <span><PiTrendUpBold style={{ verticalAlign: -2 }} /> Còn {formatCurrency(profile.amountToNextTier)} để lên hạng <strong>{profile.nextTier}</strong></span>
+              <span style={{ fontWeight: 600 }}>{tierPct}%</span>
             </div>
-          ) : (
-            <>
-              {/* Profile Section */}
-              <div className="account-section">
-                <div className="section-header">
-                  <h2><i className="fa fa-user"></i> Thông tin cá nhân</h2>
-                  <button className="btn-edit" onClick={() => editing ? saveProfile() : setEditing(true)} disabled={saving}>
-                    <i className={`fa ${editing ? (saving ? 'fa-spinner fa-spin' : 'fa-check') : 'fa-edit'}`}></i>
-                    {' '}{editing ? (saving ? 'Đang lưu...' : 'Lưu') : 'Chỉnh sửa'}
-                  </button>
-                </div>
-                {msg && (
-                  <div className={`toast show ${msgType}`} style={{ position: 'relative', top: 0, right: 0, transform: 'none', marginBottom: 12 }}>
-                    {msg}
-                  </div>
-                )}
+            <div style={{ background: 'rgba(255,255,255,0.3)', height: 8, borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ background: '#fff', height: '100%', width: `${tierPct}%`, transition: 'width 0.6s' }} />
+            </div>
+          </div>
+        )}
+      </div>
 
-                {/* Avatar upload */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px' }}>
-                  <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', fontSize: '32px', fontWeight: 700, color: '#64748b' }}>
-                    {avatar ? (
-                      <img src={avatar} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      name?.charAt(0)?.toUpperCase() || 'U'
-                    )}
-                  </div>
-                  {editing && (
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#eff6ff', color: '#2563eb', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>
-                      <i className="fa fa-camera"></i> Đổi avatar
-                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleAvatarUpload} />
-                    </label>
+      {/* STATS ROW */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, margin: '20px 0' }}>
+        <StatCard icon={<PiCoinsFill />} value={profile.loyaltyPoints} label="Điểm thưởng" color="#f59e0b" hint={`= ${formatCurrency(profile.loyaltyPoints * 100)}`} />
+        <StatCard icon={<PiPackageFill />} value={profile.totalOrders} label="Đơn hàng" color="#6366f1" />
+        <StatCard icon={<PiCrownSimpleFill />} value={profile.memberTier} label="Cấp bậc" color={tier.color} isText />
+        <StatCard icon={<PiTicketFill />} value={vouchers.length} label="Voucher cá nhân" color="#ec4899" />
+      </div>
+
+      {/* TABS */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', overflowX: 'auto' }}>
+          {([
+            ['overview', 'Tổng quan', PiUserCircleFill],
+            ['profile', 'Thông tin', PiPencilSimpleLineFill],
+            ['orders', 'Đơn hàng', PiPackageFill],
+            ['points', 'Điểm thưởng', PiCoinsFill],
+            ['vouchers', 'Voucher', PiTicketFill],
+            ['security', 'Bảo mật', PiShieldCheckBold],
+          ] as [TabKey, string, typeof PiUserCircleFill][]).map(([k, label, Icon]) => (
+            <button
+              key={k}
+              onClick={() => setActiveTab(k)}
+              style={{
+                flex: '0 0 auto', padding: '14px 22px', border: 'none',
+                background: 'transparent', cursor: 'pointer', fontSize: 14,
+                fontWeight: activeTab === k ? 600 : 500,
+                color: activeTab === k ? '#ec4899' : '#64748b',
+                borderBottom: `2px solid ${activeTab === k ? '#ec4899' : 'transparent'}`,
+                marginBottom: -1, display: 'flex', alignItems: 'center', gap: 6,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Icon /> {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding: 28 }}>
+          {/* ===== OVERVIEW ===== */}
+          {activeTab === 'overview' && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+              <Card title="Quyền lợi cấp bậc của bạn" icon={<PiCrownSimpleFill style={{ color: '#f59e0b' }} />}>
+                <ul style={{ paddingLeft: 18, margin: 0, lineHeight: 1.9, fontSize: 14 }}>
+                  {tier.perks.map((p) => (
+                    <li key={p}><PiCheckCircleFill style={{ color: '#16a34a', verticalAlign: -3, marginRight: 6 }} />{p}</li>
+                  ))}
+                </ul>
+              </Card>
+              <Card title="Lộ trình thăng hạng" icon={<PiTrendUpBold style={{ color: '#6366f1' }} />}>
+                <div style={{ fontSize: 13, lineHeight: 1.8, color: '#475569' }}>
+                  {profile.memberTier !== 'Diamond' ? (
+                    <>
+                      Mua thêm <strong style={{ color: '#0f172a' }}>{formatCurrency(profile.amountToNextTier)}</strong> để
+                      đạt hạng <strong style={{ color: '#ec4899' }}>{profile.nextTier}</strong>.
+                      <br />Mỗi đơn hàng đều được tích vào hạng tiếp theo.
+                    </>
+                  ) : (
+                    <>🎉 Bạn đã đạt hạng cao nhất Diamond!</>
                   )}
                 </div>
-
-                <div className="profile-form">
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Họ tên <span className="required">*</span></label>
-                      <input value={name} onChange={e => setName(e.target.value)} disabled={!editing} />
-                    </div>
-                    <div className="form-group">
-                      <label>Email</label>
-                      <input value={email} disabled title="Email không thể thay đổi" style={{ background: '#f8fafc', color: '#64748b' }} />
-                    </div>
-                  </div>
-                  <div className="form-group">
-                    <label>Số điện thoại</label>
-                    <input value={phone} onChange={e => setPhone(e.target.value)} disabled={!editing} />
-                  </div>
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px dashed #e5e7eb', fontSize: 13, color: '#64748b' }}>
+                  <PiCalendarBlankFill style={{ verticalAlign: -2 }} /> Tổng chi tiêu: <strong style={{ color: '#0f172a' }}>{formatCurrency(profile.totalSpent)}</strong>
                 </div>
+              </Card>
+            </div>
+          )}
+
+          {/* ===== PROFILE ===== */}
+          {activeTab === 'profile' && (
+            <div style={{ maxWidth: 600 }}>
+              <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>Thông tin cá nhân</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                <Field label="Họ và tên" icon={<PiUserCircleFill />}>
+                  {editing ? (
+                    <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} style={inputStyle} />
+                  ) : <div style={readonly}>{profile.name}</div>}
+                </Field>
+                <Field label="Số điện thoại" icon={<PiPhoneFill />}>
+                  {editing ? (
+                    <input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} style={inputStyle} />
+                  ) : <div style={readonly}>{profile.phone || '—'}</div>}
+                </Field>
+                <Field label="Email" icon={<PiEnvelopeSimple />}>
+                  <div style={{ ...readonly, color: '#94a3b8' }}>{profile.email}</div>
+                </Field>
+                <Field label="Ngày sinh" icon={<PiCalendarBlankFill />}>
+                  {editing ? (
+                    <input type="date" value={editForm.birthday} onChange={(e) => setEditForm({ ...editForm, birthday: e.target.value })} style={inputStyle} />
+                  ) : (
+                    <div style={readonly}>{profile.birthday ? formatDate(profile.birthday).split(' ')[0] : '—'}</div>
+                  )}
+                </Field>
               </div>
 
-              {/* Password Section */}
-              <div className="account-section">
-                <div className="section-header">
-                  <h2><i className="fa fa-lock"></i> Đổi mật khẩu</h2>
-                </div>
-                {pwdMsg && (
-                  <div className={`toast show ${pwdMsgType}`} style={{ position: 'relative', top: 0, right: 0, transform: 'none', marginBottom: 12 }}>
-                    {pwdMsg}
-                  </div>
-                )}
-                <div className="password-form">
-                  <div className="form-group">
-                    <label>Mật khẩu hiện tại</label>
-                    <input type="password" value={curPwd} onChange={e => setCurPwd(e.target.value)} />
-                  </div>
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label>Mật khẩu mới</label>
-                      <input type="password" value={newPwd} onChange={e => setNewPwd(e.target.value)} />
-                    </div>
-                    <div className="form-group">
-                      <label>Xác nhận mật khẩu</label>
-                      <input type="password" value={confirmPwd} onChange={e => setConfirmPwd(e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="form-actions">
-                    <button className="btn-save" onClick={changePassword} disabled={changingPwd}>
-                      <i className={`fa ${changingPwd ? 'fa-spinner fa-spin' : 'fa-key'}`}></i>
-                      {' '}{changingPwd ? 'Đang đổi...' : 'Đổi mật khẩu'}
+              <div style={{ marginTop: 24, display: 'flex', gap: 10 }}>
+                {editing ? (
+                  <>
+                    <button onClick={handleSave} disabled={saving} style={primaryBtn}>
+                      {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
                     </button>
-                  </div>
-                </div>
+                    <button onClick={() => setEditing(false)} style={secondaryBtn}>Hủy</button>
+                  </>
+                ) : (
+                  <button onClick={() => setEditing(true)} style={primaryBtn}>
+                    <PiPencilSimpleLineFill style={{ marginRight: 6, verticalAlign: -2 }} /> Chỉnh sửa
+                  </button>
+                )}
               </div>
-            </>
+            </div>
+          )}
+
+          {/* ===== ORDERS ===== */}
+          {activeTab === 'orders' && (
+            <div style={{ textAlign: 'center', padding: 40 }}>
+              <PiPackageFill style={{ fontSize: 48, color: '#cbd5e1' }} />
+              <p style={{ color: '#64748b', marginTop: 12 }}>Bạn có <strong>{profile.totalOrders}</strong> đơn hàng</p>
+              <Link to="/orders" style={{ ...primaryBtn, display: 'inline-block', textDecoration: 'none', marginTop: 12 }}>
+                Xem chi tiết đơn hàng
+              </Link>
+            </div>
+          )}
+
+          {/* ===== POINTS ===== */}
+          {activeTab === 'points' && (
+            <div>
+              <Card title="Đổi điểm lấy voucher" icon={<PiGiftFill style={{ color: '#ec4899' }} />}>
+                <p style={{ fontSize: 13, color: '#64748b', margin: '0 0 14px' }}>
+                  Tỷ lệ quy đổi: <strong>100 điểm = 10.000đ</strong>. Voucher có hạn 60 ngày.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                  {REDEEM_TIERS.map((t) => {
+                    const enough = profile.loyaltyPoints >= t.points;
+                    return (
+                      <div key={t.points} style={{
+                        padding: 16, border: `1px solid ${enough ? '#fbcfe8' : '#e5e7eb'}`,
+                        background: enough ? '#fdf2f8' : '#f8fafc',
+                        borderRadius: 10, textAlign: 'center',
+                      }}>
+                        <div style={{ fontSize: 22, fontWeight: 700, color: enough ? '#be185d' : '#94a3b8' }}>
+                          {t.points} điểm
+                        </div>
+                        <div style={{ fontSize: 13, color: '#475569', margin: '4px 0 12px' }}>
+                          → giảm {formatCurrency(t.value)}
+                        </div>
+                        <button
+                          onClick={() => handleRedeem(t.points)}
+                          disabled={!enough || redeemingPoints === t.points}
+                          style={{
+                            ...primaryBtn, width: '100%',
+                            background: enough ? '#ec4899' : '#cbd5e1',
+                            cursor: enough ? 'pointer' : 'not-allowed',
+                          }}
+                        >
+                          {redeemingPoints === t.points ? '...' : enough ? 'Đổi ngay' : 'Chưa đủ điểm'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+
+              <h3 style={{ margin: '32px 0 12px', fontSize: 16 }}>
+                <PiClockClockwiseBold style={{ verticalAlign: -3, marginRight: 6 }} /> Lịch sử điểm
+              </h3>
+              {history.length === 0 ? (
+                <p style={{ color: '#94a3b8' }}>Chưa có lịch sử giao dịch.</p>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc' }}>
+                      <th style={th}>Thời gian</th>
+                      <th style={th}>Loại</th>
+                      <th style={th}>Mô tả</th>
+                      <th style={{ ...th, textAlign: 'right' }}>Điểm</th>
+                      <th style={{ ...th, textAlign: 'right' }}>Số dư</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((h) => (
+                      <tr key={h.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                        <td style={td}>{formatDate(h.createdAt)}</td>
+                        <td style={td}>
+                          <span style={{
+                            background: h.type === 'earn' ? '#dcfce7' : h.type === 'redeem' ? '#fef2f2' : '#fef3c7',
+                            color: h.type === 'earn' ? '#166534' : h.type === 'redeem' ? '#991b1b' : '#92400e',
+                            padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                          }}>{h.type === 'earn' ? 'NHẬN' : h.type === 'redeem' ? 'ĐỔI' : h.type.toUpperCase()}</span>
+                        </td>
+                        <td style={td}>{h.description}</td>
+                        <td style={{ ...td, textAlign: 'right', color: h.points > 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                          {h.points > 0 ? '+' : ''}{h.points}
+                        </td>
+                        <td style={{ ...td, textAlign: 'right' }}>{h.balanceAfter}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {/* ===== SECURITY ===== */}
+          {activeTab === 'security' && <SecurityTab profile={profile} onReload={loadProfile} />}
+
+          {/* ===== VOUCHERS ===== */}
+          {activeTab === 'vouchers' && (
+            <div>
+              {vouchers.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 60 }}>
+                  <PiTicketFill style={{ fontSize: 60, color: '#cbd5e1' }} />
+                  <p style={{ color: '#64748b', marginTop: 16 }}>Chưa có voucher cá nhân nào</p>
+                  <button onClick={() => setActiveTab('points')} style={primaryBtn}>
+                    Đổi điểm lấy voucher
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 14 }}>
+                  {vouchers.map((v) => (
+                    <div key={v.code} style={{
+                      background: 'linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%)',
+                      border: '1px dashed #ec4899',
+                      borderRadius: 10, padding: 16, position: 'relative',
+                    }}>
+                      <div style={{ fontSize: 12, color: '#be185d', fontWeight: 600 }}>VOUCHER CÁ NHÂN</div>
+                      <div style={{ fontSize: 28, fontWeight: 700, color: '#dc2626', margin: '6px 0' }}>
+                        −{formatCurrency(v.value)}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#475569' }}>
+                        Đơn từ {formatCurrency(v.minOrderAmount)} • Hết hạn {formatDate(v.endDate).split(' ')[0]}
+                      </div>
+                      <div style={{
+                        marginTop: 12, padding: '8px 12px', background: '#fff',
+                        border: '1px dashed #f9a8d4', borderRadius: 6,
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      }}>
+                        <code style={{ fontWeight: 700, color: '#0f172a', fontSize: 13 }}>{v.code}</code>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(v.code); toast.success('Đã copy mã'); }}
+                          style={{ background: 'none', border: 'none', color: '#ec4899', cursor: 'pointer', fontSize: 14 }}
+                        >
+                          <PiCopyBold />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
     </div>
   );
 }
+
+
+// ============ SECURITY TAB ============
+function SecurityTab({ profile, onReload }: { profile: AccountDTO; onReload: () => void }) {
+  const [setupQr, setSetupQr] = useState<{ secret: string; otpAuthUri: string } | null>(null);
+  const [twoFaCode, setTwoFaCode] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  type ActivityRow = { id: number; provider: string; ip?: string; browser?: string; os?: string; deviceType?: string; success: boolean; failReason?: string; createdAt: string };
+  const [activities, setActivities] = useState<ActivityRow[]>([]);
+
+  useEffect(() => {
+    void authApi.getMyActivity().then((r) => {
+      if (r.success && r.data) setActivities(r.data);
+    });
+  }, []);
+
+  const handleStartSetup = async () => {
+    setBusy(true);
+    const r = await authApi.setup2Fa();
+    setBusy(false);
+    if (r.success && r.data) setSetupQr(r.data);
+    else toast.error(r.error || 'Không setup được 2FA');
+  };
+
+  const handleEnable2Fa = async () => {
+    if (twoFaCode.length !== 6) {
+      toast.error('Nhập đủ 6 số');
+      return;
+    }
+    setBusy(true);
+    const r = await authApi.enable2Fa(twoFaCode);
+    setBusy(false);
+    if (r.success) {
+      toast.success(r.data?.message || 'Đã bật 2FA');
+      setSetupQr(null);
+      setTwoFaCode('');
+      onReload();
+    } else {
+      toast.error(r.error || 'Mã không đúng');
+    }
+  };
+
+  const handleDisable2Fa = async () => {
+    const code = prompt('Nhập mã 6 số từ Authenticator để xác nhận tắt 2FA:');
+    if (!code) return;
+    const r = await authApi.disable2Fa(code);
+    if (r.success) {
+      toast.success('Đã tắt 2FA');
+      onReload();
+    } else {
+      toast.error(r.error || 'Mã không đúng');
+    }
+  };
+
+  const handleSendVerify = async () => {
+    const r = await authApi.sendVerifyEmail();
+    if (r.success) toast.success(r.data?.message || 'Đã gửi email');
+    else toast.error(r.error || 'Lỗi');
+  };
+
+  // QR code: dùng api.qrserver.com (free, không cần install lib)
+  const qrUrl = setupQr ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(setupQr.otpAuthUri)}` : '';
+
+  return (
+    <div style={{ display: 'grid', gap: 24 }}>
+      {/* Email verify */}
+      <Card title="Xác thực Email" icon={<PiShieldCheckBold style={{ color: '#16a34a' }} />}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 14, marginBottom: 4 }}>{profile.email}</div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>
+              Trạng thái: <strong style={{ color: '#16a34a' }}>Đã xác thực</strong>
+            </div>
+          </div>
+          <button onClick={handleSendVerify} style={secondaryBtn}>
+            Gửi lại email xác thực
+          </button>
+        </div>
+      </Card>
+
+      {/* 2FA */}
+      <Card title="Xác thực 2 yếu tố (2FA)" icon={<PiQrCodeBold style={{ color: '#6366f1' }} />}>
+        <p style={{ fontSize: 13, color: '#64748b', marginTop: 0 }}>
+          Bảo vệ tài khoản với mã 6 số từ Google Authenticator / Authy / Microsoft Authenticator.
+        </p>
+
+        {!setupQr ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <span style={{
+              padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600,
+              background: '#fef3c7', color: '#92400e',
+            }}>
+              CHƯA BẬT
+            </span>
+            <button onClick={handleStartSetup} disabled={busy} style={primaryBtn}>
+              {busy ? 'Đang tải...' : 'Bật 2FA ngay'}
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 24, alignItems: 'start' }}>
+            <div style={{ background: '#fff', padding: 8, border: '1px solid #e5e7eb', borderRadius: 8 }}>
+              <img src={qrUrl} alt="QR 2FA" style={{ width: '100%', height: 'auto' }} />
+            </div>
+            <div>
+              <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Bước 1: Quét QR bằng app Authenticator</h4>
+              <p style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>
+                Hoặc nhập tay secret này:
+              </p>
+              <code style={{
+                display: 'block', padding: '8px 12px', background: '#f1f5f9',
+                borderRadius: 6, fontSize: 13, fontFamily: 'monospace',
+                marginBottom: 16, wordBreak: 'break-all',
+              }}>{setupQr.secret}</code>
+
+              <h4 style={{ margin: '0 0 8px', fontSize: 14 }}>Bước 2: Nhập mã 6 số đang hiện trong app</h4>
+              <input
+                type="text"
+                value={twoFaCode}
+                onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="123456"
+                maxLength={6}
+                style={{
+                  width: 200, padding: '12px 14px', fontSize: 18, fontWeight: 700,
+                  letterSpacing: 4, textAlign: 'center', border: '1.5px solid #e5e7eb',
+                  borderRadius: 8, marginBottom: 12, fontFamily: 'monospace',
+                }}
+              />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={handleEnable2Fa} disabled={busy || twoFaCode.length !== 6} style={primaryBtn}>
+                  Xác nhận bật 2FA
+                </button>
+                <button onClick={() => { setSetupQr(null); setTwoFaCode(''); }} style={secondaryBtn}>
+                  Hủy
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Activity log */}
+      <Card title="Lịch sử đăng nhập" icon={<PiClockHistory style={{ color: '#ec4899' }} />}>
+        {activities.length === 0 ? (
+          <p style={{ color: '#94a3b8' }}>Chưa có lịch sử đăng nhập.</p>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f8fafc' }}>
+                <th style={th}>Thời gian</th>
+                <th style={th}>Phương thức</th>
+                <th style={th}>Thiết bị</th>
+                <th style={th}>IP</th>
+                <th style={th}>Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activities.map((a) => (
+                <tr key={a.id} style={{ borderTop: '1px solid #f1f5f9' }}>
+                  <td style={td}>{formatDate(a.createdAt)}</td>
+                  <td style={td}>
+                    <span style={{
+                      padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
+                      background: '#e0e7ff', color: '#4338ca',
+                    }}>{a.provider}</span>
+                  </td>
+                  <td style={td}>{a.browser} / {a.os}</td>
+                  <td style={td}>{a.ip || '—'}</td>
+                  <td style={td}>
+                    {a.success ? (
+                      <span style={{ color: '#16a34a', fontWeight: 600 }}>
+                        <i className="fa fa-check-circle"></i> Thành công
+                      </span>
+                    ) : (
+                      <span style={{ color: '#dc2626' }} title={a.failReason}>
+                        <i className="fa fa-times-circle"></i> Thất bại
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ============ HELPERS ============
+function StatCard({ icon, value, label, color, hint, isText }: { icon: React.ReactNode; value: string | number; label: string; color: string; hint?: string; isText?: boolean }) {
+  return (
+    <div style={{
+      background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12,
+      padding: 16, display: 'flex', alignItems: 'center', gap: 14,
+    }}>
+      <div style={{
+        width: 48, height: 48, borderRadius: 12,
+        background: `${color}1a`, color, display: 'flex',
+        alignItems: 'center', justifyContent: 'center', fontSize: 22,
+      }}>{icon}</div>
+      <div>
+        <div style={{ fontSize: isText ? 16 : 22, fontWeight: 700, color: '#0f172a' }}>{value}</div>
+        <div style={{ fontSize: 12, color: '#64748b' }}>{label}{hint && ` • ${hint}`}</div>
+      </div>
+    </div>
+  );
+}
+
+function Card({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 }}>
+      <h4 style={{ margin: '0 0 12px', fontSize: 15, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+        {icon} {title}
+      </h4>
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, icon, children }: { label: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div>
+      <label style={{ fontSize: 12, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+        {icon} {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const inputStyle: React.CSSProperties = {
+  width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1',
+  borderRadius: 6, fontSize: 14,
+};
+const readonly: React.CSSProperties = { padding: '10px 12px', background: '#f8fafc', borderRadius: 6, fontSize: 14, color: '#0f172a' };
+const primaryBtn: React.CSSProperties = {
+  padding: '10px 18px', background: '#ec4899', color: '#fff', border: 'none',
+  borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+};
+const secondaryBtn: React.CSSProperties = {
+  padding: '10px 18px', background: '#f1f5f9', color: '#0f172a',
+  border: '1px solid #e5e7eb', borderRadius: 6, cursor: 'pointer', fontSize: 13,
+};
+const th: React.CSSProperties = { padding: '10px 12px', textAlign: 'left', fontWeight: 600, color: '#475569', fontSize: 12 };
+const td: React.CSSProperties = { padding: '10px 12px', color: '#0f172a', verticalAlign: 'top' };

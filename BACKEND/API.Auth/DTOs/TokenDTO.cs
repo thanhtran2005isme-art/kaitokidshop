@@ -6,6 +6,8 @@ public class TokenDTO
     public string RefreshToken { get; set; } = string.Empty;
     public DateTime ExpiresAt { get; set; }
     public UserInfoDTO User { get; set; } = null!;
+    /// <summary>True khi user đã bật 2FA — FE phải gọi /login-2fa với code 6 số.</summary>
+    public bool TwoFactorRequired { get; set; }
 }
 
 public class UserInfoDTO

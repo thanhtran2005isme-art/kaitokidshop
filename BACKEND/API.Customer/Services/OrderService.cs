@@ -1,15 +1,18 @@
 using API.Customer.Data;
 using API.Customer.DTOs;
 using API.Customer.Models;
+using API.Customer.Services.Shipping;
 using Microsoft.EntityFrameworkCore;
 
 namespace API.Customer.Services;
 
-public class OrderService(CustomerDbContext db, ICouponService couponService) : IOrderService
+public class OrderService(
+    CustomerDbContext db,
+    ICouponService couponService,
+    IShippingService shippingService) : IOrderService
 {
     public async Task<OrderDTO> CreateOrderAsync(int userId, CreateOrderDTO dto)
     {
-        // Lấy giỏ hàng
         var cartItems = await db.CartItems
             .Include(c => c.Product)
             .Where(c => c.UserId == userId)
@@ -21,7 +24,6 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
         var subtotal = cartItems.Sum(c => c.Product.Price * c.Quantity);
         decimal discount = 0;
 
-        // Áp dụng coupon
         if (!string.IsNullOrEmpty(dto.CouponCode))
         {
             var couponResult = await couponService.ValidateAsync(new CouponValidateDTO
@@ -29,15 +31,14 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
                 Code = dto.CouponCode,
                 OrderAmount = subtotal
             });
-
             if (couponResult.IsValid)
                 discount = couponResult.DiscountAmount;
         }
 
-        var total = subtotal - discount;
+        var shippingFee = dto.ShippingFee < 0 ? 0 : dto.ShippingFee;
+        var total = subtotal - discount + shippingFee;
         if (total < 0) total = 0;
 
-        // Tạo mã đơn hàng
         var orderCode = $"KK-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}";
 
         var order = new Order
@@ -49,12 +50,20 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
             CustomerEmail = dto.CustomerEmail,
             CustomerAddress = dto.CustomerAddress,
             Subtotal = subtotal,
-            ShippingFee = 0,
+            ShippingFee = shippingFee,
             Discount = discount,
             Total = total,
             CouponCode = dto.CouponCode,
             PaymentMethod = dto.PaymentMethod,
             Note = dto.Note,
+            ShippingProvider = string.IsNullOrWhiteSpace(dto.ShippingProvider) ? "mock" : dto.ShippingProvider,
+            // Đơn ATM/VietQR: 15 phút để khách chuyển khoản, hết giờ tự hủy.
+            // Đơn COD: PaymentExpiresAt = null (không cần thanh toán trước).
+            PaymentExpiresAt = string.Equals(dto.PaymentMethod, "ATM", StringComparison.OrdinalIgnoreCase)
+                ? DateTime.UtcNow.AddMinutes(15)
+                : null,
+            ShippingServiceCode = dto.ShippingServiceCode,
+            LeadTimeHours = dto.LeadTimeHours,
             Items = cartItems.Select(c => new OrderItem
             {
                 ProductId = c.ProductId,
@@ -69,7 +78,6 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
 
         db.Orders.Add(order);
 
-        // Trừ tồn kho
         foreach (var item in cartItems)
         {
             item.Product.Stock -= item.Quantity;
@@ -78,10 +86,8 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
                 item.Product.Status = "out-of-stock";
         }
 
-        // Xóa giỏ hàng
         db.CartItems.RemoveRange(cartItems);
 
-        // Tăng usedCount coupon
         if (!string.IsNullOrEmpty(dto.CouponCode))
         {
             var coupon = await db.Coupons.FirstOrDefaultAsync(c => c.Code == dto.CouponCode);
@@ -89,6 +95,26 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
         }
 
         await db.SaveChangesAsync();
+
+        // Lưu lịch sử "đã đặt hàng"
+        await shippingService.AppendHistoryAsync(order.Id, "order_placed",
+            $"Đơn hàng {order.OrderCode} đã được tạo", "Hệ thống KaitoKid");
+
+        // COD → tạo vận đơn ngay; ATM/online → đợi xác nhận thanh toán
+        if (string.Equals(order.PaymentMethod, "COD", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                await shippingService.CreateShippingOrderAsync(
+                    order.Id,
+                    order.ShippingProvider ?? "mock",
+                    order.ShippingServiceCode ?? "standard");
+            }
+            catch
+            {
+                // Không chặn luồng tạo đơn nếu shipping fail
+            }
+        }
 
         return MapToDTO(order);
     }
@@ -108,7 +134,6 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
         var order = await db.Orders
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
-
         return order is null ? null : MapToDTO(order);
     }
 
@@ -118,12 +143,18 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
 
-        if (order is null || order.Status != "pending") return false;
+        if (order is null) return false;
+
+        // Cho phép hủy khi đơn còn trong giai đoạn chờ xử lý hoặc shipper CHƯA lấy hàng.
+        // Một khi đã "picked" (shipper đã lấy hàng từ shop) thì không cho hủy nữa.
+        var canCancel = order.Status is "pending" or "confirmed"
+                        && order.ShippingStatus is null or "ready_to_pick" or "picking";
+        if (!canCancel) return false;
 
         order.Status = "cancelled";
+        order.ShippingStatus = "cancelled";
         order.UpdatedAt = DateTime.UtcNow;
 
-        // Hoàn lại tồn kho
         foreach (var item in order.Items)
         {
             var product = await db.Products.FindAsync(item.ProductId);
@@ -137,6 +168,8 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
         }
 
         await db.SaveChangesAsync();
+        await shippingService.AppendHistoryAsync(order.Id, "cancelled",
+            "Khách hàng đã hủy đơn", null);
         return true;
     }
 
@@ -157,6 +190,12 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
         Status = o.Status,
         Note = o.Note,
         CreatedAt = o.CreatedAt,
+        TrackingCode = o.TrackingCode,
+        TrackingUrl = o.TrackingUrl,
+        ShippingStatus = o.ShippingStatus,
+        ShippingProvider = o.ShippingProvider,
+        ShippingServiceCode = o.ShippingServiceCode,
+        LeadTimeHours = o.LeadTimeHours,
         Items = o.Items.Select(i => new OrderDetailDTO
         {
             ProductId = i.ProductId,
@@ -169,6 +208,4 @@ public class OrderService(CustomerDbContext db, ICouponService couponService) : 
         }).ToList()
     };
 }
-// v1.1: Tich hop coupon va hoan ton kho khi huy don
-// v1.2: Xu ly tong tien am sau giam gia
-// fix: tong tien co the am sau giam gia
+// v1.3: Tich hop IShippingService — luu phi/provider, tao van don khi COD

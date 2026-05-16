@@ -155,3 +155,23 @@ export function clearTrackingData() {
   localStorage.removeItem(VIEWED_PRODUCTS_KEY);
   localStorage.removeItem(SEARCH_HISTORY_KEY);
 }
+
+/**
+ * Xóa 1 mục lịch sử tìm kiếm theo keyword
+ */
+export function removeSearchEntry(keyword: string) {
+  try {
+    const list = getSearchHistory();
+    const filtered = list.filter((s) => s.keyword.toLowerCase() !== keyword.toLowerCase());
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(filtered));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Xóa toàn bộ lịch sử tìm kiếm
+ */
+export function clearSearchHistory() {
+  try {
+    localStorage.removeItem(SEARCH_HISTORY_KEY);
+  } catch { /* ignore */ }
+}

@@ -660,3 +660,90 @@ body {
 .shake {
   animation: shake 0.3s ease;
 }
+
+/* ====== Refactor additions for Login.tsx (react-icons + toggle eye) ====== */
+
+/* react-icons render an <svg>, so duplicate the icon styles to apply to svg */
+.input-wrapper > svg:first-of-type {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  font-size: 18px;
+  pointer-events: none;
+  transition: color 0.3s;
+}
+
+.input-wrapper:focus-within > svg:first-of-type {
+  color: #667eea;
+}
+
+/* Eye toggle button (works with both <i> and <svg>) */
+.input-wrapper .toggle-password {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 18px;
+  border-radius: 6px;
+  transition: color 0.2s, background 0.2s;
+}
+.input-wrapper .toggle-password:hover {
+  color: #ec4899;
+  background: #fdf2f8;
+}
+
+/* Reserve space on the right for the eye toggle */
+.input-wrapper input[type="password"],
+.input-wrapper input[type="text"] {
+  padding-right: 44px;
+}
+
+/* Allow label to host a "forgot password" link on the right */
+.form-group label .forgot-link {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* Divider tweaks */
+.divider {
+  margin: 16px 0 20px;
+}
+
+/* Tabs accent: switch primary to brand pink for consistency with rest of site */
+.auth-tab.active { color: #ec4899; }
+.btn-submit {
+  background: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+}
+.btn-submit:hover {
+  box-shadow: 0 8px 25px rgba(236, 72, 153, 0.35);
+}
+
+/* OTP input numeric look */
+.input-wrapper input[inputmode="numeric"] {
+  letter-spacing: 4px;
+  font-weight: 600;
+}
+
+/* Smaller padding on small screens for two-column form-row */
+@media (max-width: 520px) {
+  .form-row { flex-direction: column; gap: 0; }
+}
+
+/* Make checkbox wrapper play nice with inline checkbox (no custom span) */
+.checkbox-wrapper input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #ec4899;
+  cursor: pointer;
+}
+.checkbox-wrapper { align-items: center; }
+.checkbox-wrapper .checkmark { display: none; }

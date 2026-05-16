@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { customerOrderApi, customerReviewApi, type CustomerOrderDTO, type CustomerOrderItemDTO } from '../services/api';
+import { customerOrderApi, customerReviewApi, shippingApi, type CustomerOrderDTO, type CustomerOrderItemDTO, type ShippingTracking } from '../services/api';
 import { formatCurrency, formatDate } from '../utils/format';
 import toast from 'react-hot-toast';
 
@@ -15,8 +15,13 @@ const statusMap: Record<string, string> = {
   cancelled: 'Đã huỷ',
 };
 
-// Trạng thái cho phép user hủy đơn
+// Trạng thái cho phép user hủy đơn (chỉ khi đơn chưa được shipper lấy hàng)
 const CANCELLABLE_STATUSES = ['pending', 'confirmed'];
+const CANCELLABLE_SHIPPING_STATUSES = ['', 'ready_to_pick', 'picking'];
+function canCancelOrder(o: { status: string; shippingStatus?: string }) {
+  if (!CANCELLABLE_STATUSES.includes(o.status)) return false;
+  return CANCELLABLE_SHIPPING_STATUSES.includes(o.shippingStatus || '');
+}
 
 export default function OrderTracking() {
   const { user } = useAuth();
@@ -24,8 +29,15 @@ export default function OrderTracking() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<CustomerOrderDTO | null>(null);
   const [reviewingItem, setReviewingItem] = useState<{ order: CustomerOrderDTO; item: CustomerOrderItemDTO } | null>(null);
-  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: '' });
+  const [reviewForm, setReviewForm] = useState<{
+    rating: number;
+    comment: string;
+    files: File[];
+    uploading: boolean;
+  }>({ rating: 5, comment: '', files: [], uploading: false });
   const [reviewedKeys, setReviewedKeys] = useState<Set<string>>(new Set());
+  const [tracking, setTracking] = useState<ShippingTracking | null>(null);
+  const [trackingLoading, setTrackingLoading] = useState(false);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -42,9 +54,11 @@ export default function OrderTracking() {
   };
 
   useEffect(() => {
-    if (user) {
-      void loadOrders();
-    }
+    if (!user) return;
+    void loadOrders();
+    // Tự reload trạng thái đơn mỗi 60s để khách thấy ship cập nhật real-time
+    const interval = window.setInterval(() => { void loadOrders(); }, 60_000);
+    return () => window.clearInterval(interval);
   }, [user]);
 
   const hasReviewed = (orderId: number, productId: number): boolean => {
@@ -70,10 +84,22 @@ export default function OrderTracking() {
       toast.success('Cảm ơn bạn đã đánh giá! Đánh giá của bạn đang chờ duyệt.');
       setReviewedKeys((prev) => new Set(prev).add(`${reviewingItem.order.id}-${reviewingItem.item.productId}`));
       setReviewingItem(null);
-      setReviewForm({ rating: 5, comment: '' });
+      setReviewForm({ rating: 5, comment: '', files: [], uploading: false });
     } else {
       toast.error(result.error || 'Không thể gửi đánh giá. Vui lòng thử lại.');
     }
+  };
+
+  const openTracking = async (orderCode: string) => {
+    setTrackingLoading(true);
+    setTracking(null);
+    const result = await shippingApi.track(orderCode);
+    if (result.success && result.data) {
+      setTracking(result.data);
+    } else {
+      toast.error(result.error || 'Không lấy được tracking');
+    }
+    setTrackingLoading(false);
   };
 
   const handleCancelOrder = async (orderId: number) => {
@@ -155,7 +181,14 @@ export default function OrderTracking() {
                   <button className="btn-view-order" onClick={() => setSelected(order)}>
                     <i className="fa fa-eye"></i> Chi tiết
                   </button>
-                  {CANCELLABLE_STATUSES.includes(order.status) && (
+                  <button
+                    className="btn-view-order"
+                    style={{ marginLeft: 8, background: '#dbeafe', color: '#1d4ed8' }}
+                    onClick={() => openTracking(order.orderCode || String(order.id))}
+                  >
+                    <i className="fa fa-truck"></i> Theo dõi
+                  </button>
+                  {canCancelOrder(order) && (
                     <button
                       className="btn-view-order"
                       style={{ marginLeft: 8, background: '#fee2e2', color: '#dc2626' }}
@@ -240,7 +273,7 @@ export default function OrderTracking() {
                 <div className="summary-row total"><span>Tổng:</span><span>{formatCurrency(selected.total)}</span></div>
               </div>
 
-              {CANCELLABLE_STATUSES.includes(selected.status) && (
+              {canCancelOrder(selected) && (
                 <div style={{ marginTop: 20, textAlign: 'right' }}>
                   <button
                     className="btn-view-order"
@@ -302,6 +335,66 @@ export default function OrderTracking() {
                 <div className="char-count">{reviewForm.comment.length} ký tự</div>
               </div>
 
+              <div className="review-media-input" style={{ marginTop: 16 }}>
+                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
+                  <i className="fa fa-image" style={{ marginRight: 6, color: '#ec4899' }}></i>
+                  Thêm ảnh / video (tối đa 5 ảnh + 1 video)
+                </label>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {reviewForm.files.map((f, idx) => (
+                    <div key={idx} style={{ position: 'relative', width: 80, height: 80, borderRadius: 6, overflow: 'hidden', background: '#f8fafc' }}>
+                      {f.type.startsWith('image/') ? (
+                        <img src={URL.createObjectURL(f)} alt={`media-${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: '#475569', fontSize: 12 }}>
+                          <i className="fa fa-video" style={{ marginRight: 4 }}></i> Video
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setReviewForm((p) => ({ ...p, files: p.files.filter((_, i) => i !== idx) }))}
+                        style={{
+                          position: 'absolute', top: 2, right: 2, width: 20, height: 20,
+                          background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none',
+                          borderRadius: '50%', cursor: 'pointer', fontSize: 11, lineHeight: 1,
+                        }}
+                      >×</button>
+                    </div>
+                  ))}
+                  {reviewForm.files.length < 6 && (
+                    <label
+                      style={{
+                        width: 80, height: 80, borderRadius: 6, border: '2px dashed #cbd5e1',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center',
+                        justifyContent: 'center', cursor: 'pointer', color: '#94a3b8',
+                        fontSize: 11,
+                      }}
+                    >
+                      <i className="fa fa-plus" style={{ fontSize: 18, marginBottom: 4 }}></i>
+                      Thêm
+                      <input
+                        type="file"
+                        accept="image/*,video/*"
+                        multiple
+                        style={{ display: 'none' }}
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          // limit 5 ảnh + 1 video
+                          const images = files.filter((f) => f.type.startsWith('image/')).slice(0, 5);
+                          const video = files.find((f) => f.type.startsWith('video/'));
+                          const all = video ? [...images, video] : images;
+                          setReviewForm((p) => ({ ...p, files: [...p.files, ...all].slice(0, 6) }));
+                          e.target.value = '';
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+                <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, marginBottom: 0 }}>
+                  Định dạng JPG/PNG/WebP (max 5MB) hoặc MP4/WebM/MOV (max 30MB).
+                </p>
+              </div>
+
               <div className="review-actions">
                 <button className="btn-cancel" onClick={() => setReviewingItem(null)}>
                   Hủy
@@ -309,11 +402,97 @@ export default function OrderTracking() {
                 <button
                   className="btn-submit-review"
                   onClick={handleSubmitReview}
-                  disabled={reviewForm.comment.trim().length < 10}
+                  disabled={reviewForm.comment.trim().length < 10 || reviewForm.uploading}
                 >
-                  Gửi đánh giá
+                  {reviewForm.uploading ? 'Đang tải tệp...' : 'Gửi đánh giá'}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal theo dõi vận chuyển */}
+      {(tracking || trackingLoading) && (
+        <div className="modal active" onClick={() => setTracking(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 640 }}>
+            <div className="modal-header">
+              <h3>
+                <i className="fa fa-truck" style={{ marginRight: 8, color: '#1d4ed8' }}></i>
+                Theo dõi vận chuyển
+              </h3>
+              <button className="modal-close" onClick={() => setTracking(null)}>×</button>
+            </div>
+            <div className="modal-body" style={{ padding: 20 }}>
+              {trackingLoading && <p style={{ textAlign: 'center', color: '#64748b' }}>Đang tải...</p>}
+              {tracking && (
+                <>
+                  <div style={{ background: '#f8fafc', padding: 16, borderRadius: 8, marginBottom: 20 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span style={{ color: '#64748b', fontSize: 13 }}>Mã đơn hàng:</span>
+                      <strong>{tracking.orderCode}</strong>
+                    </div>
+                    {tracking.maVanDon && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ color: '#64748b', fontSize: 13 }}>Mã vận đơn:</span>
+                        <strong style={{ color: '#1d4ed8' }}>{tracking.maVanDon}</strong>
+                      </div>
+                    )}
+                    {tracking.nhaVanChuyen && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <span style={{ color: '#64748b', fontSize: 13 }}>Đơn vị vận chuyển:</span>
+                        <strong>
+                          {tracking.nhaVanChuyen === 'ghn' ? 'Giao Hàng Nhanh' :
+                           tracking.nhaVanChuyen === 'ghtk' ? 'Giao Hàng Tiết Kiệm' :
+                           tracking.nhaVanChuyen === 'mock' ? 'KaitoKid (Mock)' :
+                           tracking.nhaVanChuyen}
+                        </strong>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#64748b', fontSize: 13 }}>Trạng thái:</span>
+                      <strong style={{ color: '#16a34a', textTransform: 'uppercase' }}>
+                        {tracking.trangThaiVanChuyen}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <h4 style={{ margin: '0 0 12px', fontSize: 15, color: '#0f172a' }}>Lịch sử vận chuyển</h4>
+                  {tracking.history.length === 0 ? (
+                    <p style={{ color: '#64748b' }}>Chưa có cập nhật.</p>
+                  ) : (
+                    <div style={{ borderLeft: '2px solid #e5e7eb', paddingLeft: 20, marginLeft: 8 }}>
+                      {tracking.history.slice().reverse().map((h, idx) => (
+                        <div key={h.id} style={{ marginBottom: 16, position: 'relative' }}>
+                          <div style={{
+                            position: 'absolute',
+                            left: -28,
+                            top: 4,
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            background: idx === 0 ? '#16a34a' : '#cbd5e1',
+                            border: '2px solid #fff',
+                            boxShadow: idx === 0 ? '0 0 0 3px #bbf7d0' : 'none',
+                          }} />
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#0f172a' }}>
+                            {h.moTa || h.trangThai}
+                          </div>
+                          {h.viTri && (
+                            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                              <i className="fa fa-map-marker-alt" style={{ marginRight: 4 }}></i>
+                              {h.viTri}
+                            </div>
+                          )}
+                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>
+                            {formatDate(h.thoiGian)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>

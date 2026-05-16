@@ -1,4 +1,4 @@
-namespace API.Customer.DTOs;
+﻿namespace API.Customer.DTOs;
 
 public class CreateOrderDTO
 {
@@ -9,6 +9,12 @@ public class CreateOrderDTO
     public string PaymentMethod { get; set; } = "COD";
     public string? CouponCode { get; set; }
     public string? Note { get; set; }
+
+    // Shipping
+    public string? ShippingProvider { get; set; }       // mock | ghtk | ghn ...
+    public string? ShippingServiceCode { get; set; }    // standard | express | ...
+    public decimal ShippingFee { get; set; }
+    public int? LeadTimeHours { get; set; }
 }
 
 public class OrderDTO
@@ -29,6 +35,14 @@ public class OrderDTO
     public string? Note { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<OrderDetailDTO> Items { get; set; } = [];
+
+    // Shipping echo back
+    public string? TrackingCode { get; set; }
+    public string? TrackingUrl { get; set; }
+    public string? ShippingStatus { get; set; }
+    public string? ShippingProvider { get; set; }
+    public string? ShippingServiceCode { get; set; }
+    public int? LeadTimeHours { get; set; }
 }
 
 public class OrderDetailDTO

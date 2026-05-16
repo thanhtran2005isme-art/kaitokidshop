@@ -1,87 +1,535 @@
-// Trang tìm kiếm sản phẩm - kết nối backend API
+// Trang tìm kiếm — instant search + filter + sort + history + suggestions
 
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { productApi } from '../services/api';
-import { trackSearch } from '../utils/viewedTracker';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import {
+  PiMagnifyingGlassBold,
+  PiClockCounterClockwiseBold,
+  PiTrendUpBold,
+  PiX,
+  PiFunnelBold,
+  PiSortAscendingBold,
+  PiCaretDownBold,
+} from 'react-icons/pi';
+import { productApi, categoryApi, type CategoryDTO } from '../services/api';
+import {
+  trackSearch,
+  getSearchHistory,
+  removeSearchEntry,
+  clearSearchHistory,
+} from '../utils/viewedTracker';
 import type { Product } from '../types';
 import ProductCard from '../components/product/ProductCard';
+import { formatCurrency } from '../utils/format';
+
+type SortKey = 'newest' | 'price-asc' | 'price-desc' | 'bestseller' | 'rating';
+
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'newest', label: 'Mới nhất' },
+  { key: 'price-asc', label: 'Giá thấp → cao' },
+  { key: 'price-desc', label: 'Giá cao → thấp' },
+  { key: 'bestseller', label: 'Bán chạy' },
+  { key: 'rating', label: 'Đánh giá cao' },
+];
+
+const PRICE_RANGES = [
+  { label: 'Dưới 200k', min: 0, max: 200_000 },
+  { label: '200k - 500k', min: 200_000, max: 500_000 },
+  { label: '500k - 1tr', min: 500_000, max: 1_000_000 },
+  { label: '1tr - 2tr', min: 1_000_000, max: 2_000_000 },
+  { label: 'Trên 2tr', min: 2_000_000, max: 999_999_999 },
+];
+
+const ALL_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
+const ALL_COLORS = ['Đen', 'Trắng', 'Xám', 'Hồng', 'Đỏ', 'Xanh navy', 'Be', 'Nâu'];
 
 export default function Search() {
-  const [searchParams] = useSearchParams();
-  const query = searchParams.get('q') || '';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryParam = searchParams.get('q') || '';
+  const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const [keyword, setKeyword] = useState(queryParam);
+  const [debounced, setDebounced] = useState(queryParam);
   const [results, setResults] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [history, setHistory] = useState<{ keyword: string; count: number; searchedAt: number }[]>([]);
+  const [trending, setTrending] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<CategoryDTO[]>([]);
 
+  // Filters
+  const [activeCategory, setActiveCategory] = useState<string>('');
+  const [activePriceIdx, setActivePriceIdx] = useState<number | null>(null);
+  const [activeSizes, setActiveSizes] = useState<Set<string>>(new Set());
+  const [activeColors, setActiveColors] = useState<Set<string>>(new Set());
+  const [minRating, setMinRating] = useState<number>(0);
+  const [sort, setSort] = useState<SortKey>('newest');
+
+  // Load history + trending khi mount
   useEffect(() => {
-    const trimmed = query.trim();
+    setHistory(getSearchHistory());
+    void productApi.getBestSellers(6).then((r) => r.success && r.data && setTrending(r.data));
+    void categoryApi.getAll().then((data) => Array.isArray(data) && setCategories(data));
+  }, []);
 
-    // Keyword dưới 2 ký tự: không gọi API, hiện empty state
-    if (trimmed.length < 2) {
+  // Debounce keyword → debounced
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebounced(keyword.trim()), 350);
+    return () => window.clearTimeout(t);
+  }, [keyword]);
+
+  // Sync URL khi debounced thay đổi
+  useEffect(() => {
+    if (debounced) {
+      setSearchParams({ q: debounced }, { replace: true });
+    } else if (queryParam) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [debounced]);
+
+  // Fetch products khi debounced thay đổi
+  useEffect(() => {
+    let cancelled = false;
+    if (debounced.length === 0) {
       setResults([]);
+      setAllProducts([]);
+      return;
+    }
+    if (debounced.length < 2) {
       setLoading(false);
       return;
     }
-
-    let cancelled = false;
     setLoading(true);
-
-    // Debounce 300ms để tránh fetch liên tục khi user gõ
-    const timer = window.setTimeout(async () => {
-      const result = await productApi.getAll({
-        search: trimmed,
-        page: 1,
-        pageSize: 50,
-      });
-
+    void productApi.getAll({ search: debounced, page: 1, pageSize: 100 }).then((r) => {
       if (cancelled) return;
-
-      if (result.success && result.data) {
-        setResults(result.data.products);
-        // Track lịch sử tìm kiếm để dùng cho gợi ý cá nhân hóa
-        if (result.data.products.length > 0) {
-          trackSearch(trimmed);
-        }
+      if (r.success && r.data) {
+        setAllProducts(r.data.products);
+        if (r.data.products.length > 0) trackSearch(debounced);
       } else {
-        setResults([]);
+        setAllProducts([]);
       }
       setLoading(false);
-    }, 600);
+    });
+    return () => { cancelled = true; };
+  }, [debounced]);
 
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [query]);
+  // Apply filters + sort client-side
+  useEffect(() => {
+    let list = [...allProducts];
+    if (activeCategory) list = list.filter((p) => p.category === activeCategory);
+    if (activePriceIdx !== null) {
+      const r = PRICE_RANGES[activePriceIdx];
+      list = list.filter((p) => p.price >= r.min && p.price <= r.max);
+    }
+    if (activeSizes.size > 0) {
+      list = list.filter((p) => p.sizes?.some((s) => activeSizes.has(s)));
+    }
+    if (activeColors.size > 0) {
+      list = list.filter((p) => p.colors?.some((c) => activeColors.has(c)));
+    }
+    if (minRating > 0) {
+      list = list.filter((p) => (p.rating || 0) >= minRating);
+    }
+    list.sort((a, b) => {
+      switch (sort) {
+        case 'price-asc': return a.price - b.price;
+        case 'price-desc': return b.price - a.price;
+        case 'bestseller': return b.soldCount - a.soldCount;
+        case 'rating': return (b.rating || 0) - (a.rating || 0);
+        default: return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      }
+    });
+    setResults(list);
+  }, [allProducts, activeCategory, activePriceIdx, activeSizes, activeColors, minRating, sort]);
+
+  // Suggestion live (autocomplete) khi gõ
+  const liveSuggestions = useMemo(() => {
+    if (!keyword.trim() || keyword.length < 2) return [];
+    return allProducts.slice(0, 5);
+  }, [keyword, allProducts]);
+
+  // Did you mean — gợi ý gần đúng nếu không có kết quả
+  const didYouMean = useMemo(() => {
+    if (results.length > 0 || !debounced) return null;
+    // Tìm trong history các từ khóa có Levenshtein nhỏ
+    const candidates = history
+      .filter((h) => h.keyword.toLowerCase() !== debounced.toLowerCase())
+      .map((h) => h.keyword)
+      .filter((k) => Math.abs(k.length - debounced.length) <= 3);
+    if (candidates.length === 0) return null;
+    return candidates[0];
+  }, [results, debounced, history]);
+
+  const toggleSet = (set: Set<string>, value: string, setter: (s: Set<string>) => void) => {
+    const next = new Set(set);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    setter(next);
+  };
+
+  const resetFilters = useCallback(() => {
+    setActiveCategory('');
+    setActivePriceIdx(null);
+    setActiveSizes(new Set());
+    setActiveColors(new Set());
+    setMinRating(0);
+    setSort('newest');
+  }, []);
+
+  const filterCount = (activeCategory ? 1 : 0)
+    + (activePriceIdx !== null ? 1 : 0)
+    + activeSizes.size
+    + activeColors.size
+    + (minRating > 0 ? 1 : 0);
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '40px 20px' }}>
-      <h1 style={{ marginBottom: 8 }}>Kết quả tìm kiếm</h1>
-      <p style={{ color: '#666', marginBottom: 24 }}>
-        {!query.trim()
-          ? 'Nhập từ khóa để tìm kiếm'
-          : query.trim().length < 2
-          ? 'Nhập ít nhất 2 ký tự để tìm kiếm'
-          : loading
-          ? 'Đang tìm...'
-          : `Tìm thấy ${results.length} sản phẩm cho "${query}"`}
-      </p>
+    <div style={{ maxWidth: 1300, margin: '0 auto', padding: '24px 20px 60px' }}>
+      {/* SEARCH HEADER */}
+      <div style={{ marginBottom: 24 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 600, margin: '0 0 16px', color: '#0f172a' }}>
+          Tìm kiếm sản phẩm
+        </h1>
 
-      {loading ? (
-        <div className="empty-state">
-          <i className="fa fa-spinner fa-spin" style={{ fontSize: 48, color: '#ccc', marginBottom: 16 }}></i>
-          <p>Đang tải kết quả...</p>
+        <div style={{ position: 'relative', maxWidth: 700 }}>
+          <PiMagnifyingGlassBold style={{
+            position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)',
+            color: '#94a3b8', fontSize: 18,
+          }} />
+          <input
+            ref={inputRef}
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            placeholder="Tìm áo sơ mi, quần jeans, váy..."
+            style={{
+              width: '100%', padding: '14px 14px 14px 44px',
+              border: '2px solid #e5e7eb', borderRadius: 12,
+              fontSize: 15, outline: 'none',
+              transition: 'border-color 0.2s',
+            }}
+            onFocusCapture={(e) => (e.target.style.borderColor = '#ec4899')}
+            onBlurCapture={(e) => (e.target.style.borderColor = '#e5e7eb')}
+          />
+          {keyword && (
+            <button
+              onClick={() => { setKeyword(''); inputRef.current?.focus(); }}
+              style={{
+                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                background: '#f1f5f9', border: 'none', width: 28, height: 28,
+                borderRadius: '50%', cursor: 'pointer', color: '#64748b',
+              }}
+            ><PiX /></button>
+          )}
+
+          {/* Dropdown suggestions */}
+          {showSuggestions && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6,
+              background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12,
+              boxShadow: '0 10px 30px rgba(15,23,42,0.1)', overflow: 'hidden', zIndex: 20,
+              maxHeight: 480, overflowY: 'auto',
+            }}>
+              {keyword.length >= 2 && liveSuggestions.length > 0 && (
+                <div>
+                  <div style={dropdownHead}>SẢN PHẨM GỢI Ý</div>
+                  {liveSuggestions.map((p) => (
+                    <div
+                      key={p.id}
+                      onMouseDown={() => navigate(`/product/${p.id}`)}
+                      style={dropdownItem}
+                    >
+                      <img src={p.image} alt={p.name} style={{ width: 40, height: 50, objectFit: 'cover', borderRadius: 4 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a' }}>{p.name}</div>
+                        <div style={{ fontSize: 12, color: '#dc2626' }}>{formatCurrency(p.price)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(!keyword || keyword.length < 2) && history.length > 0 && (
+                <div>
+                  <div style={{ ...dropdownHead, display: 'flex', justifyContent: 'space-between' }}>
+                    <span><PiClockCounterClockwiseBold style={{ verticalAlign: -2 }} /> TÌM KIẾM GẦN ĐÂY</span>
+                    <button
+                      onMouseDown={() => { clearSearchHistory(); setHistory([]); }}
+                      style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 11 }}
+                    >Xóa tất cả</button>
+                  </div>
+                  {history.slice(0, 6).map((h) => (
+                    <div
+                      key={h.keyword}
+                      style={{ ...dropdownItem, justifyContent: 'space-between' }}
+                    >
+                      <div onMouseDown={() => setKeyword(h.keyword)} style={{ flex: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <PiClockCounterClockwiseBold style={{ color: '#94a3b8' }} />
+                        <span style={{ fontSize: 13, color: '#475569' }}>{h.keyword}</span>
+                      </div>
+                      <button
+                        onMouseDown={() => { removeSearchEntry(h.keyword); setHistory(getSearchHistory()); }}
+                        style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                      ><PiX /></button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {(!keyword || keyword.length < 2) && trending.length > 0 && (
+                <div>
+                  <div style={dropdownHead}><PiTrendUpBold style={{ verticalAlign: -2 }} /> SẢN PHẨM HOT</div>
+                  {trending.map((p) => (
+                    <div
+                      key={p.id}
+                      onMouseDown={() => navigate(`/product/${p.id}`)}
+                      style={dropdownItem}
+                    >
+                      <img src={p.image} alt={p.name} style={{ width: 40, height: 50, objectFit: 'cover', borderRadius: 4 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a' }}>{p.name}</div>
+                        <div style={{ fontSize: 12, color: '#dc2626' }}>{formatCurrency(p.price)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      ) : results.length > 0 ? (
-        <div className="product-grid">
-          {results.map((p) => <ProductCard key={p.id} product={p} />)}
-        </div>
-      ) : query.trim().length >= 2 ? (
-        <div className="empty-state">
-          <i className="fa fa-search" style={{ fontSize: 48, color: '#ccc', marginBottom: 16 }}></i>
-          <p>Không tìm thấy sản phẩm phù hợp</p>
-        </div>
-      ) : null}
+      </div>
+
+      {/* RESULTS LAYOUT */}
+      <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 28 }}>
+        {/* SIDEBAR */}
+        <aside style={{ position: 'sticky', top: 20, alignSelf: 'flex-start' }}>
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ margin: 0, fontSize: 14, color: '#0f172a' }}>
+                <PiFunnelBold style={{ verticalAlign: -2, marginRight: 6 }} />
+                Bộ lọc {filterCount > 0 && <span style={{ background: '#ec4899', color: '#fff', padding: '1px 8px', borderRadius: 10, fontSize: 11 }}>{filterCount}</span>}
+              </h3>
+              {filterCount > 0 && (
+                <button onClick={resetFilters} style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: 12, cursor: 'pointer' }}>
+                  Xóa lọc
+                </button>
+              )}
+            </div>
+
+            {/* Category */}
+            {categories.length > 0 && (
+              <FilterGroup title="Danh mục">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={radioRow}>
+                    <input type="radio" checked={!activeCategory} onChange={() => setActiveCategory('')} />
+                    Tất cả
+                  </label>
+                  {Array.from(new Set(categories.map((c) => c.tenDanhMuc))).slice(0, 8).map((cat) => (
+                    <label key={cat} style={radioRow}>
+                      <input type="radio" checked={activeCategory === cat} onChange={() => setActiveCategory(cat)} />
+                      {cat}
+                    </label>
+                  ))}
+                </div>
+              </FilterGroup>
+            )}
+
+            {/* Price */}
+            <FilterGroup title="Khoảng giá">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {PRICE_RANGES.map((r, i) => (
+                  <label key={r.label} style={radioRow}>
+                    <input
+                      type="radio"
+                      checked={activePriceIdx === i}
+                      onChange={() => setActivePriceIdx(activePriceIdx === i ? null : i)}
+                    />
+                    {r.label}
+                  </label>
+                ))}
+              </div>
+            </FilterGroup>
+
+            {/* Size */}
+            <FilterGroup title="Kích cỡ">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {ALL_SIZES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => toggleSet(activeSizes, s, setActiveSizes)}
+                    style={{
+                      padding: '6px 12px', minWidth: 42,
+                      border: `1.5px solid ${activeSizes.has(s) ? '#ec4899' : '#e5e7eb'}`,
+                      background: activeSizes.has(s) ? '#fdf2f8' : '#fff',
+                      color: activeSizes.has(s) ? '#be185d' : '#475569',
+                      borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                    }}
+                  >{s}</button>
+                ))}
+              </div>
+            </FilterGroup>
+
+            {/* Color */}
+            <FilterGroup title="Màu sắc">
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {ALL_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => toggleSet(activeColors, c, setActiveColors)}
+                    style={{
+                      padding: '4px 10px',
+                      border: `1.5px solid ${activeColors.has(c) ? '#ec4899' : '#e5e7eb'}`,
+                      background: activeColors.has(c) ? '#fdf2f8' : '#fff',
+                      color: activeColors.has(c) ? '#be185d' : '#475569',
+                      borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                    }}
+                  >{c}</button>
+                ))}
+              </div>
+            </FilterGroup>
+
+            {/* Rating */}
+            <FilterGroup title="Đánh giá tối thiểu">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[5, 4, 3, 0].map((r) => (
+                  <label key={r} style={radioRow}>
+                    <input type="radio" checked={minRating === r} onChange={() => setMinRating(r)} />
+                    {r === 0 ? 'Tất cả' : (
+                      <>
+                        <span style={{ color: '#f59e0b' }}>{'★'.repeat(r)}</span>
+                        <span style={{ color: '#cbd5e1' }}>{'★'.repeat(5 - r)}</span>
+                        <span style={{ marginLeft: 4 }}>trở lên</span>
+                      </>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </FilterGroup>
+          </div>
+        </aside>
+
+        {/* MAIN RESULTS */}
+        <main>
+          <div style={{
+            background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12,
+            padding: '12px 16px', marginBottom: 16, display: 'flex',
+            justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12,
+          }}>
+            <div style={{ fontSize: 13, color: '#475569' }}>
+              {loading ? (
+                <span><i className="fa fa-spinner fa-spin"></i> Đang tìm...</span>
+              ) : debounced ? (
+                <>Tìm thấy <strong style={{ color: '#0f172a' }}>{results.length}</strong> sản phẩm cho "<strong>{debounced}</strong>"</>
+              ) : (
+                <span style={{ color: '#94a3b8' }}>Nhập từ khóa để bắt đầu tìm</span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <PiSortAscendingBold style={{ color: '#64748b' }} />
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                style={{
+                  padding: '6px 10px', border: '1px solid #e5e7eb',
+                  borderRadius: 6, fontSize: 13, outline: 'none', background: '#fff',
+                }}
+              >
+                {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Did you mean */}
+          {didYouMean && (
+            <div style={{ background: '#fef3c7', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13 }}>
+              💡 Bạn có ý là{' '}
+              <button
+                onClick={() => setKeyword(didYouMean)}
+                style={{ background: 'none', border: 'none', color: '#b45309', fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}
+              >{didYouMean}</button> không?
+            </div>
+          )}
+
+          {/* Results grid */}
+          {loading ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} style={{ aspectRatio: '4/5', background: '#f1f5f9', borderRadius: 8 }} />
+              ))}
+            </div>
+          ) : results.length > 0 ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+              {results.map((p) => <ProductCard key={p.id} product={p} />)}
+            </div>
+          ) : debounced.length >= 2 ? (
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '60px 20px', textAlign: 'center' }}>
+              <PiMagnifyingGlassBold style={{ fontSize: 60, color: '#cbd5e1' }} />
+              <h3 style={{ margin: '16px 0 8px', color: '#475569' }}>Không tìm thấy sản phẩm phù hợp</h3>
+              <p style={{ color: '#94a3b8', marginBottom: 20 }}>Thử dùng từ khóa khác hoặc tham khảo gợi ý dưới đây</p>
+              {trending.length > 0 && (
+                <>
+                  <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 }}>Có thể bạn quan tâm</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12, maxWidth: 800, margin: '0 auto' }}>
+                    {trending.slice(0, 4).map((p) => (
+                      <Link key={p.id} to={`/product/${p.id}`} style={{
+                        textDecoration: 'none', color: '#0f172a',
+                        background: '#fff', border: '1px solid #e5e7eb',
+                        borderRadius: 8, overflow: 'hidden', display: 'block',
+                      }}>
+                        <img src={p.image} alt={p.name} style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover' }} />
+                        <div style={{ padding: 8 }}>
+                          <div style={{ fontSize: 12, height: 32, overflow: 'hidden' }}>{p.name}</div>
+                          <div style={{ fontSize: 13, color: '#dc2626', fontWeight: 700, marginTop: 4 }}>{formatCurrency(p.price)}</div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
+              <PiMagnifyingGlassBold style={{ fontSize: 48, marginBottom: 12 }} />
+              <p>Nhập tối thiểu 2 ký tự để bắt đầu tìm kiếm.</p>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
+
+// ============ HELPERS ============
+function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div style={{ paddingBottom: 14, borderBottom: '1px solid #f1f5f9', marginBottom: 14 }}>
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          background: 'none', border: 'none', padding: '4px 0', cursor: 'pointer',
+          fontSize: 13, fontWeight: 600, color: '#0f172a',
+        }}
+      >
+        {title}
+        <PiCaretDownBold style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+      </button>
+      {open && <div style={{ marginTop: 10 }}>{children}</div>}
+    </div>
+  );
+}
+
+const dropdownHead: React.CSSProperties = {
+  padding: '10px 14px', fontSize: 11, fontWeight: 600, color: '#94a3b8',
+  letterSpacing: 0.5, textTransform: 'uppercase', background: '#f8fafc',
+};
+const dropdownItem: React.CSSProperties = {
+  padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10,
+  cursor: 'pointer', borderTop: '1px solid #f1f5f9',
+};
+const radioRow: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer',
+};

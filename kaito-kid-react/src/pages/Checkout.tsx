@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
-import { couponApi, settingsApi, locationApi, type SettingDTO, type Province, type District, type Ward } from '../services/api';
+import { couponApi, settingsApi, locationApi, shippingApi, paymentApi, type SettingDTO, type Province, type District, type Ward, type ShippingQuoteOption } from '../services/api';
 import apiClient from '../services/apiClient';
 
 interface BankAccount {
@@ -56,11 +56,17 @@ export default function Checkout() {
   // Step 3: trang thanh toán QR (chỉ hiện khi ATM + đã đặt hàng xong)
   const [paymentStep, setPaymentStep] = useState(false);
   const [pendingOrder, setPendingOrder] = useState<{ orderCode: string; total: number } | null>(null);
+  const [paymentSecondsLeft, setPaymentSecondsLeft] = useState(900); // 15 phút
+  const [paymentExpired, setPaymentExpired] = useState(false);
 
   // Step 4: trang hoàn thành đơn (cho COD hoặc sau khi quét QR xong)
   const [completedStep, setCompletedStep] = useState(false);
 
-  const shippingFee = 0;
+  const [shippingFee, setShippingFee] = useState(0);
+  const [shippingOptions, setShippingOptions] = useState<ShippingQuoteOption[]>([]);
+  const [selectedShipping, setSelectedShipping] = useState<ShippingQuoteOption | null>(null);
+  const [shippingProvider, setShippingProvider] = useState<'mock' | 'ghn' | 'ghtk' | 'all'>('all');
+  const [shippingLoading, setShippingLoading] = useState(false);
   const total = Math.max(0, subtotal - discount) + shippingFee;
 
   // Phương thức thanh toán cần hiển thị QR
@@ -118,12 +124,63 @@ export default function Checkout() {
     void loadBankSettings();
   }, []);
 
+  // Auto load coupon đã apply từ trang Cart (nếu có)
+  useEffect(() => {
+    const pending = sessionStorage.getItem('kk_pending_coupon');
+    if (pending && !appliedCoupon) {
+      setPromoCode(pending);
+      sessionStorage.removeItem('kk_pending_coupon');
+      // Auto-apply
+      void couponApi.validate({ code: pending, orderAmount: subtotal }).then((r) => {
+        if (r.success && r.data?.isValid) {
+          setDiscount(r.data.discountAmount);
+          setAppliedCoupon(pending);
+        }
+      });
+    }
+  }, [subtotal]);
+
   // Load danh sách 63 tỉnh/thành phố khi mount
   useEffect(() => {
     locationApi.getProvinces().then((list) => {
       setProvinces(list);
     });
   }, []);
+
+  // Tự tính phí ship khi địa chỉ đổi
+  useEffect(() => {
+    if (!city || !district) {
+      setShippingOptions([]);
+      setSelectedShipping(null);
+      setShippingFee(0);
+      return;
+    }
+    const totalWeight = cart.reduce((s, i) => s + 300 * i.quantity, 0);
+    setShippingLoading(true);
+    shippingApi.quote({
+      provider: shippingProvider,
+      toProvince: city,
+      toDistrict: district,
+      toWard: ward || undefined,
+      toAddress: address || undefined,
+      weightGram: Math.max(300, totalWeight),
+      orderValue: subtotal,
+    }).then((r) => {
+      if (r.success && r.data?.success && r.data.options.length > 0) {
+        setShippingOptions(r.data.options);
+        const found = selectedShipping
+          ? r.data.options.find((o) => o.provider === selectedShipping.provider && o.serviceCode === selectedShipping.serviceCode)
+          : null;
+        const pick = found || r.data.options[0];
+        setSelectedShipping(pick);
+        setShippingFee(pick.fee);
+      } else {
+        setShippingOptions([]);
+        setSelectedShipping(null);
+        setShippingFee(0);
+      }
+    }).finally(() => setShippingLoading(false));
+  }, [city, district, ward, address, subtotal, shippingProvider, cart]);
 
   // Khi đổi tỉnh: load quận/huyện, reset district + ward
   const handleChangeProvince = async (code: string) => {
@@ -167,6 +224,41 @@ export default function Checkout() {
     const w = wards.find((x) => x.code === wardCode);
     setWard(w?.name || '');
   };
+
+  // Poll status đơn ATM mỗi 5s và tự countdown từ backend
+  useEffect(() => {
+    if (!paymentStep || !pendingOrder) return;
+    let cancelled = false;
+
+    const tick = async () => {
+      const r = await paymentApi.getStatus(pendingOrder.orderCode);
+      if (cancelled || !r.success || !r.data) return;
+      setPaymentSecondsLeft(r.data.secondsLeft);
+      if (r.data.status === 'cancelled' || r.data.secondsLeft <= 0) {
+        setPaymentExpired(true);
+        return;
+      }
+      if (r.data.paidAt) {
+        // Đã thanh toán → chuyển step 4 hoàn thành
+        setPaymentStep(false);
+        setCompletedStep(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    };
+
+    void tick();
+    const interval = window.setInterval(tick, 5000);
+    return () => { cancelled = true; window.clearInterval(interval); };
+  }, [paymentStep, pendingOrder]);
+
+  // Tick countdown UI mỗi giây giữa 2 lần poll backend (smoother)
+  useEffect(() => {
+    if (!paymentStep || paymentExpired) return;
+    const t = window.setInterval(() => {
+      setPaymentSecondsLeft((s) => Math.max(0, s - 1));
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [paymentStep, paymentExpired]);
 
   if (cart.length === 0 && !successOrder && !paymentStep && !completedStep) {
     return (
@@ -216,6 +308,10 @@ export default function Checkout() {
         paymentMethod: paymentMethod.toUpperCase(),
         couponCode: appliedCoupon || undefined,
         note: undefined,
+        shippingProvider: selectedShipping?.provider,
+        shippingServiceCode: selectedShipping?.serviceCode,
+        shippingFee: selectedShipping?.fee ?? shippingFee,
+        leadTimeHours: selectedShipping?.leadTimeHours,
       });
 
       const orderData = response.data as { id?: number; orderCode?: string; total?: number };
@@ -371,6 +467,44 @@ export default function Checkout() {
               <p style={{ margin: '4px 0 0', opacity: 0.9, fontSize: 13 }}>Quét mã QR để thanh toán nhanh chóng và an toàn</p>
             </div>
           </div>
+
+          {/* Countdown banner */}
+          {!paymentExpired ? (
+            <div style={{
+              background: paymentSecondsLeft < 60 ? '#fef2f2' : '#fff7ed',
+              border: paymentSecondsLeft < 60 ? '1px solid #fecaca' : '1px solid #fed7aa',
+              padding: '14px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <i className="fa fa-clock" style={{ fontSize: 20, color: paymentSecondsLeft < 60 ? '#dc2626' : '#d97706' }}></i>
+                <div>
+                  <strong style={{ color: paymentSecondsLeft < 60 ? '#dc2626' : '#d97706', fontSize: 14 }}>Thời gian thanh toán còn lại</strong>
+                  <div style={{ fontSize: 11, color: '#92400e', marginTop: 2 }}>Đơn hàng sẽ tự hủy nếu không thanh toán trước khi hết giờ</div>
+                </div>
+              </div>
+              <div style={{
+                fontSize: 32, fontWeight: 700, fontFamily: 'monospace', letterSpacing: 1,
+                color: paymentSecondsLeft < 60 ? '#dc2626' : '#d97706',
+              }}>
+                {String(Math.floor(paymentSecondsLeft / 60)).padStart(2, '0')}:{String(paymentSecondsLeft % 60).padStart(2, '0')}
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              background: '#fef2f2', border: '1px solid #fecaca',
+              padding: '20px', textAlign: 'center',
+            }}>
+              <i className="fa fa-times-circle" style={{ fontSize: 36, color: '#dc2626', marginBottom: 8 }}></i>
+              <h3 style={{ margin: '0 0 4px', color: '#991b1b', fontSize: 18 }}>Đã hết thời gian thanh toán</h3>
+              <p style={{ color: '#7f1d1d', margin: '0 0 16px', fontSize: 14 }}>Đơn hàng đã tự hủy. Vui lòng đặt lại nếu vẫn muốn mua.</p>
+              <button
+                onClick={() => navigate('/cart')}
+                style={{ padding: '10px 24px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+              >
+                Quay về giỏ hàng
+              </button>
+            </div>
+          )}
 
           <div style={{ background: '#fff', padding: 24, borderRadius: '0 0 12px 12px', border: '1px solid #e5e7eb', borderTop: 'none' }}>
             <div style={{
@@ -531,7 +665,20 @@ export default function Checkout() {
 
             <div style={{ marginTop: 32, display: 'flex', gap: 12, justifyContent: 'center' }}>
               <button
-                onClick={() => { setPaymentStep(false); setCompletedStep(true); }}
+                onClick={async () => {
+                  // Mô phỏng webhook ngân hàng → backend set paid → poll status sẽ pickup ở lần tick tiếp theo.
+                  // Production: bỏ nút này, để webhook SePay/Casso tự động.
+                  const r = await paymentApi.simulatePaid(pendingOrder.orderCode);
+                  if (r.success) {
+                    // Trigger ngay status check thay vì đợi 5s polling
+                    const s = await paymentApi.getStatus(pendingOrder.orderCode);
+                    if (s.success && s.data?.paidAt) {
+                      setPaymentStep(false);
+                      setCompletedStep(true);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }
+                  }
+                }}
                 style={{
                   padding: '12px 24px', background: '#0f172a', color: '#fff',
                   border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
@@ -639,6 +786,63 @@ export default function Checkout() {
             </div>
             <div className="ivy-checkout-section ivy-half">
               <p className="ivy-vat-question">Bạn có muốn nhận hoá đơn VAT không? <input type="checkbox" /></p>
+            </div>
+          </div>
+
+
+          {/* Đơn vị vận chuyển */}
+          <div className="ivy-checkout-section">
+            <h3 className="ivy-section-title">Đơn vị vận chuyển</h3>
+            <div className="ivy-payment-box">
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+                {(['all', 'mock', 'ghn', 'ghtk'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setShippingProvider(p)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: 16,
+                      border: shippingProvider === p ? '2px solid #ec4899' : '1px solid #cbd5e1',
+                      background: shippingProvider === p ? '#fdf2f8' : '#fff',
+                      color: shippingProvider === p ? '#be185d' : '#475569',
+                      cursor: 'pointer',
+                      fontWeight: 500,
+                      fontSize: 13,
+                    }}
+                  >
+                    {p === 'all' ? 'Tất cả' : p === 'mock' ? 'KaitoKid Mock' : p === 'ghn' ? 'GHN' : 'GHTK'}
+                  </button>
+                ))}
+              </div>
+              {!city || !district ? (
+                <p className="ivy-payment-note">Vui lòng chọn tỉnh/quận để tính phí vận chuyển.</p>
+              ) : shippingLoading ? (
+                <p className="ivy-payment-note">Đang tính phí vận chuyển...</p>
+              ) : shippingOptions.length === 0 ? (
+                <p className="ivy-payment-note" style={{ color: '#dc2626' }}>Chưa lấy được phí ship cho địa chỉ này.</p>
+              ) : (
+                shippingOptions.map((opt) => {
+                  const isActive = selectedShipping?.provider === opt.provider && selectedShipping?.serviceCode === opt.serviceCode;
+                  return (
+                    <label
+                      key={`${opt.provider}-${opt.serviceCode}`}
+                      className="ivy-radio-option"
+                      onClick={() => { setSelectedShipping(opt); setShippingFee(opt.fee); }}
+                      style={{ borderColor: isActive ? '#ec4899' : undefined }}
+                    >
+                      <input type="radio" name="shipping" checked={isActive} readOnly />
+                      <span>
+                        <strong>{opt.serviceName}</strong> · <span style={{ color: '#dc2626', fontWeight: 600 }}>{formatCurrency(opt.fee)}</span>
+                      </span>
+                      <small>
+                        {opt.provider === 'ghn' ? 'Giao Hàng Nhanh (giá thật)' : opt.provider === 'ghtk' ? 'Giao Hàng Tiết Kiệm (giá thật)' : opt.provider === 'mock' ? 'Mô phỏng nội bộ' : opt.provider}
+                        {' · '} Dự kiến {opt.leadTimeHours}h
+                      </small>
+                    </label>
+                  );
+                })
+              )}
             </div>
           </div>
 

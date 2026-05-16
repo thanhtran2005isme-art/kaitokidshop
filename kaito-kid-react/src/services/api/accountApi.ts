@@ -8,12 +8,21 @@ export interface AccountDTO {
   phone?: string;
   avatar?: string;
   createdAt: string;
+  loyaltyPoints: number;
+  memberTier: string;
+  totalSpent: number;
+  birthday?: string | null;
+  nextTier: string;
+  nextTierAt: number;
+  amountToNextTier: number;
+  totalOrders: number;
 }
 
 export interface UpdateAccountPayload {
   name?: string;
   phone?: string;
   avatar?: string;
+  birthday?: string;
 }
 
 export interface ChangePasswordPayload {
@@ -21,34 +30,70 @@ export interface ChangePasswordPayload {
   newPassword: string;
 }
 
+export interface PointsHistoryDTO {
+  id: number;
+  type: 'earn' | 'redeem' | 'expire' | 'bonus' | string;
+  points: number;
+  balanceAfter: number;
+  orderId?: number | null;
+  orderCode?: string | null;
+  description?: string | null;
+  createdAt: string;
+}
+
+export interface RedeemResultDTO {
+  couponCode: string;
+  discountValue: number;
+  remainingPoints: number;
+  expiresAt: string;
+}
+
+export interface PersonalVoucher {
+  code: string;
+  type: string;
+  value: number;
+  minOrderAmount: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  description: string;
+}
+
 export const accountApi = {
-  /** Lấy thông tin tài khoản hiện tại */
   async getProfile(): Promise<ApiResponse<AccountDTO>> {
     try {
-      const response = await apiClient.get<AccountDTO>('/api/account');
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
-    }
+      const res = await apiClient.get<AccountDTO>('/api/account');
+      return { success: true, data: res.data };
+    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
-
-  /** Cập nhật profile (name, phone, avatar) */
-  async updateProfile(data: UpdateAccountPayload): Promise<ApiResponse<AccountDTO>> {
+  async updateProfile(payload: UpdateAccountPayload): Promise<ApiResponse<AccountDTO>> {
     try {
-      const response = await apiClient.put<AccountDTO>('/api/account', data);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
-    }
+      const res = await apiClient.put<AccountDTO>('/api/account', payload);
+      return { success: true, data: res.data };
+    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
-
-  /** Đổi mật khẩu */
-  async changePassword(data: ChangePasswordPayload): Promise<ApiResponse<{ message: string }>> {
+  async changePassword(payload: ChangePasswordPayload): Promise<ApiResponse<{ message: string }>> {
     try {
-      const response = await apiClient.post<{ message: string }>('/api/auth/change-password', data);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { success: false, error: getErrorMessage(error) };
-    }
+      const res = await apiClient.post('/api/auth/change-password', payload);
+      return { success: true, data: res.data };
+    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
+  },
+  async getPointsHistory(page = 1, pageSize = 20): Promise<ApiResponse<PointsHistoryDTO[]>> {
+    try {
+      const res = await apiClient.get<PointsHistoryDTO[]>('/api/account/points-history', { params: { page, pageSize } });
+      return { success: true, data: res.data };
+    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
+  },
+  async redeemPoints(points: number): Promise<ApiResponse<RedeemResultDTO>> {
+    try {
+      const res = await apiClient.post<RedeemResultDTO>('/api/account/redeem', { points });
+      return { success: true, data: res.data };
+    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
+  },
+  async getMyVouchers(): Promise<ApiResponse<PersonalVoucher[]>> {
+    try {
+      const res = await apiClient.get<PersonalVoucher[]>('/api/account/vouchers');
+      return { success: true, data: res.data };
+    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
   },
 };

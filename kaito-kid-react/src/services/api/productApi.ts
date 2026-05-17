@@ -58,11 +58,18 @@ export interface ProductsPagedResult {
 
 export interface GetProductsParams {
   category?: string;
+  subcategory?: string;
   gender?: string;
+  style?: string;
+  ageGroup?: string;
+  collection?: string;
   search?: string;
   minPrice?: number;
   maxPrice?: number;
-  sortBy?: string;
+  minRating?: number;
+  sizes?: string;
+  colors?: string;
+  sortBy?: 'newest' | 'price-asc' | 'price-desc' | 'bestseller' | 'rating' | string;
   isNew?: boolean;
   isSale?: boolean;
   isBestSeller?: boolean;
@@ -155,6 +162,13 @@ export const productApi = {
       if (params.isNew !== undefined) queryParams.append('isNew', String(params.isNew));
       if (params.isSale !== undefined) queryParams.append('isSale', String(params.isSale));
       if (params.isBestSeller !== undefined) queryParams.append('isBestSeller', String(params.isBestSeller));
+      if (params.subcategory) queryParams.append('subcategory', params.subcategory);
+      if (params.style) queryParams.append('style', params.style);
+      if (params.ageGroup) queryParams.append('ageGroup', params.ageGroup);
+      if (params.collection) queryParams.append('collection', params.collection);
+      if (params.minRating !== undefined) queryParams.append('minRating', String(params.minRating));
+      if (params.sizes) queryParams.append('sizes', params.sizes);
+      if (params.colors) queryParams.append('colors', params.colors);
       queryParams.append('page', String(params.page || 1));
       queryParams.append('pageSize', String(params.pageSize || 50));
 

@@ -3,7 +3,7 @@
  */
 
 export { authApi } from './authApi';
-export { productApi } from './productApi';
+export { productApi, type GetProductsParams } from './productApi';
 export { adminApi } from './adminApi';
 export { orderApi } from './orderApi';
 export { categoryApi, type CategoryDTO } from './categoryApi';

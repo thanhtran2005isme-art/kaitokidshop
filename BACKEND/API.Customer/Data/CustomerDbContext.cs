@@ -23,6 +23,10 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
     public DbSet<PointsHistory> PointsHistories => Set<PointsHistory>();
     public DbSet<NewsletterSubscriber> NewsletterSubscribers => Set<NewsletterSubscriber>();
     public DbSet<Banner> Banners => Set<Banner>();
+    public DbSet<SizeChart> SizeCharts => Set<SizeChart>();
+    public DbSet<ProductQA> ProductQAs => Set<ProductQA>();
+    public DbSet<ProductViewSession> ProductViewSessions => Set<ProductViewSession>();
+    public DbSet<VariantStock> VariantStocks => Set<VariantStock>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

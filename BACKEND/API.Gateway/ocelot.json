@@ -40,6 +40,9 @@
                        "UpstreamPathTemplate":  "/api/products/{everything}",
                        "UpstreamHttpMethod":  [
                                                   "GET",
+                                                  "POST",
+                                                  "PUT",
+                                                  "DELETE",
                                                   "OPTIONS"
                                               ],
                        "DownstreamPathTemplate":  "/api/products/{everything}",
@@ -55,6 +58,9 @@
                        "UpstreamPathTemplate":  "/api/products",
                        "UpstreamHttpMethod":  [
                                                   "GET",
+                                                  "POST",
+                                                  "PUT",
+                                                  "DELETE",
                                                   "OPTIONS"
                                               ],
                        "DownstreamPathTemplate":  "/api/products",

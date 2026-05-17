@@ -1,7 +1,7 @@
 // Trang chi tiết sản phẩm — premium redesign
 // Gallery zoom hover + variant selection + size guide + reviews + related + cross-sell
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   PiHeartStraight,
@@ -21,7 +21,7 @@ import {
   PiRulerBold,
   PiQuestion,
 } from 'react-icons/pi';
-import { productApi, customerReviewApi, wishlistApi, type CustomerReviewDTO } from '../services/api';
+import { productApi, customerReviewApi, wishlistApi, productExtrasApi, type CustomerReviewDTO, type VariantStockItem, type QAItem, type SizeChartResponse } from '../services/api';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import type { Product } from '../types';
@@ -32,7 +32,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import toast from 'react-hot-toast';
 import '../styles/product-detail-pro.css';
 
-type TabKey = 'description' | 'specs' | 'reviews' | 'shipping';
+type TabKey = 'description' | 'specs' | 'reviews' | 'qa' | 'shipping';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5155';
 
@@ -76,12 +76,14 @@ export default function ProductDetail() {
   const [isFav, setIsFav] = useState(false);
   const [favLoading, setFavLoading] = useState(false);
 
-  // "X người đang xem" — random theo product id để cảm giác sống động
-  const watchersCount = useMemo(() => {
-    if (!product) return 0;
-    const seed = product.id * 7919;
-    return 30 + (seed % 90);
-  }, [product]);
+  // "X người đang xem" — số thật từ session-based tracking (heartbeat 30s)
+  const [watchersCount, setWatchersCount] = useState(0);
+  const [variantStocks, setVariantStocks] = useState<VariantStockItem[]>([]);
+  const [sizeChart, setSizeChart] = useState<SizeChartResponse | null>(null);
+  const [qaList, setQaList] = useState<QAItem[]>([]);
+  const [qaInput, setQaInput] = useState('');
+  const [qaSubmitting, setQaSubmitting] = useState(false);
+  const sessionIdRef = useRef<string>(`vs-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
     if (id) void fetchProduct(Number(id));
@@ -95,6 +97,50 @@ export default function ProductDetail() {
     setQuantity(1);
     setActiveTab('description');
   }, [id]);
+
+  // Variants stock thật từ API
+  useEffect(() => {
+    if (!product) return;
+    void productExtrasApi.getVariants(product.id).then((r) => {
+      if (r.success && r.data) setVariantStocks(r.data);
+    });
+  }, [product]);
+
+  // Bảng size theo loại sản phẩm
+  useEffect(() => {
+    if (!product) return;
+    // Detect loại từ category — đơn giản theo keyword
+    const cat = product.category.toLowerCase();
+    let type: 'top' | 'bottom' | 'dress' | 'shoes' | 'kids' = 'top';
+    if (cat.includes('quần') || cat.includes('quan')) type = 'bottom';
+    else if (cat.includes('đầm') || cat.includes('váy') || cat.includes('dam') || cat.includes('vay')) type = 'dress';
+    else if (cat.includes('giày') || cat.includes('giay')) type = 'shoes';
+    if (product.gender === 'Tre em' || product.ageGroup) type = 'kids';
+    void productExtrasApi.getSizeChart(type).then((r) => {
+      if (r.success && r.data) setSizeChart(r.data);
+    });
+  }, [product]);
+
+  // Q&A list
+  useEffect(() => {
+    if (!product) return;
+    void productExtrasApi.getQA(product.id).then((r) => {
+      if (r.success && r.data) setQaList(r.data);
+    });
+  }, [product]);
+
+  // Heartbeat đếm số người đang xem (30s/lần)
+  useEffect(() => {
+    if (!product) return;
+    const tick = () => {
+      void productExtrasApi.heartbeat(product.id, sessionIdRef.current).then((r) => {
+        if (r.success && r.data) setWatchersCount(r.data.viewers);
+      });
+    };
+    tick();
+    const interval = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(interval);
+  }, [product]);
 
   // Check wishlist status
   useEffect(() => {
@@ -202,7 +248,41 @@ export default function ProductDetail() {
     setFavLoading(false);
   }, [user, product, isFav]);
 
-    const handleMarkHelpful = useCallback(async (reviewId: number) => {
+    const handleAddCompare = useCallback(() => {
+    if (!product) return;
+    try {
+      const list: number[] = JSON.parse(localStorage.getItem('kk_compare') || '[]');
+      if (list.includes(product.id)) {
+        toast.success('Sản phẩm đã có trong danh sách so sánh');
+        return;
+      }
+      if (list.length >= 4) {
+        toast.error('Chỉ so sánh tối đa 4 sản phẩm. Vui lòng vào /compare để bỏ bớt.');
+        return;
+      }
+      list.push(product.id);
+      localStorage.setItem('kk_compare', JSON.stringify(list));
+      toast.success(`Đã thêm vào so sánh (${list.length}/4)`);
+    } catch {
+      toast.error('Lỗi lưu so sánh');
+    }
+  }, [product]);
+
+  const handleShare = useCallback((channel: 'facebook' | 'zalo' | 'copy') => {
+    const url = window.location.href;
+    if (channel === 'copy') {
+      void navigator.clipboard.writeText(url);
+      toast.success('Đã copy link sản phẩm');
+      return;
+    }
+    if (channel === 'facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'width=600,height=600');
+    } else if (channel === 'zalo') {
+      window.open(`https://zalo.me/share?url=${encodeURIComponent(url)}`, '_blank', 'width=600,height=600');
+    }
+  }, []);
+
+  const handleMarkHelpful = useCallback(async (reviewId: number) => {
     const r = await customerReviewApi.markHelpful(reviewId);
     if (r.success) {
       setReviews((prev) => prev.map((rv) => rv.id === reviewId ? { ...rv, helpfulCount: rv.helpfulCount + 1 } : rv));
@@ -449,6 +529,44 @@ export default function ProductDetail() {
             </button>
           </div>
 
+          {/* Share + Compare row */}
+          <div className="pd-share-row" style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 12, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
+            <span style={{ fontSize: 13, color: '#64748b', marginRight: 4 }}>Chia sẻ:</span>
+            <button
+              onClick={() => handleShare('facebook')}
+              title="Chia sẻ Facebook"
+              style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#1877f2', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <i className="fa-brands fa-facebook-f"></i>
+            </button>
+            <button
+              onClick={() => handleShare('zalo')}
+              title="Chia sẻ Zalo"
+              style={{ width: 36, height: 36, borderRadius: '50%', border: 'none', background: '#0068ff', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700 }}
+            >
+              Z
+            </button>
+            <button
+              onClick={() => handleShare('copy')}
+              title="Copy link"
+              style={{ width: 36, height: 36, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#fff', color: '#475569', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <i className="fa fa-link"></i>
+            </button>
+            <div style={{ flex: 1 }}></div>
+            <button
+              onClick={handleAddCompare}
+              style={{
+                padding: '8px 14px', border: '1.5px solid #6366f1', background: '#fff',
+                color: '#6366f1', borderRadius: 8, cursor: 'pointer', fontWeight: 600, fontSize: 13,
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <i className="fa fa-balance-scale-right"></i>
+              Thêm vào so sánh
+            </button>
+          </div>
+
           {/* Trust badges */}
           <div className="pd-trust">
             <div className="pd-trust-item">
@@ -536,6 +654,34 @@ export default function ProductDetail() {
               filter={reviewFilter}
               setFilter={setReviewFilter}
               stars={stars}
+            />
+          )}
+
+          {activeTab === 'qa' && (
+            <QATab
+              productId={product.id}
+              qaList={qaList}
+              qaInput={qaInput}
+              setQaInput={setQaInput}
+              qaSubmitting={qaSubmitting}
+              onAsk={async () => {
+                if (qaInput.trim().length < 5) {
+                  toast.error('Câu hỏi phải có ít nhất 5 ký tự');
+                  return;
+                }
+                setQaSubmitting(true);
+                const r = await productExtrasApi.askQuestion(product.id, qaInput.trim(), user?.name);
+                setQaSubmitting(false);
+                if (r.success) {
+                  toast.success(r.data?.message || 'Đã gửi câu hỏi');
+                  setQaInput('');
+                  // Refresh QA list
+                  const nr = await productExtrasApi.getQA(product.id);
+                  if (nr.success && nr.data) setQaList(nr.data);
+                } else {
+                  toast.error(r.error || 'Không gửi được');
+                }
+              }}
             />
           )}
 
@@ -753,6 +899,107 @@ function ReviewsTab({
                   </div>
                 )}
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============ QA TAB ============
+function QATab({
+  productId, qaList, qaInput, setQaInput, qaSubmitting, onAsk,
+}: {
+  productId: number;
+  qaList: QAItem[];
+  qaInput: string;
+  setQaInput: (v: string) => void;
+  qaSubmitting: boolean;
+  onAsk: () => void | Promise<void>;
+}) {
+  return (
+    <div>
+      <div style={{
+        background: '#f8fafc', padding: 20, borderRadius: 10, marginBottom: 20,
+      }}>
+        <h4 style={{ margin: '0 0 10px', color: '#0f172a', fontSize: 15 }}>
+          <i className="fa fa-question-circle" style={{ color: '#6366f1', marginRight: 8 }}></i>
+          Đặt câu hỏi cho shop
+        </h4>
+        <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 12px' }}>
+          Shop sẽ trả lời trong vòng 24 giờ. Câu hỏi và câu trả lời sẽ hiển thị công khai cho khách hàng khác.
+        </p>
+        <textarea
+          value={qaInput}
+          onChange={(e) => setQaInput(e.target.value)}
+          placeholder="VD: Áo này có co giãn không? Mặc size M có vừa khi cao 1m65 nặng 50kg không?"
+          rows={3}
+          style={{
+            width: '100%', padding: '10px 14px', border: '1px solid #cbd5e1',
+            borderRadius: 8, fontSize: 14, fontFamily: 'inherit', resize: 'vertical',
+          }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+          <span style={{ fontSize: 12, color: '#94a3b8' }}>{qaInput.length}/1000 ký tự</span>
+          <button
+            onClick={onAsk}
+            disabled={qaSubmitting || qaInput.trim().length < 5}
+            style={{
+              padding: '8px 18px', background: '#0f172a', color: '#fff',
+              border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600,
+              opacity: qaSubmitting || qaInput.trim().length < 5 ? 0.5 : 1,
+            }}
+          >
+            {qaSubmitting ? 'Đang gửi...' : 'Gửi câu hỏi'}
+          </button>
+        </div>
+      </div>
+
+      {qaList.length === 0 ? (
+        <div className="pd-empty">Chưa có câu hỏi nào. Hãy là người đầu tiên hỏi về sản phẩm này!</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {qaList.map((qa) => (
+            <div key={qa.id} style={{
+              padding: 16, border: '1px solid #e5e7eb', borderRadius: 10, background: '#fff',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 8 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: '#6366f1', color: '#fff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, flexShrink: 0,
+                }}>?</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+                    <strong style={{ color: '#0f172a' }}>{qa.askerName || 'Khách'}</strong>
+                    <span style={{ color: '#94a3b8', fontSize: 12 }}>{formatDate(qa.askedAt)}</span>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: 14, color: '#334155' }}>{qa.question}</p>
+                </div>
+              </div>
+
+              {qa.status === 'answered' && qa.answer ? (
+                <div style={{
+                  marginLeft: 48, marginTop: 12, padding: 12,
+                  background: '#fdf2f8', borderLeft: '3px solid #ec4899', borderRadius: 6,
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
+                    <strong style={{ color: '#be185d', fontSize: 13 }}>
+                      <i className="fa fa-store" style={{ marginRight: 4 }}></i>
+                      {qa.answeredBy || 'Shop KaitoKid'}
+                    </strong>
+                    {qa.answeredAt && <span style={{ color: '#94a3b8', fontSize: 11 }}>{formatDate(qa.answeredAt)}</span>}
+                  </div>
+                  <p style={{ margin: 0, fontSize: 13, color: '#475569', whiteSpace: 'pre-line' }}>{qa.answer}</p>
+                </div>
+              ) : (
+                <div style={{
+                  marginLeft: 48, marginTop: 8, fontSize: 12, color: '#94a3b8', fontStyle: 'italic',
+                }}>
+                  Chờ shop trả lời...
+                </div>
+              )}
             </div>
           ))}
         </div>

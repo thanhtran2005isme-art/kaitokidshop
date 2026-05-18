@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
-import { couponApi, settingsApi, locationApi, shippingApi, paymentApi, type SettingDTO, type Province, type District, type Ward, type ShippingQuoteOption } from '../services/api';
+import { couponApi, settingsApi, locationApi, shippingApi, paymentApi, cartApi, type SettingDTO, type Province, type District, type Ward, type ShippingQuoteOption, type ComboDiscountResult } from '../services/api';
 import apiClient from '../services/apiClient';
 
 interface BankAccount {
@@ -67,7 +67,9 @@ export default function Checkout() {
   const [selectedShipping, setSelectedShipping] = useState<ShippingQuoteOption | null>(null);
   const [shippingProvider, setShippingProvider] = useState<'mock' | 'ghn' | 'ghtk' | 'all'>('all');
   const [shippingLoading, setShippingLoading] = useState(false);
-  const total = Math.max(0, subtotal - discount) + shippingFee;
+  const [combo, setCombo] = useState<ComboDiscountResult | null>(null);
+  const comboDiscount = combo?.eligible ? combo.discount : 0;
+  const total = Math.max(0, subtotal - discount - comboDiscount) + shippingFee;
 
   // Phương thức thanh toán cần hiển thị QR
   const requiresBankTransfer = paymentMethod === 'atm';
@@ -146,6 +148,14 @@ export default function Checkout() {
       setProvinces(list);
     });
   }, []);
+
+  // Combo discount: backend tính dựa trên giỏ thật (≥2 SP cùng category → 10%)
+  useEffect(() => {
+    if (cart.length === 0) { setCombo(null); return; }
+    void cartApi.getComboDiscount().then((r) => {
+      if (r.success && r.data) setCombo(r.data); else setCombo(null);
+    });
+  }, [cart]);
 
   // Tự tính phí ship khi địa chỉ đổi
   useEffect(() => {
@@ -891,6 +901,12 @@ export default function Checkout() {
             <div className="ivy-summary-row"><span>Tạm tính</span><span>{formatCurrency(subtotal)}</span></div>
             <div className="ivy-summary-row"><span>Phí vận chuyển</span><span>{shippingFee === 0 ? '0đ' : formatCurrency(shippingFee)}</span></div>
             {discount > 0 && <div className="ivy-summary-row"><span>Giảm giá</span><span>-{formatCurrency(discount)}</span></div>}
+            {comboDiscount > 0 && (
+              <div className="ivy-summary-row" style={{ color: '#16a34a' }}>
+                <span><i className="fa fa-gift" style={{ marginRight: 4 }}></i>Mua kèm −{combo?.percent}%</span>
+                <span>-{formatCurrency(comboDiscount)}</span>
+              </div>
+            )}
             <div className="ivy-summary-row ivy-summary-bold">
               <span>Tiền thanh toán</span>
               <span className="ivy-price-red">{formatCurrency(total)}</span>

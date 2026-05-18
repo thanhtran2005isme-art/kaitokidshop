@@ -1,17 +1,19 @@
 // Trang giỏ hàng — phiên bản nâng cao
-// Coupon apply trực tiếp + freeship progress + reservation timer + cross-sell
+// - Reservation timer dùng ReservedUntil thật từ backend (đồng bộ với SoLuongDaGiu)
+// - Cảnh báo low stock từ AvailableStock (real)
+// - Cross-sell theo category của item đầu tiên (backend /api/cart/cross-sell)
+// - Checkbox chọn nhiều: xóa nhiều / chuyển vào wishlist
+// - Coupon apply trực tiếp + freeship progress
 
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
-import { couponApi, productApi } from '../services/api';
-import type { Product } from '../types';
+import { couponApi, cartApi, type CartItemBackendDTO, type ComboDiscountResult } from '../services/api';
 import toast from 'react-hot-toast';
 
 const FREESHIP_THRESHOLD = 499_000;
-const RESERVATION_MINUTES = 30;
 
 interface AppliedCoupon {
   code: string;
@@ -19,56 +21,106 @@ interface AppliedCoupon {
   discount: number;
 }
 
+/** Tính số giây còn lại cho đến reservedUntil sớm nhất trong giỏ. */
+function computeReservationLeft(items: { reservedUntil?: string | null }[]): number {
+  const valid = items
+    .map((i) => (i.reservedUntil ? new Date(i.reservedUntil).getTime() : 0))
+    .filter((t) => t > 0);
+  if (valid.length === 0) return 0;
+  const earliest = Math.min(...valid);
+  return Math.max(0, Math.floor((earliest - Date.now()) / 1000));
+}
+
 export default function Cart() {
-  const { cart, totalItems, subtotal, updateQuantity, removeItem } = useCart();
+  const {
+    cart,
+    totalItems,
+    subtotal,
+    updateQuantity,
+    removeItem,
+    removeMany,
+    moveToWishlist,
+    refreshCart,
+  } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
 
   const [couponInput, setCouponInput] = useState('');
   const [applying, setApplying] = useState(false);
   const [applied, setApplied] = useState<AppliedCoupon | null>(null);
-  const [crossSell, setCrossSell] = useState<Product[]>([]);
-  const [reservationLeft, setReservationLeft] = useState(RESERVATION_MINUTES * 60);
+  const [crossSell, setCrossSell] = useState<CartItemBackendDTO[]>([]);
+  const [combo, setCombo] = useState<ComboDiscountResult | null>(null);
+  const [reservationLeft, setReservationLeft] = useState(0);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
 
-  // Reservation: 30 phút giữ giỏ hàng — lưu vào localStorage để sống qua F5
+  // Reservation timer — dùng ReservedUntil thật từ backend
   useEffect(() => {
     if (cart.length === 0) {
-      localStorage.removeItem('kk_cart_reserved_at');
-      setReservationLeft(RESERVATION_MINUTES * 60);
+      setReservationLeft(0);
       return;
     }
-    let reservedAt = Number(localStorage.getItem('kk_cart_reserved_at'));
-    if (!reservedAt || Number.isNaN(reservedAt)) {
-      reservedAt = Date.now();
-      localStorage.setItem('kk_cart_reserved_at', String(reservedAt));
-    }
-    const tick = () => {
-      const elapsed = Math.floor((Date.now() - reservedAt) / 1000);
-      const left = Math.max(0, RESERVATION_MINUTES * 60 - elapsed);
-      setReservationLeft(left);
-    };
+    const tick = () => setReservationLeft(computeReservationLeft(cart));
     tick();
     const interval = window.setInterval(tick, 1000);
     return () => window.clearInterval(interval);
-  }, [cart.length]);
+  }, [cart]);
 
-  // Cross-sell: gợi ý sản phẩm bestseller cùng category với item đầu tiên
+  // Auto-refresh giỏ khi reservation hết hạn để pull lại stock mới (sweeper đã release)
+  useEffect(() => {
+    if (cart.length === 0) return;
+    if (reservationLeft === 0) {
+      const t = window.setTimeout(() => void refreshCart(), 1500);
+      return () => window.clearTimeout(t);
+    }
+  }, [reservationLeft, cart.length, refreshCart]);
+
+  // Cross-sell: backend trả sản phẩm cùng category với item đầu tiên
   useEffect(() => {
     if (cart.length === 0) {
       setCrossSell([]);
+      setCombo(null);
       return;
     }
-    void productApi.getBestSellers(8).then((r) => {
-      if (r.success && r.data) {
-        const inCart = new Set(cart.map((c) => c.productId));
-        setCrossSell(r.data.filter((p) => !inCart.has(p.id)).slice(0, 4));
-      }
+    void cartApi.getCrossSell(4).then((r) => {
+      if (r.success && r.data) setCrossSell(r.data);
     });
-  }, [cart.length]);
+    void cartApi.getComboDiscount().then((r) => {
+      if (r.success && r.data) setCombo(r.data); else setCombo(null);
+    });
+  }, [cart.length, cart[0]?.productId, subtotal]);
+
+  // Bỏ chọn id không còn trong giỏ
+  useEffect(() => {
+    setSelected((prev) => {
+      const validIds = new Set(cart.map((c) => c.id));
+      const next = new Set<number>();
+      prev.forEach((id) => { if (validIds.has(id)) next.add(id); });
+      return next;
+    });
+  }, [cart]);
 
   const freeshipMissing = Math.max(0, FREESHIP_THRESHOLD - subtotal);
   const freeshipPct = Math.min(100, Math.round((subtotal / FREESHIP_THRESHOLD) * 100));
-  const totalAfterDiscount = Math.max(0, subtotal - (applied?.discount ?? 0));
+  const comboDiscount = combo?.eligible ? combo.discount : 0;
+  const totalAfterDiscount = Math.max(0, subtotal - (applied?.discount ?? 0) - comboDiscount);
+  const allSelected = cart.length > 0 && selected.size === cart.length;
+  const hasOverStock = useMemo(
+    () => cart.some((i) => i.availableStock !== undefined && i.quantity > i.availableStock),
+    [cart],
+  );
+
+  const toggleAll = useCallback(() => {
+    setSelected((prev) => prev.size === cart.length ? new Set() : new Set(cart.map((c) => c.id)));
+  }, [cart]);
+
+  const toggleOne = useCallback((id: number) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
 
   const handleApplyCoupon = useCallback(async () => {
     const code = couponInput.trim().toUpperCase();
@@ -98,17 +150,42 @@ export default function Cart() {
     toast.success('Đã bỏ mã giảm giá');
   }, []);
 
+  const handleBulkRemove = useCallback(async () => {
+    if (selected.size === 0) return;
+    if (!window.confirm(`Xóa ${selected.size} sản phẩm khỏi giỏ?`)) return;
+    setBulkBusy(true);
+    const removed = await removeMany(Array.from(selected));
+    setBulkBusy(false);
+    if (removed > 0) toast.success(`Đã xóa ${removed} sản phẩm`);
+    setSelected(new Set());
+  }, [selected, removeMany]);
+
+  const handleBulkMoveWishlist = useCallback(async () => {
+    if (selected.size === 0) return;
+    setBulkBusy(true);
+    const moved = await moveToWishlist(Array.from(selected));
+    setBulkBusy(false);
+    toast.success(moved > 0
+      ? `Đã chuyển ${moved} sản phẩm vào yêu thích`
+      : 'Sản phẩm đã có sẵn trong yêu thích');
+    setSelected(new Set());
+  }, [selected, moveToWishlist]);
+
   const goCheckout = useCallback(() => {
     if (!user) {
       toast.error('Vui lòng đăng nhập trước khi đặt hàng');
       navigate('/login');
       return;
     }
+    if (hasOverStock) {
+      toast.error('Có sản phẩm vượt tồn kho khả dụng — vui lòng giảm số lượng');
+      return;
+    }
     if (applied) {
       sessionStorage.setItem('kk_pending_coupon', applied.code);
     }
     navigate('/checkout');
-  }, [user, applied, navigate]);
+  }, [user, applied, navigate, hasOverStock]);
 
   // ============== EMPTY ==============
   if (cart.length === 0) {
@@ -137,7 +214,7 @@ export default function Cart() {
         <div className="ivy-step"><div className="ivy-step-num">4</div><span>Hoàn thành đơn</span></div>
       </div>
 
-      {/* Reservation banner */}
+      {/* Reservation banner — dùng dữ liệu thật từ ReservedUntil */}
       {reservationLeft > 0 ? (
         <div style={{
           background: reservationLeft < 300 ? '#fef2f2' : '#fff7ed',
@@ -148,11 +225,19 @@ export default function Cart() {
         }}>
           <i className="fa fa-clock" style={{ fontSize: 16 }}></i>
           <div style={{ flex: 1 }}>
-            <strong>Giỏ hàng đang được giữ trong {String(Math.floor(reservationLeft / 60)).padStart(2, '0')}:{String(reservationLeft % 60).padStart(2, '0')}</strong>
-            <span style={{ marginLeft: 8 }}>để các bạn khác không tranh hàng. Đặt nhanh tay nhé!</span>
+            <strong>Giỏ hàng đã giữ tồn kho trong {String(Math.floor(reservationLeft / 60)).padStart(2, '0')}:{String(reservationLeft % 60).padStart(2, '0')}</strong>
+            <span style={{ marginLeft: 8 }}>— hết giờ hệ thống sẽ trả hàng cho khách khác. Đặt nhanh tay nhé!</span>
           </div>
         </div>
-      ) : null}
+      ) : (
+        <div style={{
+          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
+          padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#991b1b',
+        }}>
+          <i className="fa fa-exclamation-circle" style={{ marginRight: 8 }}></i>
+          Giỏ hàng đã hết thời gian giữ — vui lòng kiểm tra lại tồn kho trước khi đặt.
+        </div>
+      )}
 
       {/* Freeship progress */}
       <div style={{
@@ -187,19 +272,78 @@ export default function Cart() {
             Giỏ hàng của bạn <strong>{totalItems} Sản Phẩm</strong>
           </h2>
 
+          {/* Bulk action bar */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '10px 12px', background: '#f8fafc',
+            border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: 12,
+            fontSize: 13,
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                style={{ width: 16, height: 16, cursor: 'pointer' }}
+              />
+              <span>Chọn tất cả ({cart.length})</span>
+            </label>
+            <span style={{ color: '#94a3b8' }}>|</span>
+            <span>Đã chọn: <strong>{selected.size}</strong></span>
+            <div style={{ flex: 1 }} />
+            <button
+              onClick={handleBulkMoveWishlist}
+              disabled={selected.size === 0 || bulkBusy}
+              style={{
+                padding: '6px 12px', background: '#fff', color: '#0f172a',
+                border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 12, fontWeight: 600,
+                cursor: selected.size === 0 ? 'not-allowed' : 'pointer',
+                opacity: selected.size === 0 ? 0.5 : 1,
+              }}
+            >
+              <i className="fa fa-heart" style={{ marginRight: 4, color: '#ec4899' }}></i>
+              Chuyển vào yêu thích
+            </button>
+            <button
+              onClick={handleBulkRemove}
+              disabled={selected.size === 0 || bulkBusy}
+              style={{
+                padding: '6px 12px', background: '#fff', color: '#dc2626',
+                border: '1px solid #fecaca', borderRadius: 4, fontSize: 12, fontWeight: 600,
+                cursor: selected.size === 0 ? 'not-allowed' : 'pointer',
+                opacity: selected.size === 0 ? 0.5 : 1,
+              }}
+            >
+              <i className="fa fa-trash-alt" style={{ marginRight: 4 }}></i>
+              Xóa đã chọn
+            </button>
+          </div>
+
           <div className="ivy-cart-header">
-            <span className="ivy-col-product">TÊN SẢN PHẨM</span>
+            <span className="ivy-col-product" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 16 }} />
+              TÊN SẢN PHẨM
+            </span>
             <span className="ivy-col-discount">CHIẾT KHẤU</span>
             <span className="ivy-col-qty">SỐ LƯỢNG</span>
             <span className="ivy-col-total">TỔNG TIỀN</span>
           </div>
 
           {cart.map((item) => {
-            const lowStock = item.quantity >= 3; // Mock: nếu khách add nhiều sẽ cảnh báo
+            const available = item.availableStock ?? Infinity;
+            const overStock = item.quantity > available;
+            const showLowStock = item.isLowStock || (available > 0 && available < 5);
             return (
               <div className="ivy-cart-item" key={item.id}>
                 <div className="ivy-col-product">
-                  <div className="ivy-item-info">
+                  <div className="ivy-item-info" style={{ alignItems: 'flex-start' }}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(item.id)}
+                      onChange={() => toggleOne(item.id)}
+                      style={{ width: 16, height: 16, marginTop: 8, cursor: 'pointer', flexShrink: 0 }}
+                      aria-label="Chọn sản phẩm"
+                    />
                     <Link to={`/product/${item.productId}`} className="ivy-item-img">
                       <img src={item.image} alt={item.name} />
                     </Link>
@@ -213,10 +357,22 @@ export default function Cart() {
                       <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>
                         Đơn giá: {formatCurrency(item.price)}
                       </p>
-                      {lowStock && (
+                      {showLowStock && available > 0 && (
                         <p style={{ fontSize: 12, color: '#ea580c', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <i className="fa fa-fire"></i>
-                          Size {item.size} đang được {3 + (item.id % 8)} người khác xem
+                          <i className="fa fa-exclamation-triangle"></i>
+                          Chỉ còn <strong>{available}</strong> sản phẩm trong kho
+                        </p>
+                      )}
+                      {overStock && (
+                        <p style={{ fontSize: 12, color: '#dc2626', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                          <i className="fa fa-times-circle"></i>
+                          Vượt tồn kho khả dụng — chỉ còn {available}
+                        </p>
+                      )}
+                      {available === 0 && (
+                        <p style={{ fontSize: 12, color: '#dc2626', margin: '4px 0 0', fontWeight: 600 }}>
+                          <i className="fa fa-ban" style={{ marginRight: 4 }}></i>
+                          Hết hàng cho biến thể này
                         </p>
                       )}
                     </div>
@@ -229,7 +385,11 @@ export default function Cart() {
                   <div className="ivy-qty-control">
                     <button onClick={() => updateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1}>−</button>
                     <input value={item.quantity} readOnly />
-                    <button onClick={() => updateQuantity(item.id, item.quantity + 1)}>+</button>
+                    <button
+                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                      disabled={item.quantity >= available}
+                      title={item.quantity >= available ? 'Đã đạt giới hạn tồn kho' : ''}
+                    >+</button>
                   </div>
                 </div>
                 <div className="ivy-col-total">
@@ -246,18 +406,23 @@ export default function Cart() {
             <Link to="/products" className="ivy-btn-continue">← Tiếp tục mua hàng</Link>
           </div>
 
-          {/* Cross-sell */}
+          {/* Cross-sell — backend trả sản phẩm cùng category với item đầu tiên */}
           {crossSell.length > 0 && (
             <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #e5e7eb' }}>
-              <h3 style={{ fontSize: 16, marginBottom: 16, color: '#0f172a' }}>
+              <h3 style={{ fontSize: 16, marginBottom: 6, color: '#0f172a' }}>
                 <i className="fa fa-magic" style={{ marginRight: 8, color: '#ec4899' }}></i>
                 Mua kèm để được giảm thêm
               </h3>
+              <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 14px' }}>
+                {combo?.eligible
+                  ? `🎉 Bạn đang được giảm thêm ${combo.percent}% (−${formatCurrency(combo.discount)}) — ${combo.message ?? ''}`
+                  : 'Mua thêm 1 sản phẩm khác cùng danh mục để được giảm thêm 10% trên tổng nhóm sản phẩm đó.'}
+              </p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 12 }}>
                 {crossSell.map((p) => (
                   <Link
-                    key={p.id}
-                    to={`/product/${p.id}`}
+                    key={p.productId}
+                    to={`/product/${p.productId}`}
                     style={{
                       display: 'block', textDecoration: 'none', color: '#0f172a',
                       border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden',
@@ -297,6 +462,15 @@ export default function Cart() {
               <div className="ivy-summary-row" style={{ color: '#16a34a' }}>
                 <span>Mã {applied.code}</span>
                 <span>−{formatCurrency(applied.discount)}</span>
+              </div>
+            )}
+            {combo?.eligible && combo.discount > 0 && (
+              <div className="ivy-summary-row" style={{ color: '#16a34a' }}>
+                <span>
+                  <i className="fa fa-gift" style={{ marginRight: 4 }}></i>
+                  Mua kèm −{combo.percent}%
+                </span>
+                <span>−{formatCurrency(combo.discount)}</span>
               </div>
             )}
             <div className="ivy-summary-row ivy-summary-bold" style={{ marginTop: 8 }}>
@@ -363,7 +537,13 @@ export default function Cart() {
               <p><i className="fa fa-shield-alt"></i> Không thanh toán cho shipper khi chưa nhận hàng!</p>
             </div>
 
-            <button className="ivy-btn-order" onClick={goCheckout}>
+            <button
+              className="ivy-btn-order"
+              onClick={goCheckout}
+              disabled={hasOverStock}
+              title={hasOverStock ? 'Có sản phẩm vượt tồn kho' : ''}
+              style={hasOverStock ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
+            >
               <i className="fa fa-shopping-cart" style={{ marginRight: 8 }}></i>
               Đặt hàng • {formatCurrency(totalAfterDiscount)}
             </button>

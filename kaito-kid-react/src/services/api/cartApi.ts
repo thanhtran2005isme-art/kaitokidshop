@@ -10,6 +10,12 @@ export interface CartItemDTO {
   size: string;
   color: string;
   quantity: number;
+  /** Tồn kho khả dụng theo (size, color) — đã trừ Reserved. */
+  availableStock?: number;
+  /** Thời điểm hết giữ chỗ (UTC ISO). */
+  reservedUntil?: string | null;
+  /** true nếu availableStock < 5. */
+  isLowStock?: boolean;
 }
 
 export interface AddToCartPayload {
@@ -17,6 +23,19 @@ export interface AddToCartPayload {
   size: string;
   color: string;
   quantity: number;
+}
+
+export interface BulkCartActionPayload {
+  itemIds: number[];
+}
+
+export interface ComboDiscountResult {
+  eligible: boolean;
+  percent: number;
+  discount: number;
+  eligibleSubtotal: number;
+  categories: string[];
+  message?: string | null;
 }
 
 export const cartApi = {
@@ -65,6 +84,46 @@ export const cartApi = {
     try {
       await apiClient.delete('/api/cart');
       return { success: true };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Xóa nhiều item cùng lúc */
+  async removeMany(itemIds: number[]): Promise<ApiResponse<{ removed: number }>> {
+    try {
+      const response = await apiClient.post<{ removed: number }>('/api/cart/remove-many', { itemIds });
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Chuyển nhiều item sang wishlist */
+  async moveToWishlist(itemIds: number[]): Promise<ApiResponse<{ moved: number }>> {
+    try {
+      const response = await apiClient.post<{ moved: number }>('/api/cart/move-to-wishlist', { itemIds });
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Cross-sell theo category của item đầu tiên trong giỏ */
+  async getCrossSell(limit = 4): Promise<ApiResponse<CartItemDTO[]>> {
+    try {
+      const response = await apiClient.get<CartItemDTO[]>(`/api/cart/cross-sell?limit=${limit}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Đánh giá combo discount (≥2 SP cùng category → giảm thêm 10%) */
+  async getComboDiscount(): Promise<ApiResponse<ComboDiscountResult>> {
+    try {
+      const response = await apiClient.get<ComboDiscountResult>('/api/cart/combo-discount');
+      return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: getErrorMessage(error) };
     }

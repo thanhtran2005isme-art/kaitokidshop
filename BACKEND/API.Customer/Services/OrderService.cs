@@ -9,6 +9,7 @@ namespace API.Customer.Services;
 public class OrderService(
     CustomerDbContext db,
     ICouponService couponService,
+    IComboDiscountService comboService,
     IShippingService shippingService) : IOrderService
 {
     public async Task<OrderDTO> CreateOrderAsync(int userId, CreateOrderDTO dto)
@@ -35,8 +36,13 @@ public class OrderService(
                 discount = couponResult.DiscountAmount;
         }
 
+        // Combo discount: 10% nếu giỏ có ≥2 SP khác nhau cùng category
+        var combo = await comboService.EvaluateForItemsAsync(cartItems);
+        var comboDiscount = combo.Eligible ? combo.Discount : 0m;
+
+        var totalDiscount = discount + comboDiscount;
         var shippingFee = dto.ShippingFee < 0 ? 0 : dto.ShippingFee;
-        var total = subtotal - discount + shippingFee;
+        var total = subtotal - totalDiscount + shippingFee;
         if (total < 0) total = 0;
 
         var orderCode = $"KK-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}";
@@ -51,7 +57,7 @@ public class OrderService(
             CustomerAddress = dto.CustomerAddress,
             Subtotal = subtotal,
             ShippingFee = shippingFee,
-            Discount = discount,
+            Discount = totalDiscount,
             Total = total,
             CouponCode = dto.CouponCode,
             PaymentMethod = dto.PaymentMethod,
@@ -78,12 +84,33 @@ public class OrderService(
 
         db.Orders.Add(order);
 
+        // Trừ stock thật + giải phóng phần Reserved trên variant (đã được giữ lúc add to cart)
+        var variantKeys = cartItems
+            .Select(c => new { c.ProductId, c.Size, c.Color })
+            .Distinct()
+            .ToList();
+        var productIdsForVariant = variantKeys.Select(k => k.ProductId).Distinct().ToList();
+        var variants = await db.VariantStocks
+            .Where(v => productIdsForVariant.Contains(v.ProductId))
+            .ToListAsync();
+
         foreach (var item in cartItems)
         {
             item.Product.Stock -= item.Quantity;
             item.Product.SoldCount += item.Quantity;
             if (item.Product.Stock <= 0)
                 item.Product.Status = "out-of-stock";
+
+            // Variant: trừ Stock thật, trả Reserved (đã giữ trước đó)
+            var v = variants.FirstOrDefault(x =>
+                x.ProductId == item.ProductId && x.Size == item.Size && x.Color == item.Color);
+            if (v != null)
+            {
+                v.Stock = Math.Max(0, v.Stock - item.Quantity);
+                v.Reserved = Math.Max(0, v.Reserved - item.Quantity);
+                v.SoldCount += item.Quantity;
+                v.UpdatedAt = DateTime.UtcNow;
+            }
         }
 
         db.CartItems.RemoveRange(cartItems);

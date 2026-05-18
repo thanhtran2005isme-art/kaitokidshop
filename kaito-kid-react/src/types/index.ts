@@ -67,6 +67,12 @@ export interface CartItem {
   size: string;
   color: string;
   quantity: number;
+  /** Tồn kho khả dụng cho biến thể (size, color) đã trừ phần Reserved của khách khác. */
+  availableStock?: number;
+  /** Hết hạn giữ chỗ (UTC). Sau thời điểm này backend sẽ tự release stock. */
+  reservedUntil?: string | null;
+  /** true nếu availableStock < 5 → hiển thị cảnh báo. */
+  isLowStock?: boolean;
 }
 
 // Đơn hàng - từ checkout-page.js placeOrder()

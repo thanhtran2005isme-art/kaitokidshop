@@ -9,4 +9,7 @@ public interface ICartService
     Task<CartItemDTO?> UpdateQuantityAsync(int userId, int cartItemId, int quantity);
     Task<bool> RemoveFromCartAsync(int userId, int cartItemId);
     Task ClearCartAsync(int userId);
+    Task<int> RemoveManyAsync(int userId, IEnumerable<int> cartItemIds);
+    Task<int> MoveToWishlistAsync(int userId, IEnumerable<int> cartItemIds);
+    Task<List<CartItemDTO>> GetCrossSellAsync(int userId, int limit = 4);
 }

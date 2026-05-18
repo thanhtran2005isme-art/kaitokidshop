@@ -27,6 +27,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICartService, CartService>();
+builder.Services.AddScoped<IComboDiscountService, ComboDiscountService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IWishlistService, WishlistService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
@@ -61,6 +62,7 @@ builder.Services.AddScoped<IShippingService, ShippingService>();
 
 builder.Services.AddHostedService<ShippingStatusSimulator>();
 builder.Services.AddHostedService<API.Customer.Services.PaymentExpirySweeper>();
+builder.Services.AddHostedService<API.Customer.Services.CartReservationSweeper>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

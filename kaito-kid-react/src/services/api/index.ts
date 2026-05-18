@@ -21,7 +21,7 @@ export { menuApi, type MenuDTO } from './menuApi';
 export { collectionApi, type CollectionDTO, type PublicCollectionDTO } from './collectionApi';
 export { lookbookApi, type LookbookDTO, type PublicLookbookDTO } from './lookbookApi';
 export { settingsApi, type SettingDTO, type UpsertSettingDTO } from './settingsApi';
-export { cartApi, type CartItemDTO as CartItemBackendDTO, type AddToCartPayload } from './cartApi';
+export { cartApi, type CartItemDTO as CartItemBackendDTO, type AddToCartPayload, type ComboDiscountResult } from './cartApi';
 export { customerOrderApi, customerReviewApi, type CustomerOrderDTO, type CustomerOrderItemDTO, type CreateReviewPayload, type ReviewDTO as CustomerReviewDTO } from './customerOrderApi';
 export { accountApi, type AccountDTO, type UpdateAccountPayload, type ChangePasswordPayload, type PointsHistoryDTO, type RedeemResultDTO, type PersonalVoucher } from './accountApi';
 export { addressApi, type AddressDTO, type CreateAddressPayload } from './addressApi';

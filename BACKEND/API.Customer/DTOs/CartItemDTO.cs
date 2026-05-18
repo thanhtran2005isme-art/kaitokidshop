@@ -10,6 +10,10 @@ public class CartItemDTO
     public string Size { get; set; } = string.Empty;
     public string Color { get; set; } = string.Empty;
     public int Quantity { get; set; }
+    /// <summary>Tồn kho khả dụng theo (size, color) — đã trừ Reserved.</summary>
+    public int AvailableStock { get; set; }
+    public DateTime? ReservedUntil { get; set; }
+    public bool IsLowStock { get; set; }   // true nếu Available < 5
 }
 
 public class AddToCartDTO
@@ -23,4 +27,19 @@ public class AddToCartDTO
 public class UpdateCartDTO
 {
     public int Quantity { get; set; }
+}
+
+public class BulkCartActionDTO
+{
+    public List<int> ItemIds { get; set; } = new();
+}
+
+public class ComboDiscountResultDTO
+{
+    public bool Eligible { get; set; }
+    public decimal Percent { get; set; }
+    public decimal Discount { get; set; }
+    public decimal EligibleSubtotal { get; set; }
+    public List<string> Categories { get; set; } = new();
+    public string? Message { get; set; }
 }

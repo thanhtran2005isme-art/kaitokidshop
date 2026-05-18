@@ -9,7 +9,7 @@ namespace API.Customer.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-public class CartController(ICartService cartService) : ControllerBase
+public class CartController(ICartService cartService, IComboDiscountService comboService) : ControllerBase
 {
     private int UserId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
@@ -45,5 +45,44 @@ public class CartController(ICartService cartService) : ControllerBase
     {
         await cartService.ClearCartAsync(UserId);
         return NoContent();
+    }
+
+    /// <summary>Xóa nhiều item cùng lúc (checkbox chọn nhiều).</summary>
+    [HttpPost("remove-many")]
+    public async Task<ActionResult<object>> RemoveMany([FromBody] BulkCartActionDTO dto)
+    {
+        if (dto.ItemIds is null || dto.ItemIds.Count == 0)
+            return BadRequest(new { message = "Danh sách rỗng" });
+        var removed = await cartService.RemoveManyAsync(UserId, dto.ItemIds);
+        return Ok(new { removed });
+    }
+
+    /// <summary>Chuyển nhiều item sang wishlist (xóa khỏi giỏ + thêm vào yêu thích).</summary>
+    [HttpPost("move-to-wishlist")]
+    public async Task<ActionResult<object>> MoveToWishlist([FromBody] BulkCartActionDTO dto)
+    {
+        if (dto.ItemIds is null || dto.ItemIds.Count == 0)
+            return BadRequest(new { message = "Danh sách rỗng" });
+        var moved = await cartService.MoveToWishlistAsync(UserId, dto.ItemIds);
+        return Ok(new { moved });
+    }
+
+    /// <summary>Cross-sell: gợi ý sản phẩm cùng danh mục với item đầu tiên trong giỏ.</summary>
+    [HttpGet("cross-sell")]
+    public async Task<ActionResult<List<CartItemDTO>>> CrossSell([FromQuery] int limit = 4)
+    {
+        var items = await cartService.GetCrossSellAsync(UserId, Math.Clamp(limit, 1, 20));
+        return Ok(items);
+    }
+
+    /// <summary>
+    /// Đánh giá combo discount thật từ backend: ≥2 sản phẩm khác nhau cùng danh mục → giảm thêm 10%.
+    /// FE gọi để hiển thị "Mua kèm giảm thêm" và áp giá khi checkout.
+    /// </summary>
+    [HttpGet("combo-discount")]
+    public async Task<ActionResult<ComboDiscountResultDTO>> ComboDiscount()
+    {
+        var result = await comboService.EvaluateAsync(UserId);
+        return Ok(result);
     }
 }

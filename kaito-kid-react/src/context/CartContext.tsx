@@ -14,6 +14,8 @@ interface CartContextType {
   addItem: (product: Product, size: string, color: string, qty?: number) => Promise<void>;
   updateQuantity: (cartItemId: number, qty: number) => Promise<void>;
   removeItem: (cartItemId: number) => Promise<void>;
+  removeMany: (cartItemIds: number[]) => Promise<number>;
+  moveToWishlist: (cartItemIds: number[]) => Promise<number>;
   clearCart: () => Promise<void>;
   refreshCart: () => Promise<void>;
 }
@@ -30,6 +32,9 @@ function mapDtoToCartItem(dto: CartItemBackendDTO): CartItem {
     size: dto.size,
     color: dto.color,
     quantity: dto.quantity,
+    availableStock: dto.availableStock,
+    reservedUntil: dto.reservedUntil,
+    isLowStock: dto.isLowStock,
   };
 }
 
@@ -90,6 +95,28 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const removeMany = async (cartItemIds: number[]) => {
+    if (cartItemIds.length === 0) return 0;
+    const result = await cartApi.removeMany(cartItemIds);
+    if (result.success) {
+      const idSet = new Set(cartItemIds);
+      setCart((prev) => prev.filter((item) => !idSet.has(item.id)));
+      return result.data?.removed ?? cartItemIds.length;
+    }
+    return 0;
+  };
+
+  const moveToWishlist = async (cartItemIds: number[]) => {
+    if (cartItemIds.length === 0) return 0;
+    const result = await cartApi.moveToWishlist(cartItemIds);
+    if (result.success) {
+      const idSet = new Set(cartItemIds);
+      setCart((prev) => prev.filter((item) => !idSet.has(item.id)));
+      return result.data?.moved ?? cartItemIds.length;
+    }
+    return 0;
+  };
+
   const clearCart = async () => {
     const result = await cartApi.clearCart();
     if (result.success) {
@@ -101,7 +128,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const subtotal = cart.reduce((sum, item) => sum + item.price * (item.quantity || 1), 0);
 
   return (
-    <CartContext.Provider value={{ cart, totalItems, subtotal, loading, addItem, updateQuantity, removeItem, clearCart, refreshCart }}>
+    <CartContext.Provider value={{ cart, totalItems, subtotal, loading, addItem, updateQuantity, removeItem, removeMany, moveToWishlist, clearCart, refreshCart }}>
       {children}
     </CartContext.Provider>
   );

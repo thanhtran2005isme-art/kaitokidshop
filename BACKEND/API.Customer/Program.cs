@@ -28,6 +28,7 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IComboDiscountService, ComboDiscountService>();
+builder.Services.AddScoped<API.Customer.Services.Email.IEmailService, API.Customer.Services.Email.SmtpEmailService>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IWishlistService, WishlistService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();

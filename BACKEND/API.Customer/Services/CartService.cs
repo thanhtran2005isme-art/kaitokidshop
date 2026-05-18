@@ -254,6 +254,47 @@ public class CartService(CustomerDbContext db) : ICartService
         }).ToList();
     }
 
+    public async Task<ReorderResultDTO> ReorderAsync(int userId, int orderId)
+    {
+        var order = await db.Orders
+            .Include(o => o.Items)
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
+        if (order is null)
+            throw new InvalidOperationException("Đơn hàng không tồn tại");
+
+        var result = new ReorderResultDTO();
+        foreach (var item in order.Items)
+        {
+            // Sản phẩm có thể đã bị disable / xoá → skip
+            var product = await db.Products.FindAsync(item.ProductId);
+            if (product is null || product.Status != "active")
+            {
+                result.Skipped++;
+                result.SkippedNames.Add(item.ProductName);
+                continue;
+            }
+
+            try
+            {
+                await AddToCartAsync(userId, new AddToCartDTO
+                {
+                    ProductId = item.ProductId,
+                    Size = item.Size,
+                    Color = item.Color,
+                    Quantity = item.Quantity,
+                });
+                result.Added++;
+            }
+            catch (InvalidOperationException)
+            {
+                // Hết hàng / vượt tồn kho — bỏ qua, FE sẽ báo cho user
+                result.Skipped++;
+                result.SkippedNames.Add(item.ProductName);
+            }
+        }
+        return result;
+    }
+
     private Task ReleaseReservation(CartItem item)
     {
         // Trả lại số lượng vào variant.Reserved

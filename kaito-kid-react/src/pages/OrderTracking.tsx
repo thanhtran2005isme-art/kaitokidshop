@@ -1,10 +1,22 @@
-// Trang đơn hàng của tôi - kết nối backend qua JWT
+// Trang đơn hàng của tôi — đã refactor:
+// - Filter tabs theo trạng thái
+// - hasReviewed lấy từ backend (persist qua F5)
+// - Upload media review thật (multipart)
+// - Nút Mua lại + Xuất hoá đơn
+// - Nudge banner đánh giá khi có đơn completed chưa review
 
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { customerOrderApi, customerReviewApi, shippingApi, type CustomerOrderDTO, type CustomerOrderItemDTO, type ShippingTracking } from '../services/api';
+import { useCart } from '../context/CartContext';
+import {
+  customerOrderApi, shippingApi, cartApi,
+  type CustomerOrderDTO, type CustomerOrderItemDTO, type ShippingTracking,
+} from '../services/api';
 import { formatCurrency, formatDate } from '../utils/format';
+import { openInvoicePrintWindow } from '../utils/invoicePrint';
+import OrderStatusFilter, { type OrderStatusFilterValue } from '../components/order/OrderStatusFilter';
+import ReviewModal from '../components/order/ReviewModal';
 import toast from 'react-hot-toast';
 
 const statusMap: Record<string, string> = {
@@ -15,7 +27,6 @@ const statusMap: Record<string, string> = {
   cancelled: 'Đã huỷ',
 };
 
-// Trạng thái cho phép user hủy đơn (chỉ khi đơn chưa được shipper lấy hàng)
 const CANCELLABLE_STATUSES = ['pending', 'confirmed'];
 const CANCELLABLE_SHIPPING_STATUSES = ['', 'ready_to_pick', 'picking'];
 function canCancelOrder(o: { status: string; shippingStatus?: string }) {
@@ -23,21 +34,28 @@ function canCancelOrder(o: { status: string; shippingStatus?: string }) {
   return CANCELLABLE_SHIPPING_STATUSES.includes(o.shippingStatus || '');
 }
 
+/** Map status thực sự sang group dùng cho filter tab. */
+function statusGroup(status: string): OrderStatusFilterValue {
+  if (status === 'pending' || status === 'confirmed') return 'pending';
+  if (status === 'shipping') return 'shipping';
+  if (status === 'completed') return 'completed';
+  if (status === 'cancelled') return 'cancelled';
+  return 'all';
+}
+
 export default function OrderTracking() {
   const { user } = useAuth();
+  const { refreshCart } = useCart();
+  const navigate = useNavigate();
+
   const [orders, setOrders] = useState<CustomerOrderDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<OrderStatusFilterValue>('all');
   const [selected, setSelected] = useState<CustomerOrderDTO | null>(null);
   const [reviewingItem, setReviewingItem] = useState<{ order: CustomerOrderDTO; item: CustomerOrderItemDTO } | null>(null);
-  const [reviewForm, setReviewForm] = useState<{
-    rating: number;
-    comment: string;
-    files: File[];
-    uploading: boolean;
-  }>({ rating: 5, comment: '', files: [], uploading: false });
-  const [reviewedKeys, setReviewedKeys] = useState<Set<string>>(new Set());
   const [tracking, setTracking] = useState<ShippingTracking | null>(null);
   const [trackingLoading, setTrackingLoading] = useState(false);
+  const [reorderingId, setReorderingId] = useState<number | null>(null);
 
   const loadOrders = async () => {
     setLoading(true);
@@ -56,55 +74,45 @@ export default function OrderTracking() {
   useEffect(() => {
     if (!user) return;
     void loadOrders();
-    // Tự reload trạng thái đơn mỗi 60s để khách thấy ship cập nhật real-time
     const interval = window.setInterval(() => { void loadOrders(); }, 60_000);
     return () => window.clearInterval(interval);
   }, [user]);
 
-  const hasReviewed = (orderId: number, productId: number): boolean => {
-    return reviewedKeys.has(`${orderId}-${productId}`);
-  };
-
-  const handleSubmitReview = async () => {
-    if (!reviewingItem || !user) return;
-
-    if (reviewForm.comment.trim().length < 10) {
-      toast.error('Vui lòng nhập ít nhất 10 ký tự cho đánh giá');
-      return;
+  // Đếm số đơn theo từng group cho tabs
+  const counts = useMemo(() => {
+    const c: Record<OrderStatusFilterValue, number> = {
+      all: orders.length, pending: 0, shipping: 0, completed: 0, cancelled: 0,
+    };
+    for (const o of orders) {
+      const g = statusGroup(o.status);
+      if (g !== 'all') c[g]++;
     }
+    return c;
+  }, [orders]);
 
-    const result = await customerReviewApi.create({
-      productId: reviewingItem.item.productId,
-      orderId: reviewingItem.order.id,
-      rating: reviewForm.rating,
-      comment: reviewForm.comment.trim(),
-    });
+  const visibleOrders = useMemo(() => {
+    if (filter === 'all') return orders;
+    return orders.filter((o) => statusGroup(o.status) === filter);
+  }, [orders, filter]);
 
-    if (result.success) {
-      toast.success('Cảm ơn bạn đã đánh giá! Đánh giá của bạn đang chờ duyệt.');
-      setReviewedKeys((prev) => new Set(prev).add(`${reviewingItem.order.id}-${reviewingItem.item.productId}`));
-      setReviewingItem(null);
-      setReviewForm({ rating: 5, comment: '', files: [], uploading: false });
-    } else {
-      toast.error(result.error || 'Không thể gửi đánh giá. Vui lòng thử lại.');
-    }
-  };
+  // Đơn completed có ít nhất 1 sản phẩm chưa review → hiển thị nudge banner
+  const pendingReviewCount = useMemo(() => {
+    return orders
+      .filter((o) => o.status === 'completed')
+      .reduce((acc, o) => acc + o.items.filter((i) => !i.hasReviewed).length, 0);
+  }, [orders]);
 
   const openTracking = async (orderCode: string) => {
     setTrackingLoading(true);
     setTracking(null);
     const result = await shippingApi.track(orderCode);
-    if (result.success && result.data) {
-      setTracking(result.data);
-    } else {
-      toast.error(result.error || 'Không lấy được tracking');
-    }
+    if (result.success && result.data) setTracking(result.data);
+    else toast.error(result.error || 'Không lấy được tracking');
     setTrackingLoading(false);
   };
 
   const handleCancelOrder = async (orderId: number) => {
     if (!window.confirm('Bạn có chắc muốn hủy đơn hàng này?')) return;
-
     const result = await customerOrderApi.cancel(orderId);
     if (result.success) {
       toast.success(result.data?.message || 'Đã hủy đơn hàng');
@@ -113,6 +121,33 @@ export default function OrderTracking() {
     } else {
       toast.error(result.error || 'Không thể hủy đơn hàng');
     }
+  };
+
+  const handleReorder = async (orderId: number) => {
+    setReorderingId(orderId);
+    const r = await cartApi.reorder(orderId);
+    setReorderingId(null);
+    if (!r.success || !r.data) {
+      toast.error(r.error || 'Không thể mua lại đơn này');
+      return;
+    }
+    await refreshCart();
+    if (r.data.added > 0) {
+      toast.success(`Đã thêm ${r.data.added} sản phẩm vào giỏ`);
+    }
+    if (r.data.skipped > 0) {
+      toast.error(`Đã bỏ qua ${r.data.skipped} sản phẩm hết hàng${r.data.skippedNames.length ? ': ' + r.data.skippedNames.join(', ') : ''}`);
+    }
+    if (r.data.added > 0) navigate('/cart');
+  };
+
+  const handleSubmittedReview = (orderId: number, productId: number) => {
+    // Optimistic update — cập nhật hasReviewed luôn để UI phản hồi ngay
+    setOrders((prev) => prev.map((o) => o.id !== orderId ? o : {
+      ...o,
+      items: o.items.map((i) => i.productId === productId ? { ...i, hasReviewed: true } : i),
+    }));
+    setReviewingItem(null);
   };
 
   if (!user) {
@@ -130,7 +165,6 @@ export default function OrderTracking() {
 
   return (
     <div className="order-tracking-page">
-      {/* User Info */}
       <div className="user-section">
         <div className="user-info-box">
           <div className="user-avatar"><i className="fa fa-user"></i></div>
@@ -141,22 +175,39 @@ export default function OrderTracking() {
         </div>
       </div>
 
-      {/* Orders */}
+      {pendingReviewCount > 0 && (
+        <div className="review-nudge">
+          <i className="fa fa-star"></i>
+          <div style={{ flex: 1 }}>
+            Bạn còn <strong>{pendingReviewCount}</strong> sản phẩm chưa đánh giá. Hãy chia sẻ trải nghiệm để giúp khách hàng khác lựa chọn nhé!
+          </div>
+          <button
+            className="btn-view-order"
+            style={{ background: '#f59e0b', color: '#fff' }}
+            onClick={() => setFilter('completed')}
+          >
+            Xem đơn cần đánh giá
+          </button>
+        </div>
+      )}
+
       <div className="orders-section">
         <h3><i className="fa fa-box"></i> Đơn hàng của tôi</h3>
+
+        <OrderStatusFilter value={filter} onChange={setFilter} counts={counts} />
 
         {loading ? (
           <div className="empty-orders">
             <i className="fa fa-spinner fa-spin"></i>
             <p>Đang tải đơn hàng...</p>
           </div>
-        ) : orders.length === 0 ? (
+        ) : visibleOrders.length === 0 ? (
           <div className="empty-orders">
             <i className="fa fa-inbox"></i>
-            <p>Chưa có đơn hàng nào</p>
+            <p>{filter === 'all' ? 'Chưa có đơn hàng nào' : 'Không có đơn nào trong nhóm này'}</p>
           </div>
         ) : (
-          orders.map((order) => (
+          visibleOrders.map((order) => (
             <div key={order.id} className="order-card">
               <div className="order-card-header">
                 <div>
@@ -188,6 +239,21 @@ export default function OrderTracking() {
                   >
                     <i className="fa fa-truck"></i> Theo dõi
                   </button>
+                  {order.status === 'completed' && (
+                    <button
+                      className="btn-reorder"
+                      onClick={() => void handleReorder(order.id)}
+                      disabled={reorderingId === order.id}
+                    >
+                      <i className="fa fa-redo"></i>
+                      {reorderingId === order.id ? 'Đang thêm...' : 'Mua lại'}
+                    </button>
+                  )}
+                  {(order.status === 'completed' || order.status === 'shipping' || order.status === 'confirmed') && (
+                    <button className="btn-invoice" onClick={() => openInvoicePrintWindow(order)}>
+                      <i className="fa fa-file-invoice"></i> Xuất hoá đơn
+                    </button>
+                  )}
                   {canCancelOrder(order) && (
                     <button
                       className="btn-view-order"
@@ -245,7 +311,7 @@ export default function OrderTracking() {
 
                     {selected.status === 'completed' && (
                       <div style={{ marginTop: '8px' }}>
-                        {hasReviewed(selected.id, item.productId) ? (
+                        {item.hasReviewed ? (
                           <span style={{ color: '#10b981', fontSize: '14px' }}>
                             <i className="fa fa-check-circle"></i> Đã đánh giá
                           </span>
@@ -273,8 +339,19 @@ export default function OrderTracking() {
                 <div className="summary-row total"><span>Tổng:</span><span>{formatCurrency(selected.total)}</span></div>
               </div>
 
-              {canCancelOrder(selected) && (
-                <div style={{ marginTop: 20, textAlign: 'right' }}>
+              <div style={{ marginTop: 20, display: 'flex', gap: 8, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                <button className="btn-invoice" onClick={() => openInvoicePrintWindow(selected)}>
+                  <i className="fa fa-file-invoice"></i> Xuất hoá đơn
+                </button>
+                {selected.status === 'completed' && (
+                  <button
+                    className="btn-reorder"
+                    onClick={() => { setSelected(null); void handleReorder(selected.id); }}
+                  >
+                    <i className="fa fa-redo"></i> Mua lại
+                  </button>
+                )}
+                {canCancelOrder(selected) && (
                   <button
                     className="btn-view-order"
                     style={{ background: '#dc2626', color: '#fff' }}
@@ -282,8 +359,8 @@ export default function OrderTracking() {
                   >
                     <i className="fa fa-times"></i> Hủy đơn hàng
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -291,125 +368,12 @@ export default function OrderTracking() {
 
       {/* Modal đánh giá sản phẩm */}
       {reviewingItem && (
-        <div className="modal active" onClick={() => setReviewingItem(null)}>
-          <div className="modal-content review-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Đánh giá sản phẩm</h3>
-              <button className="modal-close" onClick={() => setReviewingItem(null)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="review-product-info">
-                <img src={reviewingItem.item.productImage} alt={reviewingItem.item.productName} />
-                <div>
-                  <div className="review-product-name">{reviewingItem.item.productName}</div>
-                  <div className="review-product-variant">
-                    {reviewingItem.item.color}{reviewingItem.item.size && `, ${reviewingItem.item.size}`}
-                  </div>
-                </div>
-              </div>
-
-              <div className="review-rating-input">
-                <label>Đánh giá của bạn</label>
-                <div className="star-rating-input">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      className={star <= reviewForm.rating ? 'active' : ''}
-                      onClick={() => setReviewForm({ ...reviewForm, rating: star })}
-                    >
-                      <i className="fa fa-star"></i>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="review-comment-input">
-                <label>Nhận xét của bạn</label>
-                <textarea
-                  placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm này (tối thiểu 10 ký tự)..."
-                  value={reviewForm.comment}
-                  onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
-                  rows={5}
-                />
-                <div className="char-count">{reviewForm.comment.length} ký tự</div>
-              </div>
-
-              <div className="review-media-input" style={{ marginTop: 16 }}>
-                <label style={{ display: 'block', fontWeight: 600, marginBottom: 6 }}>
-                  <i className="fa fa-image" style={{ marginRight: 6, color: '#ec4899' }}></i>
-                  Thêm ảnh / video (tối đa 5 ảnh + 1 video)
-                </label>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                  {reviewForm.files.map((f, idx) => (
-                    <div key={idx} style={{ position: 'relative', width: 80, height: 80, borderRadius: 6, overflow: 'hidden', background: '#f8fafc' }}>
-                      {f.type.startsWith('image/') ? (
-                        <img src={URL.createObjectURL(f)} alt={`media-${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: '#475569', fontSize: 12 }}>
-                          <i className="fa fa-video" style={{ marginRight: 4 }}></i> Video
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setReviewForm((p) => ({ ...p, files: p.files.filter((_, i) => i !== idx) }))}
-                        style={{
-                          position: 'absolute', top: 2, right: 2, width: 20, height: 20,
-                          background: 'rgba(0,0,0,0.6)', color: '#fff', border: 'none',
-                          borderRadius: '50%', cursor: 'pointer', fontSize: 11, lineHeight: 1,
-                        }}
-                      >×</button>
-                    </div>
-                  ))}
-                  {reviewForm.files.length < 6 && (
-                    <label
-                      style={{
-                        width: 80, height: 80, borderRadius: 6, border: '2px dashed #cbd5e1',
-                        display: 'flex', flexDirection: 'column', alignItems: 'center',
-                        justifyContent: 'center', cursor: 'pointer', color: '#94a3b8',
-                        fontSize: 11,
-                      }}
-                    >
-                      <i className="fa fa-plus" style={{ fontSize: 18, marginBottom: 4 }}></i>
-                      Thêm
-                      <input
-                        type="file"
-                        accept="image/*,video/*"
-                        multiple
-                        style={{ display: 'none' }}
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files || []);
-                          // limit 5 ảnh + 1 video
-                          const images = files.filter((f) => f.type.startsWith('image/')).slice(0, 5);
-                          const video = files.find((f) => f.type.startsWith('video/'));
-                          const all = video ? [...images, video] : images;
-                          setReviewForm((p) => ({ ...p, files: [...p.files, ...all].slice(0, 6) }));
-                          e.target.value = '';
-                        }}
-                      />
-                    </label>
-                  )}
-                </div>
-                <p style={{ fontSize: 11, color: '#94a3b8', marginTop: 6, marginBottom: 0 }}>
-                  Định dạng JPG/PNG/WebP (max 5MB) hoặc MP4/WebM/MOV (max 30MB).
-                </p>
-              </div>
-
-              <div className="review-actions">
-                <button className="btn-cancel" onClick={() => setReviewingItem(null)}>
-                  Hủy
-                </button>
-                <button
-                  className="btn-submit-review"
-                  onClick={handleSubmitReview}
-                  disabled={reviewForm.comment.trim().length < 10 || reviewForm.uploading}
-                >
-                  {reviewForm.uploading ? 'Đang tải tệp...' : 'Gửi đánh giá'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ReviewModal
+          order={reviewingItem.order}
+          item={reviewingItem.item}
+          onClose={() => setReviewingItem(null)}
+          onSubmitted={() => handleSubmittedReview(reviewingItem.order.id, reviewingItem.item.productId)}
+        />
       )}
 
       {/* Modal theo dõi vận chuyển */}
@@ -465,12 +429,8 @@ export default function OrderTracking() {
                       {tracking.history.slice().reverse().map((h, idx) => (
                         <div key={h.id} style={{ marginBottom: 16, position: 'relative' }}>
                           <div style={{
-                            position: 'absolute',
-                            left: -28,
-                            top: 4,
-                            width: 12,
-                            height: 12,
-                            borderRadius: '50%',
+                            position: 'absolute', left: -28, top: 4,
+                            width: 12, height: 12, borderRadius: '50%',
                             background: idx === 0 ? '#16a34a' : '#cbd5e1',
                             border: '2px solid #fff',
                             boxShadow: idx === 0 ? '0 0 0 3px #bbf7d0' : 'none',

@@ -85,4 +85,19 @@ public class CartController(ICartService cartService, IComboDiscountService comb
         var result = await comboService.EvaluateAsync(UserId);
         return Ok(result);
     }
+
+    /// <summary>"Mua lại" — nạp toàn bộ item từ 1 đơn cũ vào giỏ.</summary>
+    [HttpPost("reorder/{orderId:int}")]
+    public async Task<ActionResult<ReorderResultDTO>> Reorder(int orderId)
+    {
+        try
+        {
+            var result = await cartService.ReorderAsync(UserId, orderId);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

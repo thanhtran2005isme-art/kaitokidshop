@@ -9,6 +9,8 @@ export interface CustomerOrderItemDTO {
   size: string;
   color: string;
   quantity: number;
+  /** Backend trả về true nếu user đã đánh giá sản phẩm này trong đơn này. */
+  hasReviewed?: boolean;
 }
 
 export interface CustomerOrderDTO {

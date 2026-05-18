@@ -21,7 +21,7 @@ export { menuApi, type MenuDTO } from './menuApi';
 export { collectionApi, type CollectionDTO, type PublicCollectionDTO } from './collectionApi';
 export { lookbookApi, type LookbookDTO, type PublicLookbookDTO } from './lookbookApi';
 export { settingsApi, type SettingDTO, type UpsertSettingDTO } from './settingsApi';
-export { cartApi, type CartItemDTO as CartItemBackendDTO, type AddToCartPayload, type ComboDiscountResult } from './cartApi';
+export { cartApi, type CartItemDTO as CartItemBackendDTO, type AddToCartPayload, type ComboDiscountResult, type ReorderResult } from './cartApi';
 export { customerOrderApi, customerReviewApi, type CustomerOrderDTO, type CustomerOrderItemDTO, type CreateReviewPayload, type ReviewDTO as CustomerReviewDTO } from './customerOrderApi';
 export { accountApi, type AccountDTO, type UpdateAccountPayload, type ChangePasswordPayload, type PointsHistoryDTO, type RedeemResultDTO, type PersonalVoucher } from './accountApi';
 export { addressApi, type AddressDTO, type CreateAddressPayload } from './addressApi';
@@ -38,7 +38,7 @@ export { adminShippingApi, type ShippingConfig as AdminShippingConfig, type Ship
 
 export { ghnLocationApi, type GhnProvince as GhnProvinceItem2, type GhnDistrict as GhnDistrictItem2, type GhnWard as GhnWardItem } from './ghnLocationApi';
 
-export { paymentApi, type PaymentStatus } from './paymentApi';
+export { paymentApi, type PaymentStatus, type PaymentConfig } from './paymentApi';
 
 export { newsletterApi, type NewsletterSubscribeResult } from './newsletterApi';
 

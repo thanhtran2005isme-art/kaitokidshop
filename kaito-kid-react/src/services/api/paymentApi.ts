@@ -11,7 +11,19 @@ export interface PaymentStatus {
   total: number;
 }
 
+export interface PaymentConfig {
+  allowSimulatePaid: boolean;
+}
+
 export const paymentApi = {
+  /** Cấu hình hiển thị payment do backend trả về (vd: có cho phép mô phỏng paid hay không) */
+  async getConfig(): Promise<ApiResponse<PaymentConfig>> {
+    try {
+      const res = await apiClient.get<PaymentConfig>('/api/payment/config');
+      return { success: true, data: res.data };
+    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
+  },
+
   /** Poll trạng thái thanh toán + còn bao nhiêu giây */
   async getStatus(orderCode: string): Promise<ApiResponse<PaymentStatus>> {
     try {

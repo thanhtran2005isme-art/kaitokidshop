@@ -38,6 +38,12 @@ export interface ComboDiscountResult {
   message?: string | null;
 }
 
+export interface ReorderResult {
+  added: number;
+  skipped: number;
+  skippedNames: string[];
+}
+
 export const cartApi = {
   /** Lấy giỏ hàng của user hiện tại */
   async getCart(): Promise<ApiResponse<CartItemDTO[]>> {
@@ -123,6 +129,16 @@ export const cartApi = {
   async getComboDiscount(): Promise<ApiResponse<ComboDiscountResult>> {
     try {
       const response = await apiClient.get<ComboDiscountResult>('/api/cart/combo-discount');
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Mua lại từ đơn cũ: backend tự thêm các item còn bán vào giỏ */
+  async reorder(orderId: number): Promise<ApiResponse<ReorderResult>> {
+    try {
+      const response = await apiClient.post<ReorderResult>(`/api/cart/reorder/${orderId}`);
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: getErrorMessage(error) };

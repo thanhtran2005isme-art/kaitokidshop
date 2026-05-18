@@ -1,5 +1,6 @@
 using API.Customer.Data;
 using API.Customer.DTOs;
+using API.Customer.Services.Email;
 using API.Customer.Services.Shipping;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,7 +17,10 @@ namespace API.Customer.Controllers;
 [Route("api/payment")]
 public class PaymentController(
     CustomerDbContext db,
-    IShippingService shipping) : ControllerBase
+    IShippingService shipping,
+    IEmailService email,
+    IWebHostEnvironment env,
+    IConfiguration config) : ControllerBase
 {
     private int? UserId
     {
@@ -25,6 +29,18 @@ public class PaymentController(
             var idClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             return int.TryParse(idClaim, out var id) ? id : null;
         }
+    }
+
+    /// <summary>
+    /// Trả về cấu hình hiển thị payment cho FE.
+    /// allowSimulatePaid = true ⇒ FE được phép hiển thị nút "Tôi đã chuyển khoản" (gọi simulate-paid).
+    /// </summary>
+    [HttpGet("config")]
+    public IActionResult GetConfig()
+    {
+        var allowSimulate = env.IsDevelopment()
+            || string.Equals(config["Payment:AllowSimulatePaid"], "true", StringComparison.OrdinalIgnoreCase);
+        return Ok(new { allowSimulatePaid = allowSimulate });
     }
 
     /// <summary>
@@ -123,6 +139,11 @@ public class PaymentController(
             catch { /* không chặn flow nếu shipping fail */ }
         }
 
+        // Email: thông báo đã nhận thanh toán
+        _ = email.SendAsync(order.CustomerEmail,
+            $"[KaitoKid] Đã nhận thanh toán đơn {order.OrderCode}",
+            EmailMessageBuilder.PaymentReceived(order.CustomerName, order.OrderCode, order.Total));
+
         return Ok(new { message = "Đã xác nhận thanh toán", order.OrderCode, order.PaidAt });
     }
 
@@ -162,11 +183,18 @@ public class PaymentController(
     /// <summary>
     /// Mô phỏng webhook ngân hàng — endpoint dev cho chính chủ đơn.
     /// Production: thay endpoint này bằng webhook thật từ SePay/Casso (không [Authorize]).
+    /// Endpoint này chỉ được phép chạy ở Development hoặc khi <c>Payment:AllowSimulatePaid=true</c>.
     /// </summary>
     [HttpPost("simulate-paid/{orderCode}")]
     [Authorize]
     public async Task<IActionResult> SimulatePaid(string orderCode)
     {
+        // Chặn ở production để khách không thể tự xác nhận thanh toán giả.
+        var allowSimulate = env.IsDevelopment()
+            || string.Equals(config["Payment:AllowSimulatePaid"], "true", StringComparison.OrdinalIgnoreCase);
+        if (!allowSimulate)
+            return NotFound();
+
         var uid = UserId;
         if (uid is null) return Unauthorized();
         var order = await db.Orders.FirstOrDefaultAsync(o => o.OrderCode == orderCode && o.UserId == uid);
@@ -195,6 +223,11 @@ public class PaymentController(
             }
             catch { }
         }
+
+        _ = email.SendAsync(order.CustomerEmail,
+            $"[KaitoKid] Đã nhận thanh toán đơn {order.OrderCode}",
+            EmailMessageBuilder.PaymentReceived(order.CustomerName, order.OrderCode, order.Total));
+
         return Ok(new { message = "Đã xác nhận thanh toán (mô phỏng webhook)", order.OrderCode, order.PaidAt });
     }
 }

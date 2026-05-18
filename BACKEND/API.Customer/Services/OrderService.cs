@@ -1,6 +1,7 @@
 using API.Customer.Data;
 using API.Customer.DTOs;
 using API.Customer.Models;
+using API.Customer.Services.Email;
 using API.Customer.Services.Shipping;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,7 +11,9 @@ public class OrderService(
     CustomerDbContext db,
     ICouponService couponService,
     IComboDiscountService comboService,
-    IShippingService shippingService) : IOrderService
+    IShippingService shippingService,
+    IEmailService emailService,
+    IConfiguration config) : IOrderService
 {
     public async Task<OrderDTO> CreateOrderAsync(int userId, CreateOrderDTO dto)
     {
@@ -143,17 +146,40 @@ public class OrderService(
             }
         }
 
+        // Email xác nhận đơn — fire and forget, không chặn flow
+        var frontendUrl = (config["Frontend:BaseUrl"] ?? "http://localhost:5173").TrimEnd('/');
+        var trackingUrl = $"{frontendUrl}/orders";
+        _ = emailService.SendAsync(order.CustomerEmail,
+            $"[KaitoKid] Xác nhận đơn hàng {order.OrderCode}",
+            EmailMessageBuilder.OrderConfirmation(
+                order.CustomerName,
+                order.OrderCode,
+                order.Total,
+                order.PaymentMethod,
+                trackingUrl));
+
         return MapToDTO(order);
     }
 
     public async Task<List<OrderDTO>> GetOrdersByUserAsync(int userId)
     {
-        return await db.Orders
+        var orders = await db.Orders
             .Where(o => o.UserId == userId)
             .Include(o => o.Items)
             .OrderByDescending(o => o.CreatedAt)
-            .Select(o => MapToDTO(o))
             .ToListAsync();
+
+        // Lấy tất cả review (orderId, productId) của user trong 1 query
+        var orderIds = orders.Select(o => o.Id).ToList();
+        var reviewedSet = await db.Reviews
+            .Where(r => r.UserId == userId && orderIds.Contains(r.OrderId))
+            .Select(r => new { r.OrderId, r.ProductId })
+            .ToListAsync();
+        var reviewedKeys = reviewedSet
+            .Select(x => $"{x.OrderId}:{x.ProductId}")
+            .ToHashSet();
+
+        return orders.Select(o => MapToDTO(o, reviewedKeys)).ToList();
     }
 
     public async Task<OrderDTO?> GetOrderByIdAsync(int userId, int orderId)
@@ -161,7 +187,17 @@ public class OrderService(
         var order = await db.Orders
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
-        return order is null ? null : MapToDTO(order);
+        if (order is null) return null;
+
+        var reviewedSet = await db.Reviews
+            .Where(r => r.UserId == userId && r.OrderId == orderId)
+            .Select(r => r.ProductId)
+            .ToListAsync();
+        var reviewedKeys = reviewedSet
+            .Select(pid => $"{orderId}:{pid}")
+            .ToHashSet();
+
+        return MapToDTO(order, reviewedKeys);
     }
 
     public async Task<bool> CancelOrderAsync(int userId, int orderId)
@@ -200,7 +236,9 @@ public class OrderService(
         return true;
     }
 
-    private static OrderDTO MapToDTO(Order o) => new()
+    private static OrderDTO MapToDTO(Order o) => MapToDTO(o, null);
+
+    private static OrderDTO MapToDTO(Order o, HashSet<string>? reviewedKeys) => new()
     {
         Id = o.Id,
         OrderCode = o.OrderCode,
@@ -231,7 +269,8 @@ public class OrderService(
             Price = i.Price,
             Size = i.Size,
             Color = i.Color,
-            Quantity = i.Quantity
+            Quantity = i.Quantity,
+            HasReviewed = reviewedKeys != null && reviewedKeys.Contains($"{o.Id}:{i.ProductId}"),
         }).ToList()
     };
 }

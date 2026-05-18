@@ -54,4 +54,6 @@ public class OrderDetailDTO
     public string Size { get; set; } = string.Empty;
     public string Color { get; set; } = string.Empty;
     public int Quantity { get; set; }
+    /// <summary>true nếu user đã đánh giá sản phẩm này trong đơn này.</summary>
+    public bool HasReviewed { get; set; }
 }

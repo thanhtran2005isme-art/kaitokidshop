@@ -43,3 +43,10 @@ public class ComboDiscountResultDTO
     public List<string> Categories { get; set; } = new();
     public string? Message { get; set; }
 }
+
+public class ReorderResultDTO
+{
+    public int Added { get; set; }
+    public int Skipped { get; set; }
+    public List<string> SkippedNames { get; set; } = new();
+}

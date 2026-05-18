@@ -1,4 +1,8 @@
-// Trang tìm kiếm — instant search + filter + sort + history + suggestions
+// Trang tìm kiếm — đã refactor:
+// - Backend xử lý filter + facet count + did-you-mean (Levenshtein thật)
+// - URL sync TOÀN BỘ filter (?q=ao&size=M&color=Đen&min=200000…) → F5 không mất bộ lọc
+// - Highlight từ khóa search trong tên SP
+// - Autocomplete dùng /api/search/suggestions
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
@@ -11,7 +15,7 @@ import {
   PiSortAscendingBold,
   PiCaretDownBold,
 } from 'react-icons/pi';
-import { productApi, categoryApi, type CategoryDTO } from '../services/api';
+import { productApi, searchApi, type SearchFacets, type SuggestionResponse } from '../services/api';
 import {
   trackSearch,
   getSearchHistory,
@@ -20,6 +24,7 @@ import {
 } from '../utils/viewedTracker';
 import type { Product } from '../types';
 import ProductCard from '../components/product/ProductCard';
+import { highlightText } from '../utils/highlight';
 import { formatCurrency } from '../utils/format';
 
 type SortKey = 'newest' | 'price-asc' | 'price-desc' | 'bestseller' | 'rating';
@@ -40,146 +45,194 @@ const PRICE_RANGES = [
   { label: 'Trên 2tr', min: 2_000_000, max: 999_999_999 },
 ];
 
-const ALL_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
-const ALL_COLORS = ['Đen', 'Trắng', 'Xám', 'Hồng', 'Đỏ', 'Xanh navy', 'Be', 'Nâu'];
+const ALL_SIZES_FALLBACK = ['S', 'M', 'L', 'XL', 'XXL'];
+const ALL_COLORS_FALLBACK = ['Đen', 'Trắng', 'Xám', 'Hồng', 'Đỏ', 'Xanh navy', 'Be', 'Nâu'];
 
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const queryParam = searchParams.get('q') || '';
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // ---- State đọc từ URL (single source of truth) ----
+  const queryParam = searchParams.get('q') || '';
+  const activeCategory = searchParams.get('category') || '';
+  const activeSizes = useMemo<Set<string>>(() => {
+    const v = searchParams.get('sizes');
+    return new Set(v ? v.split(',').filter(Boolean) : []);
+  }, [searchParams]);
+  const activeColors = useMemo<Set<string>>(() => {
+    const v = searchParams.get('colors');
+    return new Set(v ? v.split(',').filter(Boolean) : []);
+  }, [searchParams]);
+  const minRating = Number(searchParams.get('rating')) || 0;
+  const sort = (searchParams.get('sort') as SortKey) || 'newest';
+  const minPrice = searchParams.get('min') ? Number(searchParams.get('min')) : undefined;
+  const maxPrice = searchParams.get('max') ? Number(searchParams.get('max')) : undefined;
+  const activePriceIdx = useMemo(() => {
+    if (minPrice === undefined && maxPrice === undefined) return null;
+    return PRICE_RANGES.findIndex((r) => r.min === minPrice && r.max === maxPrice);
+  }, [minPrice, maxPrice]);
+
+  // Local state — chỉ cho input + UI cục bộ
   const [keyword, setKeyword] = useState(queryParam);
   const [debounced, setDebounced] = useState(queryParam);
-  const [results, setResults] = useState<Product[]>([]);
-  const [allProducts, setAllProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [history, setHistory] = useState<{ keyword: string; count: number; searchedAt: number }[]>([]);
   const [trending, setTrending] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<CategoryDTO[]>([]);
+  const [autocomplete, setAutocomplete] = useState<SuggestionResponse>({ suggestions: [], products: [] });
 
-  // Filters
-  const [activeCategory, setActiveCategory] = useState<string>('');
-  const [activePriceIdx, setActivePriceIdx] = useState<number | null>(null);
-  const [activeSizes, setActiveSizes] = useState<Set<string>>(new Set());
-  const [activeColors, setActiveColors] = useState<Set<string>>(new Set());
-  const [minRating, setMinRating] = useState<number>(0);
-  const [sort, setSort] = useState<SortKey>('newest');
+  // Result state
+  const [results, setResults] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [facets, setFacets] = useState<SearchFacets>({ categories: {}, sizes: {}, colors: {}, priceRanges: {} });
+  const [didYouMean, setDidYouMean] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Load history + trending khi mount
+  // Khi URL ?q= đổi → đồng bộ vào input
+  useEffect(() => { setKeyword(queryParam); }, [queryParam]);
+
+  // Load history + trending lúc mount
   useEffect(() => {
     setHistory(getSearchHistory());
     void productApi.getBestSellers(6).then((r) => r.success && r.data && setTrending(r.data));
-    void categoryApi.getAll().then((data) => Array.isArray(data) && setCategories(data));
   }, []);
 
-  // Debounce keyword → debounced
+  // Debounce keyword cho debounced query
   useEffect(() => {
     const t = window.setTimeout(() => setDebounced(keyword.trim()), 350);
     return () => window.clearTimeout(t);
   }, [keyword]);
 
-  // Sync URL khi debounced thay đổi
+  // Sync debounced query → URL ?q=
   useEffect(() => {
-    if (debounced) {
-      setSearchParams({ q: debounced }, { replace: true });
-    } else if (queryParam) {
-      setSearchParams({}, { replace: true });
-    }
-  }, [debounced]);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (debounced) next.set('q', debounced); else next.delete('q');
+      return next;
+    }, { replace: true });
+  }, [debounced, setSearchParams]);
 
-  // Fetch products khi debounced thay đổi
+  // Autocomplete khi gõ
   useEffect(() => {
     let cancelled = false;
-    if (debounced.length === 0) {
-      setResults([]);
-      setAllProducts([]);
+    if (keyword.trim().length < 2) {
+      setAutocomplete({ suggestions: [], products: [] });
       return;
     }
-    if (debounced.length < 2) {
-      setLoading(false);
+    const t = window.setTimeout(() => {
+      void searchApi.suggestions(keyword.trim(), 5).then((r) => {
+        if (cancelled) return;
+        if (r.success && r.data) setAutocomplete(r.data);
+      });
+    }, 200);
+    return () => { cancelled = true; window.clearTimeout(t); };
+  }, [keyword]);
+
+  // Helper update URL filter
+  const updateParams = useCallback((mutator: (next: URLSearchParams) => void) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      mutator(next);
+      return next;
+    }, { replace: false });
+  }, [setSearchParams]);
+
+  // ============== FETCH SEARCH ==============
+  useEffect(() => {
+    let cancelled = false;
+    const q = debounced;
+    // Chỉ fetch khi đã có query (>= 2 char) hoặc có filter
+    const hasFilter = activeCategory || activeSizes.size > 0 || activeColors.size > 0
+      || minRating > 0 || minPrice !== undefined;
+    if (q.length < 2 && !hasFilter) {
+      setResults([]); setTotal(0); setDidYouMean(null);
+      setFacets({ categories: {}, sizes: {}, colors: {}, priceRanges: {} });
       return;
     }
     setLoading(true);
-    void productApi.getAll({ search: debounced, page: 1, pageSize: 100 }).then((r) => {
+    void searchApi.search({
+      query: q,
+      category: activeCategory || undefined,
+      sizes: activeSizes.size > 0 ? Array.from(activeSizes).join(',') : undefined,
+      colors: activeColors.size > 0 ? Array.from(activeColors).join(',') : undefined,
+      minRating: minRating > 0 ? minRating : undefined,
+      minPrice,
+      maxPrice,
+      sortBy: sort,
+      page: 1,
+      pageSize: 60,
+    }).then((r) => {
       if (cancelled) return;
       if (r.success && r.data) {
-        setAllProducts(r.data.products);
-        if (r.data.products.length > 0) trackSearch(debounced);
+        setResults(r.data.items);
+        setTotal(r.data.total);
+        setFacets(r.data.facets);
+        setDidYouMean(r.data.didYouMean || null);
+        if (q.length >= 2 && r.data.items.length > 0) trackSearch(q);
       } else {
-        setAllProducts([]);
+        setResults([]); setTotal(0);
       }
       setLoading(false);
     });
     return () => { cancelled = true; };
-  }, [debounced]);
+  }, [debounced, activeCategory, activeSizes, activeColors, minRating, minPrice, maxPrice, sort]);
 
-  // Apply filters + sort client-side
-  useEffect(() => {
-    let list = [...allProducts];
-    if (activeCategory) list = list.filter((p) => p.category === activeCategory);
-    if (activePriceIdx !== null) {
-      const r = PRICE_RANGES[activePriceIdx];
-      list = list.filter((p) => p.price >= r.min && p.price <= r.max);
-    }
-    if (activeSizes.size > 0) {
-      list = list.filter((p) => p.sizes?.some((s) => activeSizes.has(s)));
-    }
-    if (activeColors.size > 0) {
-      list = list.filter((p) => p.colors?.some((c) => activeColors.has(c)));
-    }
-    if (minRating > 0) {
-      list = list.filter((p) => (p.rating || 0) >= minRating);
-    }
-    list.sort((a, b) => {
-      switch (sort) {
-        case 'price-asc': return a.price - b.price;
-        case 'price-desc': return b.price - a.price;
-        case 'bestseller': return b.soldCount - a.soldCount;
-        case 'rating': return (b.rating || 0) - (a.rating || 0);
-        default: return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      }
-    });
-    setResults(list);
-  }, [allProducts, activeCategory, activePriceIdx, activeSizes, activeColors, minRating, sort]);
+  // ============== ACTIONS ==============
+  const setCategory = (cat: string) => updateParams((p) => {
+    if (cat) p.set('category', cat); else p.delete('category');
+  });
 
-  // Suggestion live (autocomplete) khi gõ
-  const liveSuggestions = useMemo(() => {
-    if (!keyword.trim() || keyword.length < 2) return [];
-    return allProducts.slice(0, 5);
-  }, [keyword, allProducts]);
+  const togglePrice = (idx: number) => updateParams((p) => {
+    if (activePriceIdx === idx) {
+      p.delete('min'); p.delete('max');
+    } else {
+      const r = PRICE_RANGES[idx];
+      p.set('min', String(r.min));
+      p.set('max', String(r.max));
+    }
+  });
 
-  // Did you mean — gợi ý gần đúng nếu không có kết quả
-  const didYouMean = useMemo(() => {
-    if (results.length > 0 || !debounced) return null;
-    // Tìm trong history các từ khóa có Levenshtein nhỏ
-    const candidates = history
-      .filter((h) => h.keyword.toLowerCase() !== debounced.toLowerCase())
-      .map((h) => h.keyword)
-      .filter((k) => Math.abs(k.length - debounced.length) <= 3);
-    if (candidates.length === 0) return null;
-    return candidates[0];
-  }, [results, debounced, history]);
+  const toggleSize = (s: string) => updateParams((p) => {
+    const set = new Set(activeSizes);
+    if (set.has(s)) set.delete(s); else set.add(s);
+    if (set.size > 0) p.set('sizes', Array.from(set).join(',')); else p.delete('sizes');
+  });
 
-  const toggleSet = (set: Set<string>, value: string, setter: (s: Set<string>) => void) => {
-    const next = new Set(set);
-    if (next.has(value)) next.delete(value);
-    else next.add(value);
-    setter(next);
-  };
+  const toggleColor = (c: string) => updateParams((p) => {
+    const set = new Set(activeColors);
+    if (set.has(c)) set.delete(c); else set.add(c);
+    if (set.size > 0) p.set('colors', Array.from(set).join(',')); else p.delete('colors');
+  });
+
+  const setRating = (r: number) => updateParams((p) => {
+    if (r > 0) p.set('rating', String(r)); else p.delete('rating');
+  });
+
+  const setSortKey = (s: SortKey) => updateParams((p) => {
+    if (s !== 'newest') p.set('sort', s); else p.delete('sort');
+  });
 
   const resetFilters = useCallback(() => {
-    setActiveCategory('');
-    setActivePriceIdx(null);
-    setActiveSizes(new Set());
-    setActiveColors(new Set());
-    setMinRating(0);
-    setSort('newest');
-  }, []);
+    updateParams((p) => {
+      ['category', 'sizes', 'colors', 'rating', 'min', 'max', 'sort'].forEach((k) => p.delete(k));
+    });
+  }, [updateParams]);
+
+  // Hợp nhất facet với fallback (để filter vẫn hiển thị khi facet trống)
+  const sizeOptions = useMemo(() => {
+    const fromFacet = Object.keys(facets.sizes);
+    const merged = Array.from(new Set([...fromFacet, ...ALL_SIZES_FALLBACK]));
+    return merged;
+  }, [facets.sizes]);
+  const colorOptions = useMemo(() => {
+    const fromFacet = Object.keys(facets.colors);
+    const merged = Array.from(new Set([...fromFacet, ...ALL_COLORS_FALLBACK]));
+    return merged;
+  }, [facets.colors]);
+  const categoryOptions = useMemo(() => Object.keys(facets.categories), [facets.categories]);
 
   const filterCount = (activeCategory ? 1 : 0)
-    + (activePriceIdx !== null ? 1 : 0)
+    + (activePriceIdx !== null && activePriceIdx >= 0 ? 1 : 0)
     + activeSizes.size
     + activeColors.size
     + (minRating > 0 ? 1 : 0);
@@ -232,10 +285,10 @@ export default function Search() {
               boxShadow: '0 10px 30px rgba(15,23,42,0.1)', overflow: 'hidden', zIndex: 20,
               maxHeight: 480, overflowY: 'auto',
             }}>
-              {keyword.length >= 2 && liveSuggestions.length > 0 && (
+              {keyword.length >= 2 && autocomplete.products.length > 0 && (
                 <div>
                   <div style={dropdownHead}>SẢN PHẨM GỢI Ý</div>
-                  {liveSuggestions.map((p) => (
+                  {autocomplete.products.map((p) => (
                     <div
                       key={p.id}
                       onMouseDown={() => navigate(`/product/${p.id}`)}
@@ -243,7 +296,9 @@ export default function Search() {
                     >
                       <img src={p.image} alt={p.name} style={{ width: 40, height: 50, objectFit: 'cover', borderRadius: 4 }} />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a' }}>{p.name}</div>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a' }}>
+                          {highlightText(p.name, keyword)}
+                        </div>
                         <div style={{ fontSize: 12, color: '#dc2626' }}>{formatCurrency(p.price)}</div>
                       </div>
                     </div>
@@ -319,17 +374,18 @@ export default function Search() {
             </div>
 
             {/* Category */}
-            {categories.length > 0 && (
+            {categoryOptions.length > 0 && (
               <FilterGroup title="Danh mục">
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={radioRow}>
-                    <input type="radio" checked={!activeCategory} onChange={() => setActiveCategory('')} />
+                    <input type="radio" checked={!activeCategory} onChange={() => setCategory('')} />
                     Tất cả
                   </label>
-                  {Array.from(new Set(categories.map((c) => c.tenDanhMuc))).slice(0, 8).map((cat) => (
+                  {categoryOptions.slice(0, 8).map((cat) => (
                     <label key={cat} style={radioRow}>
-                      <input type="radio" checked={activeCategory === cat} onChange={() => setActiveCategory(cat)} />
+                      <input type="radio" checked={activeCategory === cat} onChange={() => setCategory(cat)} />
                       {cat}
+                      <span style={facetCount}>({facets.categories[cat] ?? 0})</span>
                     </label>
                   ))}
                 </div>
@@ -344,9 +400,12 @@ export default function Search() {
                     <input
                       type="radio"
                       checked={activePriceIdx === i}
-                      onChange={() => setActivePriceIdx(activePriceIdx === i ? null : i)}
+                      onChange={() => togglePrice(i)}
                     />
                     {r.label}
+                    {facets.priceRanges[r.label] !== undefined && (
+                      <span style={facetCount}>({facets.priceRanges[r.label]})</span>
+                    )}
                   </label>
                 ))}
               </div>
@@ -355,10 +414,10 @@ export default function Search() {
             {/* Size */}
             <FilterGroup title="Kích cỡ">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {ALL_SIZES.map((s) => (
+                {sizeOptions.map((s) => (
                   <button
                     key={s}
-                    onClick={() => toggleSet(activeSizes, s, setActiveSizes)}
+                    onClick={() => toggleSize(s)}
                     style={{
                       padding: '6px 12px', minWidth: 42,
                       border: `1.5px solid ${activeSizes.has(s) ? '#ec4899' : '#e5e7eb'}`,
@@ -366,7 +425,7 @@ export default function Search() {
                       color: activeSizes.has(s) ? '#be185d' : '#475569',
                       borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600,
                     }}
-                  >{s}</button>
+                  >{s}{facets.sizes[s] !== undefined && <span style={{ marginLeft: 4, fontWeight: 400, opacity: .7 }}>({facets.sizes[s]})</span>}</button>
                 ))}
               </div>
             </FilterGroup>
@@ -374,10 +433,10 @@ export default function Search() {
             {/* Color */}
             <FilterGroup title="Màu sắc">
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {ALL_COLORS.map((c) => (
+                {colorOptions.map((c) => (
                   <button
                     key={c}
-                    onClick={() => toggleSet(activeColors, c, setActiveColors)}
+                    onClick={() => toggleColor(c)}
                     style={{
                       padding: '4px 10px',
                       border: `1.5px solid ${activeColors.has(c) ? '#ec4899' : '#e5e7eb'}`,
@@ -385,7 +444,7 @@ export default function Search() {
                       color: activeColors.has(c) ? '#be185d' : '#475569',
                       borderRadius: 6, cursor: 'pointer', fontSize: 12,
                     }}
-                  >{c}</button>
+                  >{c}{facets.colors[c] !== undefined && <span style={{ marginLeft: 4, opacity: .7 }}>({facets.colors[c]})</span>}</button>
                 ))}
               </div>
             </FilterGroup>
@@ -395,7 +454,7 @@ export default function Search() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {[5, 4, 3, 0].map((r) => (
                   <label key={r} style={radioRow}>
-                    <input type="radio" checked={minRating === r} onChange={() => setMinRating(r)} />
+                    <input type="radio" checked={minRating === r} onChange={() => setRating(r)} />
                     {r === 0 ? 'Tất cả' : (
                       <>
                         <span style={{ color: '#f59e0b' }}>{'★'.repeat(r)}</span>
@@ -421,7 +480,7 @@ export default function Search() {
               {loading ? (
                 <span><i className="fa fa-spinner fa-spin"></i> Đang tìm...</span>
               ) : debounced ? (
-                <>Tìm thấy <strong style={{ color: '#0f172a' }}>{results.length}</strong> sản phẩm cho "<strong>{debounced}</strong>"</>
+                <>Tìm thấy <strong style={{ color: '#0f172a' }}>{total}</strong> sản phẩm cho "<strong>{debounced}</strong>"</>
               ) : (
                 <span style={{ color: '#94a3b8' }}>Nhập từ khóa để bắt đầu tìm</span>
               )}
@@ -430,7 +489,7 @@ export default function Search() {
               <PiSortAscendingBold style={{ color: '#64748b' }} />
               <select
                 value={sort}
-                onChange={(e) => setSort(e.target.value as SortKey)}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
                 style={{
                   padding: '6px 10px', border: '1px solid #e5e7eb',
                   borderRadius: 6, fontSize: 13, outline: 'none', background: '#fff',
@@ -461,9 +520,25 @@ export default function Search() {
             </div>
           ) : results.length > 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
-              {results.map((p) => <ProductCard key={p.id} product={p} />)}
+              {results.map((p) => (
+                <div key={p.id} style={{ position: 'relative' }}>
+                  <ProductCard product={p} />
+                  {/* Highlight overlay tên SP */}
+                  {debounced && (
+                    <div style={{
+                      position: 'absolute', bottom: 0, left: 0, right: 0,
+                      pointerEvents: 'none',
+                      padding: '6px 8px',
+                      background: 'linear-gradient(0deg, rgba(255,255,255,0.95), transparent)',
+                      fontSize: 12, color: '#0f172a',
+                    }}>
+                      {highlightText(p.name, debounced)}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          ) : debounced.length >= 2 ? (
+          ) : debounced.length >= 2 || filterCount > 0 ? (
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: '60px 20px', textAlign: 'center' }}>
               <PiMagnifyingGlassBold style={{ fontSize: 60, color: '#cbd5e1' }} />
               <h3 style={{ margin: '16px 0 8px', color: '#475569' }}>Không tìm thấy sản phẩm phù hợp</h3>
@@ -532,4 +607,7 @@ const dropdownItem: React.CSSProperties = {
 };
 const radioRow: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#475569', cursor: 'pointer',
+};
+const facetCount: React.CSSProperties = {
+  marginLeft: 'auto', fontSize: 12, color: '#94a3b8',
 };

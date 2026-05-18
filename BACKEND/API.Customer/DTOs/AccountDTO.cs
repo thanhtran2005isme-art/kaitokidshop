@@ -51,3 +51,9 @@ public class RedeemResultDTO
     public int RemainingPoints { get; set; }
     public DateTime ExpiresAt { get; set; }
 }
+
+public class DeleteAccountDTO
+{
+    /// <summary>Phải nhập đúng "DELETE" để xác nhận.</summary>
+    public string Confirm { get; set; } = string.Empty;
+}

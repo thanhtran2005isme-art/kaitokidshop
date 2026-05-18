@@ -26,6 +26,7 @@ import Cart from './pages/Cart';
 import Checkout from './pages/Checkout';
 import OrderTracking from './pages/OrderTracking';
 import Wishlist from './pages/Wishlist';
+import WishlistShare from './pages/WishlistShare';
 import Account from './pages/Account';
 import Address from './pages/Address';
 import Search from './pages/Search';
@@ -98,6 +99,7 @@ function App() {
               <Route path="/women" element={<WomenProducts />} />
               <Route path="/men" element={<MenProducts />} />
               <Route path="/kids" element={<KidsProducts />} />
+              <Route path="/wishlist/share" element={<WishlistShare />} />
 
               {/* Trang cần đăng nhập */}
               <Route element={<ProtectedRoute />}>

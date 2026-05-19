@@ -2,6 +2,7 @@
   <Project Path="API.Admin/API.Admin.csproj" />
   <Project Path="API.Auth/API.Auth.csproj" />
   <Project Path="API.Customer/API.Customer.csproj" />
+  <Project Path="API.Customer.Tests/API.Customer.Tests.csproj" />
   <Project Path="API.Gateway/API.Gateway.csproj" />
   <Project Path="DbHelper/DbHelper.csproj" />
   <Project Path="Shared/Shared.csproj" />

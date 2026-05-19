@@ -72,6 +72,7 @@ import AdminProfile from './admin/AdminProfile';
 import AdminSettings from './admin/AdminSettings';
 import AdminLogin from './admin/AdminLogin';
 import AdminShipping from './admin/AdminShipping';
+import AdminChat from './admin/AdminChat';
 
 import './App.css';
 
@@ -130,6 +131,7 @@ function App() {
                 <Route path="products/edit/:id" element={<AdminProductAdd />} />
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="customers" element={<AdminCustomers />} />
+                <Route path="chat" element={<AdminChat />} />
                 <Route path="categories" element={<AdminCategories />} />
                 <Route path="collections" element={<AdminCollections />} />
                 <Route path="attributes" element={<AdminAttributes />} />

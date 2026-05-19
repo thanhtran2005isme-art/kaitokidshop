@@ -52,6 +52,7 @@ Dự án mô phỏng đầy đủ các tính năng của một sàn thương m�
 - **⚡ Flash Sale**: Hiển thị động khi có chương trình, countdown timer
 - **🎫 Mã giảm giá**: Áp dụng coupon, voucher khi thanh toán
 - **👤 Quản lý tài khoản**: Profile, địa chỉ, lịch sử đơn hàng
+- **💬 Hỗ trợ trực tuyến**: Chatbot 24/7 (tra đơn, kiểm tra tồn kho, mã giảm giá, chính sách) + live chat với nhân viên khi cần
 
 ### 🎯 Phía quản trị (Admin)
 - **📊 Dashboard**: Thống kê doanh thu, đơn hàng, khách hàng theo ngày/tháng/năm
@@ -64,6 +65,7 @@ Dự án mô phỏng đầy đủ các tính năng của một sàn thương m�
 - **📈 Báo cáo**: Biểu đồ doanh thu, top sản phẩm, thống kê chi tiết
 - **🎨 Bộ sưu tập**: Tạo collection, link sản phẩm
 - **📦 Kho hàng**: Quản lý tồn kho, lịch sử xuất nhập, cảnh báo
+- **💬 Hỗ trợ chat**: Inbox tiếp nhận hội thoại, nhận phiên, trả lời real-time, đóng phiên (RBAC: chat.view/reply)
 - **⚙️ Cài đặt**: Cấu hình cửa hàng, thông tin chung
 
 ---
@@ -309,9 +311,10 @@ kaitokidshop/
 - [x] Gợi ý sản phẩm thông minh
 - [x] Dashboard admin với biểu đồ
 - [x] Quản lý tồn kho
+- [x] Live chat + Chatbot hỗ trợ khách hàng (2 tuyến: bot tự động → nhân viên)
 - [ ] Tích hợp thanh toán online (VNPay, Momo)
 - [ ] Push notifications
-- [ ] Chat real-time với khách hàng
+- [x] Chat real-time với khách hàng
 - [ ] Mobile app (React Native)
 - [ ] AI recommendation engine
 

@@ -43,10 +43,6 @@ export interface AdminSettingsConfig {
   codFee: number;
   bankEnabled: boolean;
   bankAccounts: BankAccountConfig[];
-  defaultShippingFee: number;
-  freeShippingFrom: number;
-  estimatedDelivery: string;
-  enableTracking: boolean;
   smtpHost: string;
   smtpPort: number;
   smtpEmail: string;
@@ -135,10 +131,6 @@ export const defaultAdminSettings: AdminSettingsConfig = {
   codFee: 0,
   bankEnabled: true,
   bankAccounts: [createDefaultBankAccount()],
-  defaultShippingFee: 30000,
-  freeShippingFrom: 500000,
-  estimatedDelivery: '2-3 ngay',
-  enableTracking: true,
   smtpHost: 'smtp.gmail.com',
   smtpPort: 587,
   smtpEmail: 'noreply@kaitokid.com',
@@ -176,10 +168,6 @@ export function normalizeAdminSettings(rawSettings: Partial<AdminSettingsConfig>
     codFee: Math.max(0, asNumber(rawSettings?.codFee, defaultAdminSettings.codFee)),
     bankEnabled: asBoolean(rawSettings?.bankEnabled, defaultAdminSettings.bankEnabled),
     bankAccounts: bankAccounts.length > 0 ? bankAccounts : [createDefaultBankAccount()],
-    defaultShippingFee: Math.max(0, asNumber(rawSettings?.defaultShippingFee, defaultAdminSettings.defaultShippingFee)),
-    freeShippingFrom: Math.max(0, asNumber(rawSettings?.freeShippingFrom, defaultAdminSettings.freeShippingFrom)),
-    estimatedDelivery: asString(rawSettings?.estimatedDelivery, defaultAdminSettings.estimatedDelivery),
-    enableTracking: asBoolean(rawSettings?.enableTracking, defaultAdminSettings.enableTracking),
     smtpHost: asString(rawSettings?.smtpHost, defaultAdminSettings.smtpHost),
     smtpPort: Math.max(1, asNumber(rawSettings?.smtpPort, defaultAdminSettings.smtpPort)),
     smtpEmail: asString(rawSettings?.smtpEmail, defaultAdminSettings.smtpEmail),

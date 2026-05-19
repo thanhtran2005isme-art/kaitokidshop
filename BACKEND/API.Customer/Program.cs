@@ -9,6 +9,27 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSqlServerDb<CustomerDbContext>(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
 
+// SignalR cho chat real-time. Cho phép đọc access_token từ query string khi kết nối hub
+// (WebSocket không gửi được header Authorization) — chỉ áp dụng cho path /hubs.
+builder.Services.Configure<Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerOptions>(
+    Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme,
+    options =>
+    {
+        options.Events ??= new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents();
+        options.Events.OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+            return Task.CompletedTask;
+        };
+    });
+
+builder.Services.AddSignalR();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -35,6 +56,26 @@ builder.Services.AddScoped<IWishlistService, WishlistService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IAddressService, AddressService>();
 builder.Services.AddScoped<ICouponService, CouponService>();
+
+// ===== Chat (live chat + chatbot) =====
+// Các skill rule-based truy DB
+builder.Services.AddScoped<API.Customer.Services.Bot.IChatSkill, API.Customer.Services.Bot.Skills.OrderLookupSkill>();
+builder.Services.AddScoped<API.Customer.Services.Bot.IChatSkill, API.Customer.Services.Bot.Skills.StockCheckSkill>();
+builder.Services.AddScoped<API.Customer.Services.Bot.IChatSkill, API.Customer.Services.Bot.Skills.CouponSkill>();
+builder.Services.AddScoped<API.Customer.Services.Bot.IChatSkill, API.Customer.Services.Bot.Skills.FaqSkill>();
+
+// Chatbot: nếu có cấu hình LLM thì dùng LlmChatBot, ngược lại rule-based (giống pattern Email Brevo/Console)
+var chatLlmKey = builder.Configuration["Chat:Llm:ApiKey"];
+if (!string.IsNullOrWhiteSpace(chatLlmKey))
+{
+    builder.Services.AddHttpClient<API.Customer.Services.Bot.IChatBot, API.Customer.Services.Bot.LlmChatBot>();
+}
+else
+{
+    builder.Services.AddScoped<API.Customer.Services.Bot.IChatBot, API.Customer.Services.Bot.RuleBasedChatBot>();
+}
+
+builder.Services.AddScoped<IChatService, ChatService>();
 
 // Shipping providers — Mock luôn bật, GHTK/GHN bật khi có token
 // Shipping config service (singleton để cache nhẹ trong process)
@@ -65,6 +106,7 @@ builder.Services.AddScoped<IShippingService, ShippingService>();
 builder.Services.AddHostedService<ShippingStatusSimulator>();
 builder.Services.AddHostedService<API.Customer.Services.PaymentExpirySweeper>();
 builder.Services.AddHostedService<API.Customer.Services.CartReservationSweeper>();
+builder.Services.AddHostedService<API.Customer.Services.ChatIdleSweeper>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -85,6 +127,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<API.Customer.Hubs.ChatHub>("/hubs/chat");
 
 // Banner an toàn ở console khi khởi động
 var shippingMode = (app.Configuration["Shipping:Mode"] ?? "dev").ToLowerInvariant();

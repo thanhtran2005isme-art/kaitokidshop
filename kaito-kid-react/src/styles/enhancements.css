@@ -412,38 +412,6 @@ body {
 }
 
 
-/* ---- TopBar Marquee ---- */
 .top-bar {
   overflow: hidden;
-}
-
-.top-bar-track {
-  overflow: hidden;
-  position: relative;
-}
-
-.top-bar .top-bar-content {
-  display: flex;
-  gap: 60px;
-  white-space: nowrap;
-  animation: marquee 20s linear infinite;
-  justify-content: flex-start;
-  width: max-content;
-}
-
-.top-bar .top-bar-content span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  flex-shrink: 0;
-}
-
-@keyframes marquee {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
-}
-
-.top-bar:hover .top-bar-content {
-  animation-play-state: paused;
 }

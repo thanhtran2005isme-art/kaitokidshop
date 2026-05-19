@@ -733,6 +733,64 @@ PRINT 'All inventory advanced tables created successfully.';
 
 
 -- ================================================================
+-- 31. BẢNG: CuocHoiThoai
+-- Phiên hội thoại hỗ trợ (chatbot + live chat nhân viên)
+-- ================================================================
+CREATE TABLE CuocHoiThoai (
+    Id                  INT IDENTITY(1,1)   PRIMARY KEY,
+    NguoiDungId         INT                 NULL,                   -- NULL nếu là khách vãng lai
+    MaKhachVangLai      NVARCHAR(64)        NULL,                   -- Định danh guest (localStorage)
+    TenHienThi          NVARCHAR(100)       NULL,                   -- Tên khách (nếu có)
+    TrangThai           NVARCHAR(20)        NOT NULL DEFAULT 'bot',
+        -- bot: Chatbot đang xử lý
+        -- waiting: Chờ nhân viên nhận (hàng đợi)
+        -- agent: Nhân viên đang xử lý
+        -- closed: Đã đóng
+    NhanVienId          INT                 NULL,                   -- Nhân viên đang xử lý
+    SanPhamNguCanhId    INT                 NULL,                   -- Sản phẩm khách đang xem khi mở chat
+    TinNhanCuoi         NVARCHAR(500)       NULL,                   -- Preview tin cuối cho inbox
+    ThoiGianTinCuoi     DATETIME2           NOT NULL DEFAULT GETUTCDATE(), -- Sắp xếp inbox
+    SoTinChuaDocKhach   INT                 NOT NULL DEFAULT 0,     -- Số tin khách chưa đọc
+    SoTinChuaDocNV      INT                 NOT NULL DEFAULT 0,     -- Số tin nhân viên chưa đọc
+    NgayTao             DATETIME2           NOT NULL DEFAULT GETUTCDATE(),
+    NgayCapNhat         DATETIME2           NULL
+);
+GO
+
+CREATE NONCLUSTERED INDEX IX_CuocHoiThoai_TrangThai_ThoiGianTinCuoi ON CuocHoiThoai(TrangThai, ThoiGianTinCuoi);
+CREATE NONCLUSTERED INDEX IX_CuocHoiThoai_NguoiDungId ON CuocHoiThoai(NguoiDungId);
+CREATE NONCLUSTERED INDEX IX_CuocHoiThoai_MaKhachVangLai ON CuocHoiThoai(MaKhachVangLai);
+GO
+
+-- ================================================================
+-- 32. BẢNG: TinNhan
+-- Tin nhắn trong một phiên hội thoại (khách / bot / nhân viên)
+-- ================================================================
+CREATE TABLE TinNhan (
+    Id              INT IDENTITY(1,1)   PRIMARY KEY,
+    CuocHoiThoaiId  INT                 NOT NULL,               -- Thuộc phiên nào
+    LoaiNguoiGui    NVARCHAR(20)        NOT NULL,
+        -- customer: Khách hàng
+        -- bot: Chatbot
+        -- agent: Nhân viên
+    NguoiGuiId      INT                 NULL,                   -- userId hoặc staffId; NULL cho bot/guest
+    NoiDung         NVARCHAR(MAX)       NOT NULL,               -- Văn bản (escape khi render)
+    LoaiDinhKem     NVARCHAR(20)        NULL,                   -- product / order / NULL
+    DinhKemId       NVARCHAR(50)        NULL,                   -- Id sản phẩm hoặc mã đơn
+    DinhKemJson     NVARCHAR(MAX)       NULL,                   -- Snapshot JSON để hiển thị card
+    DaDoc           BIT                 NOT NULL DEFAULT 0,     -- 0=Chưa đọc, 1=Đã đọc
+    NgayTao         DATETIME2           NOT NULL DEFAULT GETUTCDATE(),
+
+    CONSTRAINT FK_TinNhan_CuocHoiThoai FOREIGN KEY (CuocHoiThoaiId)
+        REFERENCES CuocHoiThoai(Id) ON DELETE CASCADE
+);
+GO
+
+CREATE NONCLUSTERED INDEX IX_TinNhan_CuocHoiThoaiId ON TinNhan(CuocHoiThoaiId, Id);
+GO
+
+
+-- ================================================================
 -- ================================================================
 --                    DỮ LIỆU MẪU BAN ĐẦU
 -- ================================================================
@@ -1060,3 +1118,4 @@ PRINT N'=== Tài khoản admin: admin@kaitokid.vn / Admin@123 ===';
 GO
 -- v1.1: Bo sung schema DonHang, GioHang, DanhGia, MaGiamGia va 14 bang con lai
 -- v1.2: Them du lieu mau: admin, san pham, danh muc, don hang, cau hinh
+-- v1.3: Them bang chat CuocHoiThoai + TinNhan (live chat & chatbot)

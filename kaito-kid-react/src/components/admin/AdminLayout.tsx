@@ -84,6 +84,7 @@ const menuItems: MenuItem[] = [
     ],
   },
   { path: '/admin/customers', icon: 'fa-users', label: 'Khách hàng' },
+  { path: '/admin/chat', icon: 'fa-comments', label: 'Hỗ trợ chat' },
   { path: '/admin/shipping', icon: 'fa-truck', label: 'Vận chuyển' },
   {
     icon: 'fa-tags',

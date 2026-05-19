@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { formatCurrency, formatDate } from '../utils/format';
 import { settingsApi, type SettingDTO, type UpsertSettingDTO } from '../services/api';
 import {
   defaultAdminSettings,
@@ -15,7 +14,7 @@ import {
 } from '../utils/adminSettingsConfig';
 import AdminIcon from '../components/admin/AdminIcon';
 
-type TabType = 'general' | 'payment' | 'shipping' | 'email' | 'notifications' | 'security';
+type TabType = 'general' | 'payment' | 'email' | 'notifications' | 'security';
 
 interface FlashMessage {
   type: 'success' | 'error' | 'info';
@@ -31,7 +30,6 @@ interface PasswordFormState {
 const tabs: Array<{ id: TabType; icon: string; label: string; hint: string; eyebrow: string }> = [
   { id: 'general', icon: 'fa-store', label: 'Thông tin cửa hàng', hint: 'Dữ liệu thương hiệu và liên hệ xuất hiện toàn hệ thống.', eyebrow: 'Brand core' },
   { id: 'payment', icon: 'fa-credit-card', label: 'Thanh toán', hint: 'Điều khiển COD, chuyển khoản và trạng thái checkout.', eyebrow: 'Checkout finance' },
-  { id: 'shipping', icon: 'fa-truck', label: 'Vận chuyển', hint: 'Phí ship, freeship, ETA và quyền truy cập tracking.', eyebrow: 'Delivery policy' },
   { id: 'email', icon: 'fa-envelope', label: 'Email', hint: 'SMTP, email tự động và lịch sử kiểm tra cấu hình.', eyebrow: 'Messaging hub' },
   { id: 'notifications', icon: 'fa-bell', label: 'Thông báo', hint: 'Bật tắt các cảnh báo dashboard theo nghiệp vụ.', eyebrow: 'Ops alerts' },
   { id: 'security', icon: 'fa-shield-alt', label: 'Bảo mật', hint: 'Mật khẩu admin, audit log và chính sách xác thực.', eyebrow: 'Access control' },
@@ -146,7 +144,6 @@ export default function AdminSettings() {
       settings.storeAddress.trim().length > 0,
       settings.smtpHost.trim().length > 0,
       settings.testRecipient.trim().length > 0,
-      settings.estimatedDelivery.trim().length > 0,
       settings.bankAccounts.some((bankAccount) => bankAccount.bankName && bankAccount.accountNumber && bankAccount.accountHolder),
     ];
 
@@ -161,13 +158,6 @@ export default function AdminSettings() {
         value: `${enabledPaymentMethods}/2 phương thức`,
         meta: enabledPaymentMethods > 0 ? 'Sẵn sàng nhận thanh toán' : 'Cần bật ít nhất một phương thức',
         tone: enabledPaymentMethods > 0 ? 'positive' : 'warning',
-      },
-      {
-        icon: 'fa-truck',
-        label: 'Vận chuyển',
-        value: `${formatCurrency(settings.defaultShippingFee)} / ${formatCurrency(settings.freeShippingFrom)}`,
-        meta: settings.enableTracking ? 'Tracking đang bật' : 'Tracking đang tắt',
-        tone: settings.enableTracking ? 'info' : 'muted',
       },
       {
         icon: 'fa-envelope',
@@ -202,7 +192,6 @@ export default function AdminSettings() {
   const getSettingGroup = (key: string): string => {
     if (['storeName', 'storeSlogan', 'storeEmail', 'storePhone', 'storeAddress'].includes(key)) return 'general';
     if (['codEnabled', 'codFee', 'bankEnabled', 'bankAccounts'].includes(key)) return 'payment';
-    if (['defaultShippingFee', 'freeShippingFrom', 'estimatedDelivery', 'enableTracking'].includes(key)) return 'shipping';
     if (key.startsWith('smtp') || key.startsWith('email') || key.startsWith('test') || key.startsWith('lastEmail')) return 'email';
     if (key.startsWith('notify')) return 'notifications';
     return 'security';
@@ -678,30 +667,6 @@ export default function AdminSettings() {
                   <div className="settings-preview-row"><span>Phương thức đang mở</span><strong>{enabledPaymentMethods > 0 ? `${enabledPaymentMethods} phương thức` : 'Chưa có'}</strong></div>
                   <div className="settings-preview-row"><span>Phụ phí COD</span><strong>{settings.codEnabled ? `${settings.codFee}%` : 'Đang tắt'}</strong></div>
                   <div className="settings-preview-row"><span>Tài khoản ngân hàng</span><strong>{settings.bankEnabled ? `${settings.bankAccounts.length} tài khoản` : 'Đang tắt'}</strong></div>
-                </div>
-              </aside>
-            </div>
-          )}
-
-          {activeTab === 'shipping' && (
-            <div className="settings-workspace-grid">
-              <section className="settings-editor-panel">
-                <div className="settings-panel-head"><div><span className="settings-overline">Delivery policy</span><h3>Thiết lập vận chuyển & tracking</h3></div><p>Những con số này ảnh hưởng trực tiếp tới phí ship và thông báo freeship.</p></div>
-                <div className="settings-form-grid">
-                  <label className="settings-field"><span>Phí vận chuyển mặc định</span><input type="number" min="0" value={settings.defaultShippingFee} onChange={(event) => updateField('defaultShippingFee', Number(event.target.value))} /><small>Áp dụng cho đơn chưa đạt freeship.</small></label>
-                  <label className="settings-field"><span>Ngưỡng freeship</span><input type="number" min="0" value={settings.freeShippingFrom} onChange={(event) => updateField('freeShippingFrom', Number(event.target.value))} /><small>Checkout dùng đúng mốc này để hiển thị ưu đãi.</small></label>
-                  <label className="settings-field settings-span-2"><span>Thời gian giao dự kiến</span><input type="text" value={settings.estimatedDelivery} onChange={(event) => updateField('estimatedDelivery', event.target.value)} /></label>
-                </div>
-                <article className="settings-toggle-card"><div className="settings-toggle-head"><div><h4>Bật trang theo dõi đơn</h4><p>Cho phép khách chủ động kiểm tra trạng thái giao hàng.</p></div><label className="settings-switch"><input type="checkbox" checked={settings.enableTracking} onChange={(event) => updateField('enableTracking', event.target.checked)} /><span className="settings-switch-track"></span></label></div></article>
-                <div className="settings-form-actions"><button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('vận chuyển')}><AdminIcon name="fa-save" /><span>Lưu vận chuyển</span></button></div>
-              </section>
-              <aside className="settings-insight-panel">
-                <div className="settings-panel-head"><div><span className="settings-overline">Policy board</span><h3>Ảnh hưởng ở frontend</h3></div></div>
-                <div className="settings-preview-stack">
-                  <div className="settings-preview-row"><span>Phí ship hiện tại</span><strong>{formatCurrency(settings.defaultShippingFee)}</strong></div>
-                  <div className="settings-preview-row"><span>Ngưỡng freeship</span><strong>{formatCurrency(settings.freeShippingFrom)}</strong></div>
-                  <div className="settings-preview-row"><span>Tracking</span><strong>{settings.enableTracking ? 'Đang mở' : 'Đang khóa'}</strong></div>
-                  <div className="settings-preview-row"><span>ETA hiển thị</span><strong>{settings.estimatedDelivery || 'Chưa cài đặt'}</strong></div>
                 </div>
               </aside>
             </div>

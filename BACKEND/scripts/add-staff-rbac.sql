@@ -161,7 +161,11 @@ BEGIN
     (N'staff.view', N'Xem nhân viên', N'staff', N'Xem danh sách NV'),
     (N'staff.manage', N'Quản lý nhân viên', N'staff', N'Thêm/sửa/xóa NV'),
     -- Roles
-    (N'roles.manage', N'Quản lý vai trò', N'staff', N'Cấu hình quyền cho vai trò');
+    (N'roles.manage', N'Quản lý vai trò', N'staff', N'Cấu hình quyền cho vai trò'),
+    -- Support (chat/live chat)
+    (N'chat.view', N'Xem hội thoại hỗ trợ', N'support', N'Xem inbox và lịch sử chat'),
+    (N'chat.reply', N'Trả lời hội thoại', N'support', N'Nhận phiên và trả lời khách'),
+    (N'chat.manage', N'Quản lý hội thoại', N'support', N'Gán/đóng/quản lý phiên chat');
 
     PRINT 'Seeded QuyenHan';
 END
@@ -212,6 +216,7 @@ BEGIN
         N'customers.view', N'customers.manage',
         N'products.view',
         N'reviews.view', N'reviews.moderate',
+        N'chat.view', N'chat.reply',
         N'reports.view'
     );
 

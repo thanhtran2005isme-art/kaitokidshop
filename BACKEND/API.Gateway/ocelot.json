@@ -463,6 +463,78 @@
                                                   ]
                    },
                    {
+                       "UpstreamPathTemplate":  "/api/admin/chat/{everything}",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "POST",
+                                                  "PUT",
+                                                  "DELETE",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/admin/chat/{everything}",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/admin/chat",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "POST",
+                                                  "PUT",
+                                                  "DELETE",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/admin/chat",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/chat/{everything}",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "POST",
+                                                  "PUT",
+                                                  "DELETE",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/chat/{everything}",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/chat",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "POST",
+                                                  "PUT",
+                                                  "DELETE",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/chat",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
                        "UpstreamPathTemplate":  "/api/admin/{everything}",
                        "UpstreamHttpMethod":  [
                                                   "GET",

@@ -31,6 +31,8 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
     public DbSet<ProductQA> ProductQAs => Set<ProductQA>();
     public DbSet<ProductViewSession> ProductViewSessions => Set<ProductViewSession>();
     public DbSet<VariantStock> VariantStocks => Set<VariantStock>();
+    public DbSet<Conversation> Conversations => Set<Conversation>();
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -66,7 +68,21 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
         {
             e.HasIndex(h => h.OrderId);
         });
+
+        modelBuilder.Entity<Conversation>(e =>
+        {
+            e.HasIndex(c => new { c.Status, c.LastMessageAt });
+            e.HasIndex(c => c.UserId);
+            e.HasIndex(c => c.GuestId);
+            e.HasMany(c => c.Messages).WithOne(m => m.Conversation!).HasForeignKey(m => m.ConversationId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ChatMessage>(e =>
+        {
+            e.HasIndex(m => new { m.ConversationId, m.Id });
+        });
     }
 }
 // v1.1: Them indexes cho Slug, Status, OrderCode, Wishlist
 // v1.2: Them ShippingHistories cho luong van chuyen
+// v1.3: Them bang chat CuocHoiThoai + TinNhan

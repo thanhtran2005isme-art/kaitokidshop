@@ -1,5 +1,6 @@
 using API.Customer.Data;
 using API.Customer.DTOs;
+using API.Customer.Services;
 using API.Customer.Services.Email;
 using API.Customer.Services.Shipping;
 using Microsoft.AspNetCore.Authorization;
@@ -69,19 +70,17 @@ public class PaymentController(
             order.ShippingStatus = "cancelled";
             order.UpdatedAt = now;
 
-            // Hoàn tồn kho
+            // Hoàn tồn kho cả 2 cấp (product + variant) — fix BUG #1
             var items = await db.OrderItems.Where(i => i.OrderId == order.Id).ToListAsync();
-            foreach (var item in items)
+            await InventoryRestoreHelper.RestoreStockAsync(db, items);
+
+            // Hoàn lại lượt dùng coupon (fix BUG #2)
+            if (!string.IsNullOrEmpty(order.CouponCode))
             {
-                var product = await db.Products.FindAsync(item.ProductId);
-                if (product is not null)
-                {
-                    product.Stock += item.Quantity;
-                    product.SoldCount = Math.Max(0, product.SoldCount - item.Quantity);
-                    if (product.Stock > 0 && product.Status == "out-of-stock")
-                        product.Status = "active";
-                }
+                var coupon = await db.Coupons.FirstOrDefaultAsync(c => c.Code == order.CouponCode);
+                if (coupon is not null && coupon.UsedCount > 0) coupon.UsedCount--;
             }
+
             await db.SaveChangesAsync();
             await shipping.AppendHistoryAsync(order.Id, "cancelled",
                 "Hết hạn thanh toán (15 phút) — đơn tự hủy", null);
@@ -165,16 +164,17 @@ public class PaymentController(
         order.ShippingStatus = "cancelled";
         order.UpdatedAt = DateTime.UtcNow;
 
+        // Hoàn tồn kho cả 2 cấp (product + variant) — fix BUG #1
         var items = await db.OrderItems.Where(i => i.OrderId == order.Id).ToListAsync();
-        foreach (var item in items)
+        await InventoryRestoreHelper.RestoreStockAsync(db, items);
+
+        // Hoàn lại lượt dùng coupon (fix BUG #2)
+        if (!string.IsNullOrEmpty(order.CouponCode))
         {
-            var product = await db.Products.FindAsync(item.ProductId);
-            if (product is not null)
-            {
-                product.Stock += item.Quantity;
-                product.SoldCount = Math.Max(0, product.SoldCount - item.Quantity);
-            }
+            var coupon = await db.Coupons.FirstOrDefaultAsync(c => c.Code == order.CouponCode);
+            if (coupon is not null && coupon.UsedCount > 0) coupon.UsedCount--;
         }
+
         await db.SaveChangesAsync();
         await shipping.AppendHistoryAsync(order.Id, "cancelled", "Khách đã hủy giao dịch", null);
         return Ok(new { message = "Đã hủy đơn hàng", orderCode });

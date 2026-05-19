@@ -17,7 +17,6 @@ namespace API.Customer.Controllers;
 public class AdminShippingController(
     CustomerDbContext db,
     IShippingConfigService configService,
-    IEnumerable<IShippingProvider> providers,
     ILogger<AdminShippingController> logger) : ControllerBase
 {
     private static readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(15) };

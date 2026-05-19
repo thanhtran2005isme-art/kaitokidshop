@@ -16,6 +16,7 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
     public DbSet<Coupon> Coupons => Set<Coupon>();
     public DbSet<Collection> Collections => Set<Collection>();
     public DbSet<Lookbook> Lookbooks => Set<Lookbook>();
+    public DbSet<LookbookHotspot> LookbookHotspots => Set<LookbookHotspot>();
     public DbSet<User> Users => Set<User>();
     public DbSet<ProductAttribute> ProductAttributes => Set<ProductAttribute>();
     public DbSet<ShippingHistory> ShippingHistories => Set<ShippingHistory>();
@@ -23,6 +24,9 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
     public DbSet<PointsHistory> PointsHistories => Set<PointsHistory>();
     public DbSet<NewsletterSubscriber> NewsletterSubscribers => Set<NewsletterSubscriber>();
     public DbSet<Banner> Banners => Set<Banner>();
+    public DbSet<HomepageBlock> HomepageBlocks => Set<HomepageBlock>();
+    public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<Referral> Referrals => Set<Referral>();
     public DbSet<SizeChart> SizeCharts => Set<SizeChart>();
     public DbSet<ProductQA> ProductQAs => Set<ProductQA>();
     public DbSet<ProductViewSession> ProductViewSessions => Set<ProductViewSession>();

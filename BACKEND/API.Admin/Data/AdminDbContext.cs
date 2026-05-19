@@ -29,6 +29,7 @@ public class AdminDbContext(DbContextOptions<AdminDbContext> options) : DbContex
     public DbSet<PhieuNhap> PhieuNhap => Set<PhieuNhap>();
     public DbSet<ChiTietPhieuNhap> ChiTietPhieuNhap => Set<ChiTietPhieuNhap>();
     public DbSet<TonKhoBienThe> TonKhoBienThe => Set<TonKhoBienThe>();
+    public DbSet<HomepageBlock> HomepageBlock => Set<HomepageBlock>();
 
     protected override void OnModelCreating(ModelBuilder m)
     {

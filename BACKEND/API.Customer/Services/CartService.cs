@@ -69,14 +69,14 @@ public class CartService(CustomerDbContext db) : ICartService
             c.UserId == userId && c.ProductId == dto.ProductId &&
             c.Size == dto.Size && c.Color == dto.Color);
 
-        var quantityDelta = existing != null ? dto.Quantity : dto.Quantity;
+        // dto.Quantity là số lượng cần cộng vào cart (cũng chính là số cần reserve thêm).
+        var quantityDelta = dto.Quantity;
         var reserveUntil = DateTime.UtcNow.AddMinutes(ReservationMinutes);
 
         if (existing != null)
         {
-            // Cộng dồn — kiểm tra tổng không vượt stock
-            if (existing.Quantity + dto.Quantity > availableStock + existing.Quantity)
-                throw new InvalidOperationException("Số lượng vượt quá tồn kho khả dụng");
+            // Cộng dồn — số lượng thêm dto.Quantity đã được check ở trên (availableStock < dto.Quantity).
+            // availableStock đã trừ phần đang reserve (gồm cả phần của user này), nên không cần check tổng nữa.
             existing.Quantity += dto.Quantity;
             existing.ReservedUntil = reserveUntil;
         }

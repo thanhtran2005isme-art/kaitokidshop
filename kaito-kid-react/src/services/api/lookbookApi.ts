@@ -1,4 +1,4 @@
-import apiClient, { getErrorMessage } from '../apiClient';
+﻿import apiClient, { getErrorMessage } from '../apiClient';
 import type { ApiResponse } from '../../types/api';
 
 export interface LookbookDTO {
@@ -13,6 +13,19 @@ export interface LookbookDTO {
   ngayTao: string;
 }
 
+export interface LookbookHotspotDTO {
+  id: number;
+  productId: number;
+  productName: string;
+  productImage?: string;
+  productPrice: number;
+  productOldPrice?: number | null;
+  x: number;
+  y: number;
+  note?: string;
+  sortOrder: number;
+}
+
 // Public DTO (from LookbooksController)
 export interface PublicLookbookDTO {
   id: number;
@@ -21,7 +34,11 @@ export interface PublicLookbookDTO {
   description?: string;
   image: string;
   link?: string;
+  videoUrl?: string;
+  season?: string;
+  style?: string;
   sortOrder: number;
+  hotspots: LookbookHotspotDTO[];
 }
 
 export interface CreateLookbookDTO {
@@ -37,11 +54,25 @@ export interface CreateLookbookDTO {
 export const lookbookApi = {
   /**
    * Public: Get all active lookbooks
-   * GET /api/lookbooks
+   * GET /api/lookbooks?season=&style=
    */
-  async getPublic(): Promise<ApiResponse<PublicLookbookDTO[]>> {
+  async getPublic(opts: { season?: string; style?: string } = {}): Promise<ApiResponse<PublicLookbookDTO[]>> {
     try {
-      const response = await apiClient.get<PublicLookbookDTO[]>('/api/lookbooks');
+      const params = new URLSearchParams();
+      if (opts.season) params.append('season', opts.season);
+      if (opts.style) params.append('style', opts.style);
+      const qs = params.toString() ? `?${params.toString()}` : '';
+      const response = await apiClient.get<PublicLookbookDTO[]>(`/api/lookbooks${qs}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Public: lấy danh sách season/style để FE render dropdown filter. */
+  async getFilters(): Promise<ApiResponse<{ seasons: string[]; styles: string[] }>> {
+    try {
+      const response = await apiClient.get<{ seasons: string[]; styles: string[] }>('/api/lookbooks/filters');
       return { success: true, data: response.data };
     } catch (error) {
       return { success: false, error: getErrorMessage(error) };

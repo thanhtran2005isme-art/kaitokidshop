@@ -218,22 +218,28 @@ public class OrderService(
         order.ShippingStatus = "cancelled";
         order.UpdatedAt = DateTime.UtcNow;
 
-        foreach (var item in order.Items)
-        {
-            var product = await db.Products.FindAsync(item.ProductId);
-            if (product is not null)
-            {
-                product.Stock += item.Quantity;
-                product.SoldCount -= item.Quantity;
-                if (product.Stock > 0 && product.Status == "out-of-stock")
-                    product.Status = "active";
-            }
-        }
+        // Hoàn kho cả 2 cấp (product + variant) — fix BUG #1
+        await InventoryRestoreHelper.RestoreStockAsync(db, order.Items);
+
+        // Hoàn lại lượt dùng coupon nếu đơn có áp mã
+        await RestoreCouponUsageAsync(order.CouponCode);
 
         await db.SaveChangesAsync();
         await shippingService.AppendHistoryAsync(order.Id, "cancelled",
             "Khách hàng đã hủy đơn", null);
         return true;
+    }
+
+    /// <summary>
+    /// Hoàn lại 1 lượt dùng coupon khi đơn bị huỷ (fix BUG #2).
+    /// Không cho UsedCount âm.
+    /// </summary>
+    private async Task RestoreCouponUsageAsync(string? couponCode)
+    {
+        if (string.IsNullOrEmpty(couponCode)) return;
+        var coupon = await db.Coupons.FirstOrDefaultAsync(c => c.Code == couponCode);
+        if (coupon is not null && coupon.UsedCount > 0)
+            coupon.UsedCount--;
     }
 
     private static OrderDTO MapToDTO(Order o) => MapToDTO(o, null);

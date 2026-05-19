@@ -99,7 +99,7 @@ export default function ProductVariantModal({ product, open, onClose, onConfirm 
             src={product.image}
             alt={product.name}
             style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8, flexShrink: 0 }}
-          />
+           loading="lazy" decoding="async" />
           <div style={{ flex: 1, paddingTop: 4 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
               {discountPercent > 0 && (

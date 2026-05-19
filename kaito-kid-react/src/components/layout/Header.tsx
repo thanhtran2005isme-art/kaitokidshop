@@ -14,6 +14,9 @@ import {
   PiUserCircleFill,
 } from 'react-icons/pi';
 import { Link, useNavigate } from 'react-router-dom';
+import { useWishlist } from '../../context/WishlistContext';
+import NotificationBell from './NotificationBell';
+import HeaderSearch from './HeaderSearch';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { categoryApi, type CategoryDTO } from '../../services/api/categoryApi';
@@ -28,6 +31,8 @@ interface CategoryNode {
 
 export default function Header() {
   const { user, isAdmin, logout } = useAuth();
+  const { count: wishlistCount } = useWishlist();
+  const [mobileOpen, setMobileOpen] = useState(false);
   const { totalItems } = useCart();
   const [categories, setCategories] = useState<CategoryNode[]>([]);
 
@@ -61,19 +66,15 @@ export default function Header() {
     };
     void loadCategories();
   }, []);
-  const [searchQuery, setSearchQuery] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const navigate = useNavigate();
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim() && searchQuery.trim().length >= 2) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = ''; };
     }
-  };
-
-  const handleLogout = () => {
+  }, [mobileOpen]);
+const handleLogout = () => {
     if (confirm('Bạn có chắc chắn muốn đăng xuất?')) {
       logout();
       navigate('/');
@@ -90,18 +91,7 @@ export default function Header() {
         </div>
 
         {/* Search Bar */}
-        <form className="search-bar" onSubmit={handleSearch}>
-          <input
-            type="text"
-            placeholder="Tìm áo sơ mi, quần jeans, váy..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            autoComplete="off"
-          />
-          <button type="submit" aria-label="Tìm kiếm">
-            <PiMagnifyingGlassBold aria-hidden="true" />
-          </button>
-        </form>
+        <HeaderSearch />
 
         {/* Header Icons */}
         <div className="header-actions">
@@ -172,15 +162,16 @@ export default function Header() {
               </div>
             </div>
           </div>
+          <NotificationBell />
           <Link to="/wishlist" className="icon-link">
             <PiHeartStraight aria-hidden="true" />
-            <span className="cart-badge">0</span>
+            {wishlistCount > 0 && <span className="cart-badge">{wishlistCount}</span>}
           </Link>
           <Link to="/cart" className="icon-link cart-link">
             <PiShoppingBagOpenBold aria-hidden="true" />
             <span className="cart-badge">{totalItems}</span>
           </Link>
-          <button className="mobile-menu-btn" type="button" aria-label="Mở menu">
+          <button className="mobile-menu-btn" type="button" aria-label="Mở menu" aria-expanded={mobileOpen} onClick={() => setMobileOpen(true)}>
             <PiListBold aria-hidden="true" />
           </button>
         </div>
@@ -207,6 +198,60 @@ export default function Header() {
           <li><Link to="/lookbook">LOOKBOOK</Link></li>
         </ul>
       </nav>
+      {/* Mobile drawer */}
+      <div
+        className={`mobile-drawer-overlay ${mobileOpen ? 'open' : ''}`}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden={!mobileOpen}
+      />
+      <aside
+        className={`mobile-drawer ${mobileOpen ? 'open' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu di động"
+      >
+        <div className="mobile-drawer-head">
+          <strong>Danh mục</strong>
+          <button
+            type="button"
+            className="mobile-drawer-close"
+            aria-label="Đóng menu"
+            onClick={() => setMobileOpen(false)}
+          >×</button>
+        </div>
+        <nav className="mobile-drawer-nav">
+          <Link to="/women" onClick={() => setMobileOpen(false)}>Thời trang nữ</Link>
+          <Link to="/men" onClick={() => setMobileOpen(false)}>Thời trang nam</Link>
+          <Link to="/kids" onClick={() => setMobileOpen(false)}>Trẻ em</Link>
+          <Link to="/new-in" onClick={() => setMobileOpen(false)}>New In</Link>
+          <Link to="/sale" onClick={() => setMobileOpen(false)}>Sale</Link>
+          <Link to="/bestseller" onClick={() => setMobileOpen(false)}>Bán chạy</Link>
+          <Link to="/collections" onClick={() => setMobileOpen(false)}>Bộ sưu tập</Link>
+          <Link to="/lookbook" onClick={() => setMobileOpen(false)}>Lookbook</Link>
+          <hr />
+          {user ? (
+            <>
+              <Link to="/account" onClick={() => setMobileOpen(false)}>Tài khoản</Link>
+              <Link to="/orders" onClick={() => setMobileOpen(false)}>Đơn hàng của tôi</Link>
+              <Link to="/wishlist" onClick={() => setMobileOpen(false)}>Yêu thích</Link>
+              <Link to="/address" onClick={() => setMobileOpen(false)}>Địa chỉ</Link>
+              <button
+                type="button"
+                onClick={() => { setMobileOpen(false); logout(); navigate('/'); }}
+                className="mobile-drawer-logout"
+              >Đăng xuất</button>
+            </>
+          ) : (
+            <>
+              <Link to="/login" onClick={() => setMobileOpen(false)}>Đăng nhập</Link>
+              <Link to="/login?tab=register" onClick={() => setMobileOpen(false)}>Đăng ký</Link>
+            </>
+          )}
+          {isAdmin && (
+            <Link to="/admin/dashboard" onClick={() => setMobileOpen(false)}>Trang quản trị</Link>
+          )}
+        </nav>
+      </aside>
     </header>
   );
 }

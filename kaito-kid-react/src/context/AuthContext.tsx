@@ -11,7 +11,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   login: (identifier: string, password: string, recaptchaToken?: string) => Promise<{ success: boolean; error?: string; requireTwoFactor?: boolean; identifier?: string; password?: string }>;
-  register: (data: { name: string; email: string; phone: string; password: string }) => Promise<{ success: boolean; error?: string }>;
+  register: (data: { name: string; email: string; phone?: string; password: string; recaptchaToken?: string; otpCode?: string }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   refreshUser: () => Promise<void>;
 }
@@ -50,8 +50,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return result;
   };
 
-  const register = async (data: { name: string; email: string; phone: string; password: string }) => {
-    return await authApi.register(data);
+  const register = async (data: { name: string; email: string; phone?: string; password: string; recaptchaToken?: string; otpCode?: string }) => {
+    const r = await authApi.register(data);
+    return { success: r.success, error: r.error };
   };
 
   const refreshUser = async () => {

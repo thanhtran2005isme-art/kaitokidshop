@@ -36,8 +36,10 @@ public class AdminOrdersController(AdminDbContext db) : ControllerBase
     [HttpPut("{id}/status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusDto dto)
     {
-        var dh = await db.DonHang.FindAsync(id);
+        var dh = await db.DonHang.Include(d => d.ChiTiet).FirstOrDefaultAsync(d => d.Id == id);
         if (dh is null) return NotFound();
+
+        var truocDo = dh.TrangThai;
 
         dh.TrangThai = dto.TrangThai;
         dh.GhiChuAdmin = dto.GhiChuAdmin;
@@ -47,8 +49,62 @@ public class AdminOrdersController(AdminDbContext db) : ControllerBase
         if (dto.TrangThai == "shipping") dh.NgayGiaoHang = DateTime.UtcNow;
         if (dto.TrangThai == "completed") dh.NgayHoanThanh = DateTime.UtcNow;
 
+        // Khi admin chuyển đơn sang "cancelled" (và trước đó CHƯA hủy) → hoàn tồn kho
+        // cả 2 cấp: SanPham.TonKho và TonKhoBienThe (theo size + màu). Fix BUG #1.
+        // Đồng thời hoàn 1 lượt dùng coupon nếu đơn có áp mã. Fix BUG #2.
+        if (dto.TrangThai == "cancelled" && truocDo != "cancelled")
+        {
+            await HoanTonKhoAsync(dh.ChiTiet);
+            await HoanLuotCouponAsync(dh.MaGiamGia);
+        }
+
         await db.SaveChangesAsync();
         return Ok(dh);
+    }
+
+    /// <summary>
+    /// Hoàn lại 1 lượt dùng coupon khi hủy đơn (fix BUG #2). Không cho DaSuDung âm.
+    /// </summary>
+    private async Task HoanLuotCouponAsync(string? maGiamGia)
+    {
+        if (string.IsNullOrEmpty(maGiamGia)) return;
+        var coupon = await db.MaGiamGia.FirstOrDefaultAsync(c => c.MaCoupon == maGiamGia);
+        if (coupon is not null && coupon.DaSuDung > 0)
+            coupon.DaSuDung--;
+    }
+
+    /// <summary>
+    /// Hoàn tồn kho khi hủy đơn: cộng lại SanPham.TonKho + TonKhoBienThe.SoLuong,
+    /// đồng thời giảm SoLuongDaBan tương ứng và mở lại trạng thái "active" nếu cần.
+    /// </summary>
+    private async Task HoanTonKhoAsync(ICollection<Models.ChiTietDonHang> chiTiet)
+    {
+        if (chiTiet.Count == 0) return;
+
+        var sanPhamIds = chiTiet.Select(c => c.SanPhamId).Distinct().ToList();
+        var sanPhams = await db.SanPham.Where(p => sanPhamIds.Contains(p.Id)).ToListAsync();
+        var bienThes = await db.TonKhoBienThe.Where(v => sanPhamIds.Contains(v.SanPhamId)).ToListAsync();
+
+        foreach (var item in chiTiet)
+        {
+            var sp = sanPhams.FirstOrDefault(p => p.Id == item.SanPhamId);
+            if (sp is not null)
+            {
+                sp.TonKho += item.SoLuong;
+                sp.SoLuongDaBan = Math.Max(0, sp.SoLuongDaBan - item.SoLuong);
+                if (sp.TonKho > 0 && sp.TrangThai == "out-of-stock")
+                    sp.TrangThai = "active";
+            }
+
+            var bt = bienThes.FirstOrDefault(v =>
+                v.SanPhamId == item.SanPhamId && v.KichCo == item.KichCo && v.MauSac == item.MauSac);
+            if (bt is not null)
+            {
+                bt.SoLuong += item.SoLuong;
+                bt.SoLuongDaBan = Math.Max(0, bt.SoLuongDaBan - item.SoLuong);
+                bt.NgayCapNhat = DateTime.UtcNow;
+            }
+        }
     }
 
     [HttpGet("stats")]

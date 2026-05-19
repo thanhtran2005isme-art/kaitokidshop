@@ -110,7 +110,7 @@ export default function ReviewModal({ order, item, onClose, onSubmitted }: Props
         </div>
         <div className="modal-body">
           <div className="review-product-info">
-            <img src={item.productImage} alt={item.productName} />
+            <img src={item.productImage} alt={item.productName}  loading="lazy" decoding="async" />
             <div>
               <div className="review-product-name">{item.productName}</div>
               <div className="review-product-variant">
@@ -154,7 +154,7 @@ export default function ReviewModal({ order, item, onClose, onSubmitted }: Props
               {files.map((f, idx) => (
                 <div key={idx} className="review-media-thumb">
                   {f.type.startsWith('image/') ? (
-                    <img src={URL.createObjectURL(f)} alt={`media-${idx}`} />
+                    <img src={URL.createObjectURL(f)} alt={`media-${idx}`}  loading="lazy" decoding="async" />
                   ) : (
                     <div className="video-thumb"><i className="fa fa-video"></i> Video</div>
                   )}

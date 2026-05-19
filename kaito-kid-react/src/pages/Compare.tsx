@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PiX, PiScalesBold, PiCheckBold } from 'react-icons/pi';
 import { productApi } from '../services/api';
@@ -6,6 +6,8 @@ import type { Product } from '../types';
 import { formatCurrency } from '../utils/format';
 import { useCart } from '../context/CartContext';
 import toast from 'react-hot-toast';
+
+import '../styles/auth-pages.css';
 
 export default function Compare() {
   const navigate = useNavigate();
@@ -42,18 +44,20 @@ export default function Compare() {
   };
 
   if (loading) {
-    return <div style={{ padding: 80, textAlign: 'center', color: '#64748b' }}>Đang tải...</div>;
+    return (
+      <div className="compare-page compare-empty">Đang tải...</div>
+    );
   }
 
   if (products.length === 0) {
     return (
-      <div style={{ maxWidth: 600, margin: '60px auto', padding: 40, textAlign: 'center' }}>
+      <div className="compare-page compare-empty">
         <PiScalesBold style={{ fontSize: 64, color: '#cbd5e1' }} />
         <h2 style={{ margin: '16px 0 8px' }}>Chưa có sản phẩm để so sánh</h2>
-        <p style={{ color: '#64748b' }}>Thêm sản phẩm vào danh sách so sánh từ trang chi tiết để xem chúng cạnh nhau.</p>
+        <p>Thêm sản phẩm vào danh sách so sánh từ trang chi tiết để xem chúng cạnh nhau.</p>
         <button
           onClick={() => navigate('/products')}
-          style={{ marginTop: 16, padding: '12px 28px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+          className="auth-page-success-back"
         >
           Khám phá sản phẩm
         </button>
@@ -66,7 +70,7 @@ export default function Compare() {
   const allSizes = Array.from(new Set(products.flatMap((p) => p.sizes || [])));
 
   return (
-    <div style={{ maxWidth: 1300, margin: '0 auto', padding: '24px 20px 60px' }}>
+    <div className="compare-page">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 24 }}>
         <h1 style={{ fontSize: 26, fontWeight: 600, color: '#0f172a' }}>
           <PiScalesBold style={{ verticalAlign: -2, marginRight: 10 }} />
@@ -78,40 +82,42 @@ export default function Compare() {
         >Xoá tất cả</button>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', minWidth: 720, borderCollapse: 'separate', borderSpacing: 12 }}>
+      <div className="compare-table-wrap">
+        <table className="compare-table">
           <thead>
             <tr>
               <th style={{ minWidth: 140 }}></th>
               {products.map((p) => (
-                <th key={p.id} style={{ width: 240, verticalAlign: 'top' }}>
-                  <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', position: 'relative' }}>
+                <th key={p.id} className="compare-product-cell">
+                  <div style={{ position: 'relative' }}>
                     <button
                       onClick={() => removeProduct(p.id)}
+                      aria-label="Xoá khỏi danh sách so sánh"
                       title="Xoá"
-                      style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', border: 'none', cursor: 'pointer', color: '#dc2626' }}
+                      style={{ position: 'absolute', top: 4, right: 4, width: 28, height: 28, borderRadius: '50%', background: 'rgba(255,255,255,0.9)', border: 'none', cursor: 'pointer', color: '#dc2626' }}
                     ><PiX /></button>
                     <Link to={`/product/${p.id}`}>
-                      <img src={p.image} alt={p.name} style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover' }} />
+                      <img src={p.image} alt={p.name} loading="lazy" decoding="async" />
                     </Link>
-                    <div style={{ padding: 12 }}>
-                      <Link to={`/product/${p.id}`} style={{ textDecoration: 'none', color: '#0f172a', fontWeight: 600, fontSize: 14, display: 'block', minHeight: 38 }}>
-                        {p.name}
-                      </Link>
-                      <div style={{ marginTop: 6, fontSize: 16, fontWeight: 700, color: '#dc2626' }}>{formatCurrency(p.price)}</div>
-                      {p.oldPrice && <div style={{ fontSize: 12, color: '#94a3b8', textDecoration: 'line-through' }}>{formatCurrency(p.oldPrice)}</div>}
-                      <button
-                        onClick={() => {
-                          const size = p.sizes?.[0] || '';
-                          const color = p.colors?.[0] || '';
-                          void addItem(p, size, color, 1);
-                          toast.success('Đã thêm vào giỏ');
-                        }}
-                        style={{ marginTop: 10, width: '100%', padding: '8px 12px', background: '#0f172a', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600, fontSize: 13 }}
-                      >
-                        Thêm vào giỏ
-                      </button>
+                    <Link to={`/product/${p.id}`} className="compare-product-name">{p.name}</Link>
+                    <div className="compare-product-price">
+                      {formatCurrency(p.price)}
+                      {p.oldPrice && (
+                        <span className="compare-product-old">{formatCurrency(p.oldPrice)}</span>
+                      )}
                     </div>
+                    <button
+                      onClick={() => {
+                        const size = p.sizes?.[0] || '';
+                        const color = p.colors?.[0] || '';
+                        void addItem(p, size, color, 1);
+                        toast.success('Đã thêm vào giỏ');
+                      }}
+                      className="auth-page-submit"
+                      style={{ marginTop: 10, padding: '8px 12px', fontSize: 13, fontWeight: 600 }}
+                    >
+                      Thêm vào giỏ
+                    </button>
                   </div>
                 </th>
               ))}
@@ -127,23 +133,26 @@ export default function Compare() {
             <Row label="Tồn kho" values={products.map((p) => `${p.stock}`)} />
             {allColors.length > 0 && (
               <tr>
-                <td style={cellLabel}>Màu sắc</td>
+                <td>Màu sắc</td>
                 {products.map((p) => (
-                  <td key={p.id} style={cellValue}>
+                  <td key={p.id}>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                      {allColors.map((c) => (
-                        <span
-                          key={c}
-                          style={{
-                            padding: '2px 8px', borderRadius: 10, fontSize: 11,
-                            background: p.colors?.includes(c) ? '#dcfce7' : '#f1f5f9',
-                            color: p.colors?.includes(c) ? '#166534' : '#cbd5e1',
-                          }}
-                          title={p.colors?.includes(c) ? 'Có' : 'Không có'}
-                        >
-                          {p.colors?.includes(c) ? <PiCheckBold style={{ verticalAlign: -2 }} /> : '–'} {c}
-                        </span>
-                      ))}
+                      {allColors.map((c) => {
+                        const has = p.colors?.includes(c);
+                        return (
+                          <span
+                            key={c}
+                            style={{
+                              padding: '2px 8px', borderRadius: 10, fontSize: 11,
+                              background: has ? '#dcfce7' : '#f1f5f9',
+                              color: has ? '#166534' : '#cbd5e1',
+                            }}
+                            title={has ? 'Có' : 'Không có'}
+                          >
+                            {has ? <PiCheckBold style={{ verticalAlign: -2 }} /> : '–'} {c}
+                          </span>
+                        );
+                      })}
                     </div>
                   </td>
                 ))}
@@ -165,15 +174,8 @@ export default function Compare() {
 function Row({ label, values }: { label: string; values: (string | number)[] }) {
   return (
     <tr>
-      <td style={cellLabel}>{label}</td>
-      {values.map((v, i) => <td key={i} style={cellValue}>{v}</td>)}
+      <td>{label}</td>
+      {values.map((v, i) => <td key={i}>{v}</td>)}
     </tr>
   );
 }
-
-const cellLabel: React.CSSProperties = {
-  padding: '12px 16px', background: '#f8fafc', fontWeight: 600, color: '#475569', fontSize: 13, borderRadius: 6,
-};
-const cellValue: React.CSSProperties = {
-  padding: '12px 16px', textAlign: 'center', fontSize: 13, color: '#0f172a', background: '#fff', borderRadius: 6, border: '1px solid #f1f5f9',
-};

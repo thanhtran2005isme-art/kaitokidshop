@@ -1,9 +1,10 @@
-// Layout chính cho trang khách hàng
-// Thay thế việc copy/paste header + footer vào mỗi file HTML
+﻿// Layout chính cho trang khách hàng
 
 import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import Footer from './Footer';
+import RecentlyViewedStrip from './RecentlyViewedStrip';
+import MessengerChat from '../MessengerChat';
 
 export default function MainLayout() {
   return (
@@ -12,7 +13,9 @@ export default function MainLayout() {
       <main>
         <Outlet />
       </main>
+      <RecentlyViewedStrip />
       <Footer />
+      <MessengerChat />
     </>
   );
 }

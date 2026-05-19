@@ -51,18 +51,15 @@ public class PaymentExpirySweeper(
             order.ShippingStatus = "cancelled";
             order.UpdatedAt = now;
 
-            // Hoàn tồn kho
+            // Hoàn tồn kho cả 2 cấp (product + variant) — fix BUG #1
             var items = await db.OrderItems.Where(i => i.OrderId == order.Id).ToListAsync(ct);
-            foreach (var item in items)
+            await InventoryRestoreHelper.RestoreStockAsync(db, items, ct);
+
+            // Hoàn lại lượt dùng coupon (fix BUG #2)
+            if (!string.IsNullOrEmpty(order.CouponCode))
             {
-                var product = await db.Products.FindAsync([item.ProductId], ct);
-                if (product is not null)
-                {
-                    product.Stock += item.Quantity;
-                    product.SoldCount = Math.Max(0, product.SoldCount - item.Quantity);
-                    if (product.Stock > 0 && product.Status == "out-of-stock")
-                        product.Status = "active";
-                }
+                var coupon = await db.Coupons.FirstOrDefaultAsync(c => c.Code == order.CouponCode, ct);
+                if (coupon is not null && coupon.UsedCount > 0) coupon.UsedCount--;
             }
         }
 

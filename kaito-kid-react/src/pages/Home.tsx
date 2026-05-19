@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import Seo from '../components/Seo';
+import LazySection from '../components/LazySection';
 import {
   PiArrowRightBold,
   PiCaretLeftBold,
@@ -12,7 +14,7 @@ import {
 } from 'react-icons/pi';
 import { Link } from 'react-router-dom';
 import ProductCard from '../components/product/ProductCard';
-import { productApi, customerOrderApi, flashSaleApi, publicBannerApi, newsletterApi, type PublicFlashSale, type PublicBannerDTO } from '../services/api';
+import { productApi, customerOrderApi, flashSaleApi, publicBannerApi, newsletterApi, reviewApi, type PublicFlashSale, type PublicBannerDTO, type FeaturedReviewDTO, homepageBlocksApi, type HomepageBlock } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import {
   getViewedProducts,
@@ -71,14 +73,14 @@ const defaultHeroSlides: HeroSlide[] = [
   },
 ];
 
-const categoryTiles = [
+const defaultCategoryTiles = [
   { image: '/london.png', alt: 'Women', title: 'WOMEN', to: '/women' },
   { image: '/Nhat.png', alt: 'Men', title: 'MEN', to: '/men' },
   { image: '/images/d53c7593-3c1b-437a-98bc-f71b44050b40.png', alt: 'New In', title: 'NEW IN', to: '/new-in' },
   { image: '/ChatGPT Image 22_35_00 22 thg 4, 2025.png', alt: 'Sale', title: 'SALE', to: '/sale' },
 ] as const;
 
-const brandValues = [
+const defaultBrandValuesText = [
   'Thiết kế tại Việt Nam, hướng tới dáng người châu Á',
   'Chất liệu được chọn kỹ, ưu tiên thoáng mát - ít nhăn',
   'Cam kết đổi trả trong 7 ngày nếu bạn không hài lòng',
@@ -105,7 +107,7 @@ const defaultReviews: HomeReview[] = [
   },
 ];
 
-const socialImages = [
+const defaultSocialImages = [
   '/london.png',
   '/Nhat.png',
   '/images/d53c7593-3c1b-437a-98bc-f71b44050b40.png',
@@ -141,6 +143,12 @@ function matchesCategory(product: Product, filter: string) {
 export default function Home() {
   const { user } = useAuth();
   const [heroSlides, setHeroSlides] = useState<HeroSlide[]>(defaultHeroSlides);
+  const [heroSlidesAPI, setHeroSlidesAPI] = useState<HomepageBlock[]>([]);
+  const [categoryTilesAPI, setCategoryTilesAPI] = useState<HomepageBlock[]>([]);
+  const [brandValuesAPI, setBrandValuesAPI] = useState<HomepageBlock[]>([]);
+  const [socialImagesAPI, setSocialImagesAPI] = useState<HomepageBlock[]>([]);
+  const [featuredReviews, setFeaturedReviews] = useState<FeaturedReviewDTO[]>([]);
+
   const [recentlyViewed, setRecentlyViewed] = useState<Product[]>([]);
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [newsletterSubmitting, setNewsletterSubmitting] = useState(false);
@@ -170,14 +178,37 @@ export default function Home() {
 
     const loadAll = async () => {
       setInitialLoading(true);
-      const [bannersR, newArrR, saleR, bestR, flashR] = await Promise.all([
+      const [bannersR, newArrR, saleR, bestR, flashR, blocksR] = await Promise.all([
         publicBannerApi.getActive('homepage', 'slider').catch(() => null),
         productApi.getNewArrivals(8),
         productApi.getSaleProducts(8),
         productApi.getBestSellers(8),
         flashSaleApi.getActive(),
+        homepageBlocksApi.getAll().catch(() => null),
       ]);
       if (cancelled) return;
+      // Block hero (nếu có) — đè lên hero slides từ banner.
+      const heroBlocks = blocksR?.data?.hero ?? [];
+      if (heroBlocks.length > 0) {
+        setHeroSlides(heroBlocks.map((b) => ({
+          image: b.image || '',
+          alt: b.title || '',
+          tagline: b.subtitle || '',
+          title: b.title || '',
+          subtitle: b.description || '',
+          primaryAction: { label: 'Xem ngay', to: b.link || '/products' },
+          secondaryAction: { label: 'Khám phá', to: '/collections' },
+        })));
+      }
+      setHeroSlidesAPI(heroBlocks);
+      setCategoryTilesAPI(blocksR?.data?.categoryTile ?? []);
+      setBrandValuesAPI(blocksR?.data?.brandValue ?? []);
+      setSocialImagesAPI(blocksR?.data?.socialImage ?? []);
+
+      // Featured reviews — không quan trọng nên fetch tách, không block initial render
+      void reviewApi.getFeatured(6).then((rr) => {
+        if (!cancelled && rr.success && rr.data) setFeaturedReviews(rr.data);
+      });
 
       // Hero slides — ưu tiên banner từ DB, fallback default
       if (bannersR?.success && bannersR.data && bannersR.data.length > 0) {
@@ -379,11 +410,16 @@ export default function Home() {
 
   return (
     <div className="home-page">
+      <Seo
+        title="KAITO KID - Thời trang hiện đại"
+        description="Mua sắm thời trang nam, nữ, trẻ em chính hãng tại KAITO KID. Freeship đơn 499K, đổi trả 7 ngày, bảo hành chất lượng."
+        canonical="/"
+      />
       <section className="hero-banner">
         {heroSlides.map((slide, index) => (
           <div key={`${slide.title}-${index}`} className={`hero-slide ${index === currentSlide ? 'active' : ''}`}>
             <Link to={slide.primaryAction.to}>
-              <img src={slide.image} alt={slide.alt} />
+              <img src={slide.image} alt={slide.alt}  loading="lazy" decoding="async" />
             </Link>
           </div>
         ))}
@@ -410,9 +446,9 @@ export default function Home() {
 
       <section className="category-section">
         <div className="category-grid">
-          {categoryTiles.map((tile) => (
-            <Link key={tile.title} to={tile.to} className="category-tile">
-              <img src={tile.image} alt={tile.alt} />
+          {(categoryTilesAPI.length > 0 ? categoryTilesAPI.map((b, i) => ({ image: b.image || '', alt: b.title || '', title: b.title || '', to: b.link || '#', _key: 'api-' + (b.id ?? i) })) : defaultCategoryTiles.map((t, i) => ({ ...t, _key: 'def-' + i }))).map((tile) => (
+            <Link key={tile._key} to={tile.to} className="category-tile">
+              <img src={tile.image} alt={tile.alt}  loading="lazy" decoding="async" />
               <div className="category-overlay">
                 <h3>{tile.title}</h3>
                 <span className="category-overlay-cta">
@@ -595,7 +631,7 @@ export default function Home() {
                       src={item.image}
                       alt={item.name}
                       style={{ width: '100%', height: 200, objectFit: 'cover' }}
-                    />
+                     loading="lazy" decoding="async" />
                     {discount > 0 && (
                       <span
                         style={{
@@ -673,17 +709,17 @@ export default function Home() {
       <section className="brand-values-section">
         <div className="brand-container">
           <div className="brand-image">
-            <img src="/london.png" alt="Về KAITO KID" />
+            <img src="/london.png" alt="Về KAITO KID"  loading="lazy" decoding="async" />
           </div>
 
           <div className="brand-content">
             <h2>Chúng tôi là KAITO KID</h2>
 
             <ul className="brand-values">
-              {brandValues.map((value) => (
-                <li key={value}>
+              {(brandValuesAPI.length > 0 ? brandValuesAPI.map((b) => ({ key: 'api-' + b.id, text: b.title || '' })) : defaultBrandValuesText.map((v, i) => ({ key: 'def-' + i, text: v }))).map((item) => (
+                <li key={item.key}>
                   <PiSealCheckFill aria-hidden="true" />
-                  <span>{value}</span>
+                  <span>{item.text}</span>
                 </li>
               ))}
             </ul>
@@ -697,6 +733,7 @@ export default function Home() {
 
       {/* Sản phẩm đã xem gần đây — chỉ hiện khi có data */}
       {recentlyViewed.length > 0 && (
+        <LazySection minHeight={400}>
         <section className="recently-viewed-section" style={{ padding: '60px 20px', background: '#fff' }}>
           <div style={{ maxWidth: 1280, margin: '0 auto' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 24 }}>
@@ -711,6 +748,7 @@ export default function Home() {
             </div>
           </div>
         </section>
+        </LazySection>
       )}
 
       <section className="reviews-section recommendations-section">
@@ -756,6 +794,50 @@ export default function Home() {
           </div>
         )}
       </section>
+      {/* Khách hàng nói gì */}
+      <LazySection minHeight={300}>
+        <section className="reviews-section testimonials-section" style={{ padding: '60px 20px', background: '#fafafa' }}>
+          <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+            <div className="section-header" style={{ textAlign: 'center', marginBottom: 32 }}>
+              <h2>Khách hàng nói gì về KAITO KID</h2>
+              <p style={{ color: '#6b7280', fontSize: 14, marginTop: 6 }}>
+                Cảm nhận thực tế từ những người đã mua sắm tại đây
+              </p>
+            </div>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 20,
+            }}>
+              {(featuredReviews.length > 0
+                ? featuredReviews.map((r) => ({
+                    key: 'api-' + r.id,
+                    name: r.customerName,
+                    meta: new Date(r.createdAt).toLocaleDateString('vi-VN'),
+                    text: '"' + r.comment + '"',
+                    rating: r.rating,
+                  }))
+                : defaultReviews.map((r, i) => ({ key: 'def-' + i, ...r }))
+              ).map((r) => (
+                <div key={r.key} style={{
+                  background: '#fff', padding: 20, borderRadius: 12,
+                  boxShadow: '0 2px 12px rgba(15,23,42,0.05)',
+                }}>
+                  <div style={{ color: '#f59e0b', fontSize: 14, marginBottom: 8 }}>
+                    {'★'.repeat(r.rating)}{'☆'.repeat(Math.max(0, 5 - r.rating))}
+                  </div>
+                  <p style={{ fontSize: 14, color: '#0f172a', lineHeight: 1.5, margin: 0 }}>
+                    {r.text}
+                  </p>
+                  <div style={{ marginTop: 12, fontSize: 12, color: '#64748b' }}>
+                    <strong style={{ color: '#0f172a' }}>{r.name}</strong> · {r.meta}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </LazySection>
 
       <section className="newsletter-social-section">
         <div className="newsletter-social-container">
@@ -780,7 +862,7 @@ export default function Home() {
                 toast.error(r.error || 'Đăng ký thất bại');
               }
             }}>
-              <input type="email" placeholder="Email của bạn" required />
+              <input type="email" placeholder="Email của bạn" required value={newsletterEmail} onChange={(e) => setNewsletterEmail(e.target.value)} disabled={newsletterSubmitting} />
               <button type="submit">
                 <PiPaperPlaneTiltFill aria-hidden="true" />
                 <span>Đăng ký</span>
@@ -793,20 +875,20 @@ export default function Home() {
             </label>
           </div>
 
-          <div className="social-gallery">
+          <LazySection minHeight={400}><div className="social-gallery">
             <h3>#kaitokidlook</h3>
 
             <div className="social-grid">
-              {socialImages.map((image) => (
-                <div key={image} className="social-item">
-                  <img src={image} alt="Instagram" />
+              {(socialImagesAPI.length > 0 ? socialImagesAPI.map((b) => ({ key: 'api-' + b.id, src: b.image || '', link: b.link })) : defaultSocialImages.map((s, i) => ({ key: 'def-' + i, src: s, link: undefined as string | undefined }))).map((image) => (
+                <div key={image.key} className="social-item">
+                  <img src={image.src} alt="Instagram"  loading="lazy" decoding="async" />
                   <div className="social-overlay">
                     <PiInstagramLogoFill aria-hidden="true" />
                   </div>
                 </div>
               ))}
             </div>
-          </div>
+          </div></LazySection>
         </div>
       </section>
     </div>

@@ -52,7 +52,8 @@ const PRICE_BUCKETS = [
 const SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 const COLORS = ['Đen', 'Trắng', 'Xám', 'Be', 'Nâu', 'Đỏ', 'Hồng', 'Xanh navy', 'Xanh lá', 'Vàng'];
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE_OPTIONS = [12, 24, 48, 96] as const;
+type PageSize = (typeof PAGE_SIZE_OPTIONS)[number];
 
 export default function ProductListPage({
   title, subtitle, bannerImage, fixedFilters, showCategoryFilter = true,
@@ -64,11 +65,15 @@ export default function ProductListPage({
   const [loading, setLoading] = useState(false);
 
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<PageSize>(() => {
+    const fromQuery = Number(params.get('pageSize'));
+    return (PAGE_SIZE_OPTIONS as readonly number[]).includes(fromQuery) ? (fromQuery as PageSize) : 24;
+  });
   const [sort, setSort] = useState<SortKey>(() => (params.get('sort') as SortKey) || 'newest');
   const [viewMode, setViewMode] = useState<ViewMode>(() => (params.get('view') as ViewMode) || 'grid-4');
 
   // Filter states
-  const [activeCategory, setActiveCategory] = useState<string>('');
+  const [activeCategory, setActiveCategory] = useState<string>(() => params.get('category') || '');
   const [activePriceIdx, setActivePriceIdx] = useState<number | null>(null);
   const [activeSizes, setActiveSizes] = useState<Set<string>>(new Set());
   const [activeColors, setActiveColors] = useState<Set<string>>(new Set());
@@ -97,12 +102,27 @@ export default function ProductListPage({
     setLoading(true);
 
     const priceRange = activePriceIdx !== null ? PRICE_BUCKETS[activePriceIdx] : null;
+    // Đọc các filter từ URL (ngoài state đã quản lý) để link sâu /products?category=X hoạt động.
+    const urlCategory = params.get('category') || undefined;
+    const urlGender = params.get('gender') || undefined;
+    const urlSubcategory = params.get('subcategory') || undefined;
+    const urlStyle = params.get('style') || undefined;
+    const urlAgeGroup = params.get('ageGroup') || undefined;
+    const urlCollection = params.get('collection') || undefined;
+    const urlSearch = params.get('search') || undefined;
+
     const apiParams: GetProductsParams = {
       ...fixedFilters,
-      category: activeCategory || fixedFilters?.category,
+      category: activeCategory || urlCategory || fixedFilters?.category,
+      gender: fixedFilters?.gender || urlGender,
+      subcategory: fixedFilters?.subcategory || urlSubcategory,
+      style: fixedFilters?.style || urlStyle,
+      ageGroup: fixedFilters?.ageGroup || urlAgeGroup,
+      collection: fixedFilters?.collection || urlCollection,
+      search: fixedFilters?.search || urlSearch,
       sortBy: sort,
       page,
-      pageSize: PAGE_SIZE,
+      pageSize: pageSize,
     };
     if (priceRange) {
       apiParams.minPrice = priceRange.min;
@@ -125,7 +145,7 @@ export default function ProductListPage({
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategory, activePriceIdx, activeSizes, activeColors, minRating, sort, page]);
+  }, [activeCategory, activePriceIdx, activeSizes, activeColors, minRating, sort, page, pageSize, params]);
 
   // Sync URL
   useEffect(() => {
@@ -135,7 +155,7 @@ export default function ProductListPage({
     if (page > 1) next.set('page', String(page)); else next.delete('page');
     setParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sort, viewMode, page]);
+  }, [sort, viewMode, page, pageSize]);
 
   const toggleSet = (set: Set<string>, value: string, setter: (s: Set<string>) => void) => {
     const next = new Set(set);
@@ -159,7 +179,7 @@ export default function ProductListPage({
     + activeColors.size
     + (minRating > 0 ? 1 : 0);
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const gridColumns = viewMode === 'grid-4' ? 4 : viewMode === 'grid-3' ? 3 : 1;
 
@@ -240,6 +260,19 @@ export default function ProductListPage({
               }}
             >
               {SORT_OPTIONS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+            </select>
+            <span style={{ marginLeft: 12, color: '#64748b', fontSize: 13 }}>Hiển thị:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => { setPageSize(Number(e.target.value) as PageSize); setPage(1); }}
+              style={{
+                padding: '6px 28px 6px 10px', border: '1px solid #e5e7eb',
+                borderRadius: 6, fontSize: 13, background: '#fff', cursor: 'pointer',
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n} / trang</option>
+              ))}
             </select>
           </div>
         </div>
@@ -463,7 +496,7 @@ function ListItem({ product }: { product: Product }) {
       padding: 12, background: '#fff', border: '1px solid #e5e7eb',
       borderRadius: 10, textDecoration: 'none', color: '#0f172a',
     }}>
-      <img src={product.image} alt={product.name} style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', borderRadius: 6 }} />
+      <img src={product.image} alt={product.name} style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover', borderRadius: 6 }}  loading="lazy" decoding="async" />
       <div>
         <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 600 }}>{product.name}</h3>
         <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>

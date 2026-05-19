@@ -151,7 +151,7 @@ export default function PaymentStep({ orderCode, total, bankAccounts, allowSimul
             <div className="ivy-payment-qr">
               <h3>Quét mã QR để thanh toán</h3>
               <div className="ivy-payment-qr__frame">
-                <img src={qrUrl} alt="VietQR" />
+                <img src={qrUrl} alt="VietQR"  loading="lazy" decoding="async" />
               </div>
               <p className="ivy-payment-qr__hint">Quét bằng app ngân hàng để thanh toán nhanh chóng</p>
               <a href={qrUrl} download={`QR-${orderCode}.png`} className="ivy-btn-primary">

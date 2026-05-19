@@ -36,7 +36,7 @@ export default function Collections() {
             {collections.map((col) => (
               <div key={col.id} className="collection-card">
                 <div className="collection-image">
-                  <img src={col.image || '/images/slide_1.jpg'} alt={col.name} />
+                  <img src={col.image || '/images/slide_1.jpg'} alt={col.name}  loading="lazy" decoding="async" />
                   <div className="collection-overlay">
                     <Link
                       to={`/products?collection=${col.slug || slugifyLabel(col.name)}`}

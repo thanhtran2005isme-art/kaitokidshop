@@ -27,7 +27,7 @@ export default function Footer() {
         {/* Col 1: Logo + Social + Hotline */}
         <div className="ivy-footer-col ivy-footer-brand">
           <div className="ivy-footer-logo">
-            <img src="/images/logokaitokid.png" alt="KAITO KID" />
+            <img src="/images/logokaitokid.png" alt="KAITO KID"  loading="lazy" decoding="async" />
           </div>
           <div className="ivy-footer-socials">
             <a href="#" aria-label="Facebook"><PiFacebookLogoFill aria-hidden="true" /></a>
@@ -97,10 +97,10 @@ export default function Footer() {
             <p>Download App</p>
             <div className="ivy-app-badges">
               <a href="#" aria-label="App Store">
-                <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="App Store" />
+                <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="App Store"  loading="lazy" decoding="async" />
               </a>
               <a href="#" aria-label="Google Play">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Google Play" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Google Play"  loading="lazy" decoding="async" />
               </a>
             </div>
           </div>

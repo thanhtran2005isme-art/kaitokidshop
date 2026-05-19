@@ -1,7 +1,7 @@
 // ProductCard - IVY moda style: clean, minimal
 
 import { useState, useCallback } from 'react';
-import { PiHeartStraight, PiHeartStraightFill, PiShoppingBagOpenFill } from 'react-icons/pi';
+import { PiHeartStraight, PiHeartStraightFill, PiShoppingBagOpenFill, PiScalesBold, PiScales } from 'react-icons/pi';
 import { Link } from 'react-router-dom';
 import type { Product } from '../../types';
 import { formatCurrency } from '../../utils/format';
@@ -27,9 +27,29 @@ function toggleWishlistInStorage(id: number): boolean {
   return idx < 0;
 }
 
+function getCompare(): number[] {
+  try { return JSON.parse(localStorage.getItem('kk_compare') || '[]'); }
+  catch { return []; }
+}
+
+function toggleCompareInStorage(id: number): { added: boolean; full: boolean } {
+  const list = getCompare();
+  const idx = list.indexOf(id);
+  if (idx >= 0) {
+    list.splice(idx, 1);
+    localStorage.setItem('kk_compare', JSON.stringify(list));
+    return { added: false, full: false };
+  }
+  if (list.length >= 4) return { added: false, full: true };
+  list.push(id);
+  localStorage.setItem('kk_compare', JSON.stringify(list));
+  return { added: true, full: false };
+}
+
 export default function ProductCard({ product, onToggleWishlist, isWishlisted }: ProductCardProps) {
   const [wishlisted, setWishlisted] = useState(() => isWishlisted ?? getWishlist().includes(product.id));
   const [variantModalOpen, setVariantModalOpen] = useState(false);
+  const [compared, setCompared] = useState(() => getCompare().includes(product.id));
   const { addItem } = useCart();
 
   const handleWishlist = useCallback(() => {
@@ -40,6 +60,15 @@ export default function ProductCard({ product, onToggleWishlist, isWishlisted }:
       setWishlisted(toggleWishlistInStorage(product.id));
     }
   }, [onToggleWishlist, product.id]);
+
+  const handleCompare = useCallback(() => {
+    const r = toggleCompareInStorage(product.id);
+    if (r.full) {
+      alert('Chỉ so sánh tối đa 4 sản phẩm. Vui lòng bỏ bớt trước.');
+      return;
+    }
+    setCompared(r.added);
+  }, [product.id]);
 
   // Mở modal chọn biến thể (size + màu + số lượng)
   const handleAddToCart = () => {

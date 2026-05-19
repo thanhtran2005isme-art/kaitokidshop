@@ -15,5 +15,6 @@ public class User
     [Column("CapBac")] public string MemberTier { get; set; } = "Member";
     [Column("TongChiTieu", TypeName = "decimal(18,0)")] public decimal TotalSpent { get; set; }
     [Column("NgaySinh")] public DateTime? Birthday { get; set; }
+    [Column("MaGioiThieu")] public string? ReferralCode { get; set; }
     [Column("NgayTao")] public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

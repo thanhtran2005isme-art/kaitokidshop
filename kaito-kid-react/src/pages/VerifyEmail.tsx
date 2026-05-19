@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { PiCheckCircleFill, PiXCircleFill, PiSpinnerGapBold } from 'react-icons/pi';
 import { authApi } from '../services/api/authApi';
+
+import '../styles/auth-pages.css';
 
 export default function VerifyEmail() {
   const [params] = useSearchParams();
@@ -27,48 +29,31 @@ export default function VerifyEmail() {
   }, [token]);
 
   return (
-    <div style={{
-      minHeight: 'calc(100vh - 200px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: '60px 20px', background: '#f8fafc',
-    }}>
-      <div style={{
-        background: '#fff', borderRadius: 16, padding: '48px 40px',
-        maxWidth: 480, width: '100%', boxShadow: '0 4px 24px rgba(15,23,42,0.06)',
-        textAlign: 'center',
-      }}>
+    <div className="auth-page">
+      <div className="auth-page-card auth-page-success-state">
         {status === 'loading' && (
           <>
-            <PiSpinnerGapBold style={{ fontSize: 64, color: '#6366f1', animation: 'spin 1s linear infinite' }} />
-            <h2 style={{ marginTop: 16, color: '#0f172a' }}>Đang xác thực...</h2>
+            <PiSpinnerGapBold className="auth-page-success-icon auth-spinning" style={{ color: '#6366f1' }} />
+            <h2>Đang xác thực…</h2>
           </>
         )}
         {status === 'success' && (
           <>
-            <PiCheckCircleFill style={{ fontSize: 72, color: '#16a34a' }} />
-            <h2 style={{ margin: '16px 0 8px', color: '#0f172a' }}>Xác thực thành công!</h2>
-            <p style={{ color: '#64748b', fontSize: 14, marginBottom: 24 }}>{message}</p>
-            <Link to="/" style={{
-              display: 'inline-block', padding: '12px 28px',
-              background: '#16a34a', color: '#fff', borderRadius: 8,
-              textDecoration: 'none', fontWeight: 600,
-            }}>Về trang chủ</Link>
+            <PiCheckCircleFill className="auth-page-success-icon" />
+            <h2>Xác thực thành công!</h2>
+            <p>{message}</p>
+            <Link to="/" className="auth-page-success-back">Về trang chủ</Link>
           </>
         )}
         {status === 'error' && (
           <>
-            <PiXCircleFill style={{ fontSize: 72, color: '#dc2626' }} />
-            <h2 style={{ margin: '16px 0 8px', color: '#0f172a' }}>Xác thực thất bại</h2>
-            <p style={{ color: '#64748b', fontSize: 14, marginBottom: 24 }}>{message}</p>
-            <Link to="/account" style={{
-              display: 'inline-block', padding: '12px 28px',
-              background: '#0f172a', color: '#fff', borderRadius: 8,
-              textDecoration: 'none', fontWeight: 600,
-            }}>Vào tài khoản để gửi lại</Link>
+            <PiXCircleFill className="auth-page-success-icon auth-page-success-icon-red" />
+            <h2>Xác thực thất bại</h2>
+            <p>{message}</p>
+            <Link to="/account" className="auth-page-success-back">Vào tài khoản để gửi lại</Link>
           </>
         )}
       </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

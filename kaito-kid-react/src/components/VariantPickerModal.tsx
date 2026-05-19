@@ -1,6 +1,7 @@
-﻿// Mini modal chọn size + color trước khi Add-to-cart từ Wishlist.
+// Mini modal chọn size + color trước khi Add-to-cart từ Wishlist.
 // Tự load product detail (variants) qua productApi.getById khi mở.
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { PiX, PiShoppingCartFill, PiSpinner } from 'react-icons/pi';
 import { productApi } from '../services/api';
 import { formatCurrency } from '../utils/format';
@@ -20,6 +21,8 @@ export default function VariantPickerModal({ productId, onClose, onConfirm }: Pr
   const [qty, setQty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, true, onClose);
 
   useEffect(() => {
     let alive = true;
@@ -67,7 +70,7 @@ export default function VariantPickerModal({ productId, onClose, onConfirm }: Pr
 
   return (
     <div className="vp-overlay" onClick={onClose}>
-      <div className="vp-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <div ref={dialogRef} className="vp-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="vp-title">
         <button className="vp-close" onClick={onClose} aria-label="Đóng">
           <PiX />
         </button>
@@ -81,9 +84,9 @@ export default function VariantPickerModal({ productId, onClose, onConfirm }: Pr
         ) : (
           <>
             <div className="vp-head">
-              <img src={product.image} alt={product.name} />
+              <img src={product.image} alt={product.name}  loading="lazy" decoding="async" />
               <div>
-                <div className="vp-name">{product.name}</div>
+                <div className="vp-name" id="vp-title">{product.name}</div>
                 <div className="vp-price">
                   <strong>{formatCurrency(product.price)}</strong>
                   {product.oldPrice && (

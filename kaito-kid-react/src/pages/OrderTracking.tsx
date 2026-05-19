@@ -74,8 +74,16 @@ export default function OrderTracking() {
   useEffect(() => {
     if (!user) return;
     void loadOrders();
-    const interval = window.setInterval(() => { void loadOrders(); }, 60_000);
-    return () => window.clearInterval(interval);
+    // Polling 60s, pause khi tab ẩn để tránh gọi API thừa.
+    const tick = () => {
+      if (document.visibilityState === 'visible') void loadOrders();
+    };
+    const interval = window.setInterval(tick, 60_000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', tick);
+    };
   }, [user]);
 
   // Đếm số đơn theo từng group cho tabs
@@ -221,7 +229,7 @@ export default function OrderTracking() {
 
               <div className="order-items-preview">
                 {order.items.slice(0, 4).map((item, i) => (
-                  <img key={i} src={item.productImage} alt={item.productName} />
+                  <img key={i} src={item.productImage} alt={item.productName}  loading="lazy" decoding="async" />
                 ))}
                 {order.items.length > 4 && <span>+{order.items.length - 4}</span>}
               </div>
@@ -301,7 +309,7 @@ export default function OrderTracking() {
               <h4 style={{ margin: '20px 0 12px' }}>Sản phẩm ({selected.items.length})</h4>
               {selected.items.map((item, i) => (
                 <div key={i} className="order-item">
-                  <img src={item.productImage} alt={item.productName} />
+                  <img src={item.productImage} alt={item.productName}  loading="lazy" decoding="async" />
                   <div className="order-item-info">
                     <div className="order-item-name">{item.productName}</div>
                     <div className="order-item-variant">

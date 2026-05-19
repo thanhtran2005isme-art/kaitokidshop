@@ -8,7 +8,7 @@ namespace API.Customer.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ReviewsController(IReviewService reviewService, IWebHostEnvironment env) : ControllerBase
+public class ReviewsController(IReviewService reviewService, IWebHostEnvironment env, API.Customer.Data.CustomerDbContext db) : ControllerBase
 {
     private const long MaxImageBytes = 5 * 1024 * 1024;       // 5MB / ảnh
     private const long MaxVideoBytes = 30 * 1024 * 1024;      // 30MB / video
@@ -21,6 +21,30 @@ public class ReviewsController(IReviewService reviewService, IWebHostEnvironment
         return Ok(await reviewService.GetByProductAsync(productId));
     }
 
+    /// <summary>
+    /// Public: top reviews 5 sao đã duyệt (cho section "Khách hàng nói gì" trên Home).
+    /// </summary>
+    [HttpGet("featured")]
+    public async Task<IActionResult> Featured([FromQuery] int limit = 6)
+    {
+        var rows = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            db.Reviews
+                .Where(r => r.Status == "approved" && r.Rating >= 4)
+                .OrderByDescending(r => r.HelpfulCount)
+                .ThenByDescending(r => r.CreatedAt)
+                .Take(Math.Min(limit, 12))
+                .Select(r => new
+                {
+                    id = r.Id,
+                    productId = r.ProductId,
+                    customerName = r.CustomerName,
+                    rating = r.Rating,
+                    comment = r.Comment,
+                    createdAt = r.CreatedAt,
+                })
+        );
+        return Ok(rows);
+    }
     [HttpPost]
     [Authorize]
     public async Task<ActionResult<ReviewDTO>> Create([FromBody] CreateReviewDTO dto)

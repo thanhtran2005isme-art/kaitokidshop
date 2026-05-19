@@ -63,7 +63,7 @@ export default function ReviewOrderModal({
                   borderBottom: '1px solid #f1f5f9',
                 }}
               >
-                <img src={item.image} alt={item.name} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4 }} />
+                <img src={item.image} alt={item.name} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4 }}  loading="lazy" decoding="async" />
                 <div style={{ flex: 1, fontSize: 13 }}>
                   <div style={{ fontWeight: 600, color: '#0f172a' }}>{item.name}</div>
                   <div style={{ color: '#64748b' }}>

@@ -1,4 +1,5 @@
 // Trang giỏ hàng — phiên bản nâng cao
+import '../styles/cart-extra.css';
 // - Reservation timer dùng ReservedUntil thật từ backend (đồng bộ với SoLuongDaGiu)
 // - Cảnh báo low stock từ AvailableStock (real)
 // - Cross-sell theo category của item đầu tiên (backend /api/cart/cross-sell)
@@ -223,10 +224,10 @@ export default function Cart() {
           display: 'flex', alignItems: 'center', gap: 12, fontSize: 13,
           color: reservationLeft < 300 ? '#991b1b' : '#9a3412',
         }}>
-          <i className="fa fa-clock" style={{ fontSize: 16 }}></i>
-          <div style={{ flex: 1 }}>
+          <i className="fa fa-clock cart-banner-icon-16"></i>
+          <div className="cart-banner-flex-1">
             <strong>Giỏ hàng đã giữ tồn kho trong {String(Math.floor(reservationLeft / 60)).padStart(2, '0')}:{String(reservationLeft % 60).padStart(2, '0')}</strong>
-            <span style={{ marginLeft: 8 }}>— hết giờ hệ thống sẽ trả hàng cho khách khác. Đặt nhanh tay nhé!</span>
+            <span className="cart-banner-note">— hết giờ hệ thống sẽ trả hàng cho khách khác. Đặt nhanh tay nhé!</span>
           </div>
         </div>
       ) : (
@@ -234,7 +235,7 @@ export default function Cart() {
           background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
           padding: '10px 16px', marginBottom: 16, fontSize: 13, color: '#991b1b',
         }}>
-          <i className="fa fa-exclamation-circle" style={{ marginRight: 8 }}></i>
+          <i className="fa fa-exclamation-circle cart-icon-mr-8"></i>
           Giỏ hàng đã hết thời gian giữ — vui lòng kiểm tra lại tồn kho trước khi đặt.
         </div>
       )}
@@ -246,19 +247,19 @@ export default function Cart() {
       }}>
         {freeshipMissing > 0 ? (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13 }}>
-              <span style={{ color: '#166534' }}>
-                <i className="fa fa-truck" style={{ marginRight: 6 }}></i>
+            <div className="cart-row-between">
+              <span className="ok">
+                <i className="fa fa-truck cart-icon-mr-6"></i>
                 Mua thêm <strong>{formatCurrency(freeshipMissing)}</strong> để được <strong>FREESHIP</strong>!
               </span>
-              <span style={{ color: '#16a34a', fontWeight: 600 }}>{freeshipPct}%</span>
+              <span className="pct">{freeshipPct}%</span>
             </div>
-            <div style={{ background: '#dcfce7', height: 8, borderRadius: 4, overflow: 'hidden' }}>
+            <div className="cart-progress-track">
               <div style={{ background: 'linear-gradient(90deg, #22c55e, #16a34a)', height: '100%', width: `${freeshipPct}%`, transition: 'width 0.4s' }} />
             </div>
           </>
         ) : (
-          <div style={{ color: '#16a34a', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="cart-freeship-line">
             <i className="fa fa-check-circle"></i>
             Đơn hàng được FREESHIP! Cảm ơn bạn đã ủng hộ KaitoKid 🎉
           </div>
@@ -279,18 +280,18 @@ export default function Cart() {
             border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: 12,
             fontSize: 13,
           }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
+            <label className="cart-bulk-checkbox-label">
               <input
                 type="checkbox"
                 checked={allSelected}
                 onChange={toggleAll}
-                style={{ width: 16, height: 16, cursor: 'pointer' }}
+                className="cart-checkbox-16"
               />
               <span>Chọn tất cả ({cart.length})</span>
             </label>
-            <span style={{ color: '#94a3b8' }}>|</span>
+            <span className="cart-bulk-sep">|</span>
             <span>Đã chọn: <strong>{selected.size}</strong></span>
-            <div style={{ flex: 1 }} />
+            <div className="cart-bulk-spacer" />
             <button
               onClick={handleBulkMoveWishlist}
               disabled={selected.size === 0 || bulkBusy}
@@ -301,7 +302,7 @@ export default function Cart() {
                 opacity: selected.size === 0 ? 0.5 : 1,
               }}
             >
-              <i className="fa fa-heart" style={{ marginRight: 4, color: '#ec4899' }}></i>
+              <i className="fa fa-heart cart-icon-mr-4"></i>
               Chuyển vào yêu thích
             </button>
             <button
@@ -314,14 +315,14 @@ export default function Cart() {
                 opacity: selected.size === 0 ? 0.5 : 1,
               }}
             >
-              <i className="fa fa-trash-alt" style={{ marginRight: 4 }}></i>
+              <i className="fa fa-trash-alt cart-icon-mr-4-trash"></i>
               Xóa đã chọn
             </button>
           </div>
 
           <div className="ivy-cart-header">
-            <span className="ivy-col-product" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 16 }} />
+            <span className="ivy-col-product cart-item-product-cell">
+              <span className="cart-item-product-spacer" />
               TÊN SẢN PHẨM
             </span>
             <span className="ivy-col-discount">CHIẾT KHẤU</span>
@@ -336,16 +337,16 @@ export default function Cart() {
             return (
               <div className="ivy-cart-item" key={item.id}>
                 <div className="ivy-col-product">
-                  <div className="ivy-item-info" style={{ alignItems: 'flex-start' }}>
+                  <div className="ivy-item-info cart-item-info-aligned">
                     <input
                       type="checkbox"
                       checked={selected.has(item.id)}
                       onChange={() => toggleOne(item.id)}
-                      style={{ width: 16, height: 16, marginTop: 8, cursor: 'pointer', flexShrink: 0 }}
+                      className="cart-item-checkbox"
                       aria-label="Chọn sản phẩm"
                     />
                     <Link to={`/product/${item.productId}`} className="ivy-item-img">
-                      <img src={item.image} alt={item.name} />
+                      <img src={item.image} alt={item.name}  loading="lazy" decoding="async" />
                     </Link>
                     <div className="ivy-item-details">
                       <Link to={`/product/${item.productId}`} className="ivy-item-name">{item.name}</Link>
@@ -354,17 +355,17 @@ export default function Cart() {
                         {item.color && item.size && <>&nbsp;&nbsp;|&nbsp;&nbsp;</>}
                         {item.size && <>Size: {item.size}</>}
                       </p>
-                      <p style={{ fontSize: 12, color: '#94a3b8', margin: '4px 0 0' }}>
+                      <p className="cart-item-meta">
                         Đơn giá: {formatCurrency(item.price)}
                       </p>
                       {showLowStock && available > 0 && (
-                        <p style={{ fontSize: 12, color: '#ea580c', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <p className="cart-item-warn">
                           <i className="fa fa-exclamation-triangle"></i>
                           Chỉ còn <strong>{available}</strong> sản phẩm trong kho
                         </p>
                       )}
                       {overStock && (
-                        <p style={{ fontSize: 12, color: '#dc2626', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                        <p className="cart-item-error">
                           <i className="fa fa-times-circle"></i>
                           Vượt tồn kho khả dụng — chỉ còn {available}
                         </p>
@@ -432,7 +433,7 @@ export default function Cart() {
                     onMouseLeave={(e) => (e.currentTarget.style.borderColor = '#e5e7eb')}
                   >
                     <div style={{ aspectRatio: '4/5', background: '#f8fafc', overflow: 'hidden' }}>
-                      <img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      <img src={p.image} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }}  loading="lazy" decoding="async" />
                     </div>
                     <div style={{ padding: 8 }}>
                       <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, height: 32, overflow: 'hidden' }}>{p.name}</div>

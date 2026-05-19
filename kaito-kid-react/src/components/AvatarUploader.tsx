@@ -1,6 +1,7 @@
 // Avatar uploader với crop hình tròn (Canvas API, không cần lib ngoài).
 // Trả base64 data-URL JPEG nén ~85% để lưu vào field `avatar` của AccountDTO.
 import { useEffect, useRef, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { PiCameraFill, PiX, PiCheckBold, PiArrowsClockwise } from 'react-icons/pi';
 
 interface Props {
@@ -19,6 +20,8 @@ export default function AvatarUploader({ current, size = 320, onSave }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(dialogRef, open, () => setOpen(false));
 
   const handlePick = () => fileInputRef.current?.click();
 
@@ -158,7 +161,7 @@ export default function AvatarUploader({ current, size = 320, onSave }: Props) {
 
       {open && src && (
         <div className="vp-overlay" onClick={() => !saving && setOpen(false)}>
-          <div className="vp-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }}>
+          <div ref={dialogRef} className="vp-dialog" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 380 }} role="dialog" aria-modal="true" aria-label="Cắt ảnh đại diện">
             <button className="vp-close" onClick={() => setOpen(false)} disabled={saving}>
               <PiX />
             </button>

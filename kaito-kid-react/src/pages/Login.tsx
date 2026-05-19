@@ -6,6 +6,7 @@
 // - Toggle hiện/ẩn mật khẩu, cảnh báo Caps Lock, thanh độ mạnh password
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useNavigate, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
@@ -86,6 +87,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [twoFaState, setTwoFaState] = useState<{ identifier: string; password: string } | null>(null);
   const [twoFaCode, setTwoFaCode] = useState('');
+  const twoFaDialogRef = useRef<HTMLDivElement>(null);
+  useFocusTrap(twoFaDialogRef, !!twoFaState, () => setTwoFaState(null));
   const [capsLock, setCapsLock] = useState(false);
 
   // ---- Login state ----
@@ -277,6 +280,12 @@ export default function Login() {
     setLoading(false);
 
     if (result.success) {
+      // Server yêu cầu nhập mã 2FA → mở modal, không lưu token (đã do authApi xử lý).
+      if (result.requireTwoFactor && result.identifier && result.password) {
+        setTwoFaState({ identifier: result.identifier, password: result.password });
+        setTwoFaCode('');
+        return;
+      }
       if (remember) localStorage.setItem('lastLoginId', id);
       else localStorage.removeItem('lastLoginId');
       toast.success('Đăng nhập thành công');
@@ -339,7 +348,7 @@ export default function Login() {
 
     setLoading(true);
     const recaptchaToken = await getRecaptchaToken('register');
-    const r = await authApi.register({
+    const r = await register({
       name: regName.trim(),
       email: regEmail.trim().toLowerCase(),
       phone: regPhone.trim(),
@@ -367,7 +376,6 @@ export default function Login() {
 
     // Backup: nếu register trả về token và auto-login (tùy backend),
     // có thể navigate('/') ngay. Hiện tại chuyển về tab login cho an toàn.
-    void register;
   };
 
   // ==== Derived ================================================
@@ -386,7 +394,7 @@ export default function Login() {
         </div>
         <div className="branding-content">
           <div className="brand-logo">
-            <img src="/images/logokaitokid.png" alt="KAITO KID" />
+            <img src="/images/logokaitokid.png" alt="KAITO KID"  loading="lazy" decoding="async" />
           </div>
           <h1>Chào mừng đến với KAITO KID</h1>
           <p>Thời trang hiện đại, phong cách riêng biệt cho cả gia đình.</p>
@@ -725,6 +733,63 @@ export default function Login() {
           </Link>
         </div>
       </div>
+      {twoFaState && (
+        <div className="vp-overlay" onClick={() => setTwoFaState(null)}>
+          <div
+            className="vp-dialog"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 400 }}
+          >
+            <button className="vp-close" onClick={() => setTwoFaState(null)} aria-label="Đóng">×</button>
+            <h3 id="twofa-title" style={{ margin: '0 0 6px' }}>Xác thực 2 yếu tố</h3>
+            <p style={{ color: '#64748b', fontSize: 13, marginTop: 0 }}>
+              Mở app Authenticator trên điện thoại và nhập mã 6 số đang hiện cho tài khoản{' '}
+              <strong>{twoFaState.identifier}</strong>.
+            </p>
+            <input
+              type="text"
+              autoFocus
+              inputMode="numeric"
+              maxLength={6}
+              value={twoFaCode}
+              onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="123456"
+              style={{
+                width: '100%', padding: '14px 18px', fontSize: 22, fontWeight: 700,
+                letterSpacing: 8, textAlign: 'center', border: '1.5px solid #e5e7eb',
+                borderRadius: 10, marginBottom: 14, fontFamily: 'monospace',
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && twoFaCode.length === 6) void handleSubmit2Fa();
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleSubmit2Fa}
+                disabled={loading || twoFaCode.length !== 6}
+                className="vp-submit"
+                style={{ marginTop: 0 }}
+              >
+                {loading ? 'Đang kiểm tra...' : 'Xác nhận'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setTwoFaState(null); setTwoFaCode(''); }}
+                disabled={loading}
+                style={{
+                  padding: '12px 18px', background: '#f1f5f9', color: '#0f172a',
+                  border: '1px solid #e5e7eb', borderRadius: 10, cursor: 'pointer', fontSize: 14,
+                }}
+              >Hủy</button>
+            </div>
+            <p style={{ marginTop: 14, fontSize: 12, color: '#94a3b8' }}>
+              Mất quyền truy cập app? Liên hệ hỗ trợ qua email để khôi phục tài khoản.
+            </p>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

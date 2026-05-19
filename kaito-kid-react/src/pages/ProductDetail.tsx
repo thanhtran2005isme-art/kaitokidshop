@@ -2,6 +2,7 @@
 // Gallery zoom hover + variant selection + size guide + reviews + related + cross-sell
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import Seo, { buildProductJsonLd, buildBreadcrumbJsonLd } from '../components/Seo';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   PiHeartStraight,
@@ -195,17 +196,27 @@ export default function ProductDetail() {
   const stockBySize = useMemo(() => {
     const m = new Map<string, number>();
     if (!product) return m;
-    if (product.variants?.length) {
-      product.variants.forEach((v) => {
-        const cur = m.get(v.size) || 0;
-        m.set(v.size, cur + 5); // Mỗi variant tạm tính 5 cái
+
+    // Ưu tiên variantStocks (API thật). Nếu user chọn màu, chỉ tính tồn kho cùng màu.
+    if (variantStocks.length > 0) {
+      const list = selectedColor
+        ? variantStocks.filter((v) => v.color === selectedColor)
+        : variantStocks;
+      list.forEach((v) => {
+        const prev = m.get(v.size) || 0;
+        m.set(v.size, prev + (v.stock ?? 0));
       });
+      return m;
     }
-    if (m.size === 0 && product.sizes) {
-      product.sizes.forEach((s) => m.set(s, Math.max(1, Math.floor((product.stock || 0) / product.sizes!.length))));
+
+    // Fallback khi chưa có variantStocks: chia đều product.stock cho các size.
+    if (product.sizes?.length) {
+      product.sizes.forEach((s) =>
+        m.set(s, Math.max(0, Math.floor((product.stock || 0) / product.sizes!.length)))
+      );
     }
     return m;
-  }, [product]);
+  }, [product, variantStocks, selectedColor]);
 
   const handleAddToCart = useCallback(async () => {
     if (!product) return;
@@ -336,6 +347,32 @@ export default function ProductDetail() {
 
   return (
     <div className="pd-page">
+      <Seo
+        title={product.name}
+        description={product.shortDescription || product.description?.slice(0, 160) || (product.name + ' chính hãng tại KAITO KID')}
+        image={product.image}
+        canonical={'/product/' + product.id}
+        type="product"
+        jsonLd={[
+          buildProductJsonLd({
+            id: product.id,
+            name: product.name,
+            image: product.image,
+            price: product.price,
+            oldPrice: product.oldPrice,
+            rating: product.rating,
+            soldCount: product.soldCount,
+            description: product.shortDescription,
+            sku: product.sku,
+            status: product.status,
+          }),
+          buildBreadcrumbJsonLd([
+            { name: 'Trang chủ', url: '/' },
+            { name: 'Sản phẩm', url: '/products' },
+            { name: product.name, url: '/product/' + product.id },
+          ]),
+        ]}
+      />
       {/* Breadcrumb */}
       <nav className="pd-breadcrumb" aria-label="breadcrumb">
         <Link to="/">Trang chủ</Link>
@@ -359,7 +396,7 @@ export default function ProductDetail() {
                 onMouseEnter={() => setActiveImageIdx(i)}
                 aria-label={`Ảnh ${i + 1}`}
               >
-                <img src={img} alt={`${product.name} - ${i + 1}`} />
+                <img src={img} alt={`${product.name} - ${i + 1}`}  loading="lazy" decoding="async" />
               </button>
             ))}
           </div>
@@ -377,7 +414,7 @@ export default function ProductDetail() {
               {product.isBestSeller && <span className="pd-badge bestseller"><PiFire style={{ verticalAlign: -2 }} /> Best</span>}
             </div>
             {!zoomed && (
-              <img src={images[activeImageIdx]} alt={product.name} />
+              <img src={images[activeImageIdx]} alt={product.name}  loading="lazy" decoding="async" />
             )}
             {images.length > 1 && (
               <>
@@ -501,7 +538,19 @@ export default function ProductDetail() {
 
           {/* Model info */}
           <div className="pd-model-info">
-            <strong>Người mẫu</strong> cao 1m65, nặng 50kg, mặc size <strong>M</strong>.
+            {(() => {
+              const g = (product.gender || '').toLowerCase();
+              if (g.includes('nam') || g === 'men' || g === 'male') {
+                return <><strong>Người mẫu nam</strong> cao 1m75, nặng 65kg, mặc size <strong>L</strong>.</>;
+              }
+              if (g.includes('tre') || g === 'kids' || g === 'kid') {
+                return <><strong>Người mẫu nhí</strong> cao 1m20, nặng 24kg, mặc size <strong>M</strong> (8-9 tuổi).</>;
+              }
+              if (g.includes('unisex')) {
+                return <><strong>Người mẫu</strong> cao 1m70, mặc size <strong>L</strong>. Sản phẩm unisex phù hợp cả nam và nữ.</>;
+              }
+              return <><strong>Người mẫu nữ</strong> cao 1m65, nặng 50kg, mặc size <strong>M</strong>.</>;
+            })()}{' '}
             Tham khảo bảng size để chọn vừa nhất với bạn.
           </div>
 
@@ -608,6 +657,7 @@ export default function ProductDetail() {
             ['description', 'Mô tả sản phẩm'],
             ['specs', 'Thông số'],
             ['reviews', `Đánh giá`],
+            ['qa', 'Hỏi đáp'],
             ['shipping', 'Vận chuyển & Đổi trả'],
           ] as [TabKey, string][]).map(([key, label]) => (
             <button
@@ -878,7 +928,7 @@ function ReviewsTab({
                     )}
                     {r.images?.map((img, idx) => (
                       <div key={idx} className="pd-review-photo" onClick={() => window.open(apiBase + img, '_blank')}>
-                        <img src={apiBase + img} alt={`đánh giá ${idx + 1}`} />
+                        <img src={apiBase + img} alt={`đánh giá ${idx + 1}`}  loading="lazy" decoding="async" />
                       </div>
                     ))}
                   </div>

@@ -4,6 +4,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
+import { WishlistProvider } from './context/WishlistContext';
 import { StaffAuthProvider } from './context/StaffAuthContext';
 
 // Layouts
@@ -11,6 +12,8 @@ import MainLayout from './components/layout/MainLayout';
 import AdminLayout from './components/admin/AdminLayout';
 import { AdminUiProvider } from './components/admin/AdminUiProvider';
 import ProtectedRoute from './components/ProtectedRoute';
+import ErrorBoundary from './components/ErrorBoundary';
+import { I18nProvider } from './i18n/I18nContext';
 import AdminProtectedRoute from './components/admin/AdminProtectedRoute';
 
 // Customer Pages
@@ -74,7 +77,10 @@ import './App.css';
 
 function App() {
   return (
-    <AuthProvider>
+    <ErrorBoundary>
+      <I18nProvider>
+        <AuthProvider>
+      <WishlistProvider>
       <CartProvider>
         <StaffAuthProvider>
           <BrowserRouter>
@@ -153,7 +159,10 @@ function App() {
         </BrowserRouter>
         </StaffAuthProvider>
       </CartProvider>
-    </AuthProvider>
+      </WishlistProvider>
+        </AuthProvider>
+      </I18nProvider>
+    </ErrorBoundary>
   );
 }
 

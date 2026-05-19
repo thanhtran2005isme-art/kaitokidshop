@@ -626,6 +626,116 @@
                                                           "Port":  5265
                                                       }
                                                   ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/homepage-blocks",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/homepage-blocks",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/homepage-blocks/{everything}",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/homepage-blocks/{everything}",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/notifications",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "POST",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/notifications",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/notifications/{everything}",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "POST",
+                                                  "PUT",
+                                                  "DELETE",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/notifications/{everything}",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/referral/{everything}",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "POST",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/referral/{everything}",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/sitemap.xml",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/sitemap.xml",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/robots.txt",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/robots.txt",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
                    }
                ],
     "GlobalConfiguration":  {

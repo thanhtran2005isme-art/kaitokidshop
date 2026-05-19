@@ -21,7 +21,24 @@ export interface ReviewListResponse {
   pageSize: number;
 }
 
+
+export interface FeaturedReviewDTO {
+  id: number;
+  productId: number;
+  customerName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
 export const reviewApi = {
+  /** Public: top reviews 5 sao cho section Home. */
+  async getFeatured(limit = 6): Promise<ApiResponse<FeaturedReviewDTO[]>> {
+    try {
+      const res = await apiClient.get<FeaturedReviewDTO[]>('/api/reviews/featured', { params: { limit } });
+      return { success: true, data: res.data };
+    } catch (e) { return { success: false, error: getErrorMessage(e) }; }
+  },
+
   /** Lấy tất cả reviews (Admin) */
   async getAll(params?: { status?: string; page?: number; pageSize?: number }): Promise<ApiResponse<ReviewListResponse>> {
     try {

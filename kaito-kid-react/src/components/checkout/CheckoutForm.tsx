@@ -28,7 +28,7 @@ export default function CheckoutForm({ isLoggedIn, value, onChange, error }: Pro
   const fillFromAddress = async (a: AddressDTO) => {
     setSelectedAddressId(a.id);
     const province = provinces.find((p) => p.name === a.province);
-    let provinceCode = province?.code ?? null;
+    const provinceCode = province?.code ?? null;
     let districtCode: number | null = null;
     let dList: District[] = [];
     let wList: Ward[] = [];

@@ -75,6 +75,9 @@ import './styles/checkout-ivy.css'
 import './styles/admin/admin-page-variants.css'
 
 import App from './App.tsx'
+import { registerServiceWorker } from './registerSW';
+
+registerServiceWorker();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

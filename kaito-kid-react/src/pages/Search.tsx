@@ -294,7 +294,7 @@ export default function Search() {
                       onMouseDown={() => navigate(`/product/${p.id}`)}
                       style={dropdownItem}
                     >
-                      <img src={p.image} alt={p.name} style={{ width: 40, height: 50, objectFit: 'cover', borderRadius: 4 }} />
+                      <img src={p.image} alt={p.name} style={{ width: 40, height: 50, objectFit: 'cover', borderRadius: 4 }}  loading="lazy" decoding="async" />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a' }}>
                           {highlightText(p.name, keyword)}
@@ -342,7 +342,7 @@ export default function Search() {
                       onMouseDown={() => navigate(`/product/${p.id}`)}
                       style={dropdownItem}
                     >
-                      <img src={p.image} alt={p.name} style={{ width: 40, height: 50, objectFit: 'cover', borderRadius: 4 }} />
+                      <img src={p.image} alt={p.name} style={{ width: 40, height: 50, objectFit: 'cover', borderRadius: 4 }}  loading="lazy" decoding="async" />
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: '#0f172a' }}>{p.name}</div>
                         <div style={{ fontSize: 12, color: '#dc2626' }}>{formatCurrency(p.price)}</div>
@@ -553,7 +553,7 @@ export default function Search() {
                         background: '#fff', border: '1px solid #e5e7eb',
                         borderRadius: 8, overflow: 'hidden', display: 'block',
                       }}>
-                        <img src={p.image} alt={p.name} style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover' }} />
+                        <img src={p.image} alt={p.name} style={{ width: '100%', aspectRatio: '4/5', objectFit: 'cover' }}  loading="lazy" decoding="async" />
                         <div style={{ padding: 8 }}>
                           <div style={{ fontSize: 12, height: 32, overflow: 'hidden' }}>{p.name}</div>
                           <div style={{ fontSize: 13, color: '#dc2626', fontWeight: 700, marginTop: 4 }}>{formatCurrency(p.price)}</div>

@@ -53,3 +53,16 @@ export { homepageBlocksApi, adminHomepageBlocksApi, type HomepageBlock, type Hom
 export { notificationApi, type NotificationDTO, type NotificationListResponse } from './notificationApi';
 
 export { referralApi, type ReferralCodeResponse, type ClaimReferralResponse } from './referralApi';
+
+export {
+  staffManagementApi,
+  type StaffListItem,
+  type StaffDetail,
+  type CreateStaffPayload,
+  type UpdateStaffPayload,
+  type StaffListParams,
+  type Role as StaffRole,
+  type CreateRolePayload,
+  type Permission as StaffPermission,
+  type PermissionGroupKey,
+} from './staffManagementApi';

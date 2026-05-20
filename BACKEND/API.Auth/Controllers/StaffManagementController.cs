@@ -13,11 +13,21 @@ namespace API.Auth.Controllers;
 [Authorize]
 public class StaffManagementController(AuthDbContext db) : ControllerBase
 {
-    private bool IsSuperAdmin =>
-        User.FindFirstValue("is_super_admin") == "true" || User.IsInRole("admin");
+    /// <summary>
+    /// Chỉ tài khoản nhân viên (user_type = "staff") mới được chạm tới controller này.
+    /// Chặn khách hàng dù có JWT hợp lệ vẫn không gọi được endpoint quản lý nhân viên.
+    /// </summary>
+    private bool IsStaff => User.FindFirstValue("user_type") == "staff";
+
+    /// <summary>
+    /// Super admin: CHỈ dựa vào claim is_super_admin (đồng nhất với PermissionAuthorizationHandler).
+    /// Không dựa vào IsInRole("admin") để tránh ai trùng tên role "admin" cũng thành super admin.
+    /// </summary>
+    private bool IsSuperAdmin => User.FindFirstValue("is_super_admin") == "true";
 
     private bool HasPermission(string permission)
     {
+        if (!IsStaff) return false;
         if (IsSuperAdmin) return true;
         return User.HasClaim("permission", permission);
     }
@@ -240,6 +250,8 @@ public class StaffManagementController(AuthDbContext db) : ControllerBase
     [HttpGet("roles")]
     public async Task<IActionResult> GetRoles()
     {
+        if (!HasPermission("staff.view") && !HasPermission("roles.manage")) return Forbid();
+
         var roles = await db.VaiTro
             .OrderBy(v => v.Id)
             .Select(v => new RoleDTO
@@ -343,6 +355,8 @@ public class StaffManagementController(AuthDbContext db) : ControllerBase
     [HttpGet("permissions")]
     public async Task<IActionResult> GetPermissions()
     {
+        if (!HasPermission("staff.view") && !HasPermission("roles.manage")) return Forbid();
+
         var perms = await db.QuyenHan
             .OrderBy(q => q.Nhom).ThenBy(q => q.MaQuyen)
             .Select(q => new PermissionDTO

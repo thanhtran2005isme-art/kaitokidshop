@@ -73,8 +73,11 @@ import AdminSettings from './admin/AdminSettings';
 import AdminLogin from './admin/AdminLogin';
 import AdminShipping from './admin/AdminShipping';
 import AdminChat from './admin/AdminChat';
+import AdminStaff from './admin/AdminStaff';
+import AdminRoles from './admin/AdminRoles';
 
 import './App.css';
+import './styles/admin-staff.css';
 
 function App() {
   return (
@@ -154,6 +157,13 @@ function App() {
                 <Route path="lookbook" element={<AdminLookbook />} />
                 <Route path="profile" element={<AdminProfile />} />
                 <Route path="shipping" element={<AdminShipping />} />
+                {/* Nhân sự & phân quyền — gate theo quyền cụ thể */}
+                <Route element={<AdminProtectedRoute permission="staff.view" />}>
+                  <Route path="staff" element={<AdminStaff />} />
+                </Route>
+                <Route element={<AdminProtectedRoute permission="roles.manage" />}>
+                  <Route path="roles" element={<AdminRoles />} />
+                </Route>
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
             </Route>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useStaffAuth } from '../../context/StaffAuthContext';
 import { useAdminUi } from './AdminUiProvider';
 import type { Order, Product } from '../../types';
 import { inventoryService, INVENTORY_UPDATED_EVENT } from '../../services/inventoryService';
@@ -113,6 +114,7 @@ const menuItems: MenuItem[] = [
 
 export default function AdminLayout() {
   const { user, logout } = useAuth();
+  const { hasPermission } = useStaffAuth();
   const { confirm } = useAdminUi();
   const adminProfile = readAdminProfile();
   const location = useLocation();
@@ -135,6 +137,21 @@ export default function AdminLayout() {
   const adminInitial = adminName.charAt(0).toUpperCase();
 
   const isMobileViewport = () => typeof window !== 'undefined' && window.innerWidth <= 768;
+
+  // Menu hiển thị: chèn nhóm "Nhân sự" theo quyền (staff.view / roles.manage)
+  const visibleMenu = useMemo<MenuItem[]>(() => {
+    const hrSubmenu: { path: string; label: string }[] = [];
+    if (hasPermission('staff.view')) hrSubmenu.push({ path: '/admin/staff', label: 'Quản lý nhân viên' });
+    if (hasPermission('roles.manage')) hrSubmenu.push({ path: '/admin/roles', label: 'Vai trò & quyền' });
+
+    if (hrSubmenu.length === 0) return menuItems;
+
+    const hrMenu: MenuItem = { icon: 'fa-user-shield', label: 'Nhân sự', submenu: hrSubmenu };
+    const items = [...menuItems];
+    const settingsIdx = items.findIndex((i) => i.path === '/admin/settings');
+    items.splice(settingsIdx === -1 ? items.length : settingsIdx, 0, hrMenu);
+    return items;
+  }, [hasPermission]);
 
   const loadAdminSignals = () => {
     setOrders(orderService.getAll());
@@ -516,7 +533,7 @@ export default function AdminLayout() {
 
         <nav className="sidebar-nav">
           <ul className="nav-list">
-            {menuItems.map((item, index) => (
+            {visibleMenu.map((item, index) => (
               <li
                 key={index}
                 className={`nav-item ${item.submenu ? 'has-submenu' : ''} ${isActive(item) ? 'active' : ''} ${openSubmenu === item.label ? 'open' : ''}`}

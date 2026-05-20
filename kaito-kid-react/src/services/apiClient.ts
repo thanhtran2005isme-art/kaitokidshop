@@ -7,6 +7,16 @@ import { tokenStorage } from './tokenStorage';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5053';
 
+// Khóa lưu token nhân viên (khớp với StaffAuthContext). Để hằng số ở đây tránh circular import.
+const STAFF_ACCESS_TOKEN_KEY = 'staff_access_token';
+const STAFF_REFRESH_TOKEN_KEY = 'staff_refresh_token';
+
+/** Request thuộc khu vực nhân viên (admin/staff) → dùng token nhân viên. */
+function isStaffRequest(url?: string): boolean {
+  if (!url) return false;
+  return url.includes('/api/admin') || url.includes('/api/auth/staff');
+}
+
 const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: 30000,
@@ -15,10 +25,13 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor - Attach JWT token
+// Request interceptor - Gắn JWT token đúng theo ngữ cảnh (staff vs customer)
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = tokenStorage.getAccessToken();
+    // Endpoint admin/staff → token nhân viên; còn lại → token khách hàng
+    const token = isStaffRequest(config.url)
+      ? localStorage.getItem(STAFF_ACCESS_TOKEN_KEY)
+      : tokenStorage.getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -51,6 +64,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+
+    // Request thuộc khu vực nhân viên: KHÔNG dùng luồng refresh token khách.
+    // Để StaffAuthContext/AdminProtectedRoute tự xử lý (tránh xóa nhầm token khách + redirect sai trang).
+    if (isStaffRequest(originalRequest.url)) {
+      return Promise.reject(error);
+    }
 
     // Bỏ qua redirect khi đang ở trang /login hoặc khi đó là request login/register/refresh
     const isAuthPage = window.location.pathname === '/login' || window.location.pathname === '/register';

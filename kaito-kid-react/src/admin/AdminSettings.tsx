@@ -14,7 +14,7 @@ import {
 } from '../utils/adminSettingsConfig';
 import AdminIcon from '../components/admin/AdminIcon';
 
-type TabType = 'general' | 'payment' | 'email' | 'notifications' | 'security';
+type TabType = 'general' | 'payment' | 'email' | 'notifications' | 'security' | 'chatbot';
 
 interface FlashMessage {
   type: 'success' | 'error' | 'info';
@@ -33,6 +33,7 @@ const tabs: Array<{ id: TabType; icon: string; label: string; hint: string; eyeb
   { id: 'email', icon: 'fa-envelope', label: 'Email', hint: 'SMTP, email tự động và lịch sử kiểm tra cấu hình.', eyebrow: 'Messaging hub' },
   { id: 'notifications', icon: 'fa-bell', label: 'Thông báo', hint: 'Bật tắt các cảnh báo dashboard theo nghiệp vụ.', eyebrow: 'Ops alerts' },
   { id: 'security', icon: 'fa-shield-alt', label: 'Bảo mật', hint: 'Mật khẩu admin, audit log và chính sách xác thực.', eyebrow: 'Access control' },
+  { id: 'chatbot', icon: 'fa-robot', label: 'Chatbot AI', hint: 'Cấu hình API key, model LLM cho trợ lý chat.', eyebrow: 'AI assistant' },
 ];
 
 const emptyPasswordForm: PasswordFormState = {
@@ -194,6 +195,7 @@ export default function AdminSettings() {
     if (['codEnabled', 'codFee', 'bankEnabled', 'bankAccounts'].includes(key)) return 'payment';
     if (key.startsWith('smtp') || key.startsWith('email') || key.startsWith('test') || key.startsWith('lastEmail')) return 'email';
     if (key.startsWith('notify')) return 'notifications';
+    if (key.startsWith('chatLlm')) return 'chatbot';
     return 'security';
   };
 
@@ -741,6 +743,92 @@ export default function AdminSettings() {
               <aside className="settings-insight-panel">
                 <div className="settings-panel-head"><div><span className="settings-overline">Audit trail</span><h3>Lịch sử truy cập & thay đổi</h3></div></div>
                 {renderActivityList(securityActivities, 'fa-shield-alt', 'Chưa có dữ liệu bảo mật nào được ghi nhận.', 'security')}
+              </aside>
+            </div>
+          )}
+
+          {activeTab === 'chatbot' && (
+            <div className="settings-workspace-grid">
+              <section className="settings-editor-panel">
+                <div className="settings-panel-head">
+                  <div><span className="settings-overline">AI assistant</span><h3>Cấu hình Chatbot AI</h3></div>
+                  <p>Bật LLM để trợ lý hiểu câu hỏi tự nhiên và tư vấn (RAG truy dữ liệu shop). Tắt thì bot chạy chế độ rule-based truy DB như mặc định. Lưu là có hiệu lực ngay, không cần khởi động lại.</p>
+                </div>
+
+                <article className="settings-toggle-card">
+                  <div className="settings-toggle-head">
+                    <div>
+                      <h4>Bật trợ lý AI (LLM)</h4>
+                      <p>Khi bật và có API key hợp lệ, câu hỏi tự do sẽ do AI trả lời. Đơn hàng/tồn kho/mã giảm giá vẫn truy DB chính xác.</p>
+                    </div>
+                    <label className="settings-switch">
+                      <input type="checkbox" checked={settings.chatLlmEnabled} onChange={(event) => updateField('chatLlmEnabled', event.target.checked)} />
+                      <span className="settings-switch-track"></span>
+                    </label>
+                  </div>
+                </article>
+
+                <div className="settings-form-grid">
+                  <label className="settings-field settings-span-2">
+                    <span>API Key</span>
+                    <input
+                      type="password"
+                      placeholder="Dán API key (Gemini / OpenAI...)"
+                      value={settings.chatLlmApiKey}
+                      onChange={(event) => updateField('chatLlmApiKey', event.target.value)}
+                      autoComplete="new-password"
+                    />
+                    <small>Key được lưu ở server. Với Gemini, lấy key tại Google AI Studio.</small>
+                  </label>
+                  <label className="settings-field settings-span-2">
+                    <span>Endpoint</span>
+                    <input
+                      type="text"
+                      value={settings.chatLlmEndpoint}
+                      onChange={(event) => updateField('chatLlmEndpoint', event.target.value)}
+                    />
+                    <small>Gemini (OpenAI-compat): https://generativelanguage.googleapis.com/v1beta/openai/chat/completions — OpenAI: https://api.openai.com/v1/chat/completions</small>
+                  </label>
+                  <label className="settings-field settings-span-2">
+                    <span>Model</span>
+                    <input
+                      type="text"
+                      placeholder="gemini-2.0-flash"
+                      value={settings.chatLlmModel}
+                      onChange={(event) => updateField('chatLlmModel', event.target.value)}
+                    />
+                    <small>Ví dụ: gemini-2.0-flash, gemini-2.5-flash, gpt-4o-mini.</small>
+                  </label>
+                </div>
+
+                <div className="settings-form-actions">
+                  <button type="button" className="settings-primary-btn" onClick={() => handleSaveSection('Chatbot AI')}>
+                    <AdminIcon name="fa-save" /><span>Lưu cấu hình chatbot</span>
+                  </button>
+                </div>
+              </section>
+
+              <aside className="settings-insight-panel">
+                <div className="settings-panel-head"><div><span className="settings-overline">Trạng thái</span><h3>Chế độ hoạt động</h3></div></div>
+                <div className="settings-note-list">
+                  <article className="settings-note-item">
+                    <div className="settings-note-icon"><AdminIcon name={settings.chatLlmEnabled && settings.chatLlmApiKey ? 'fa-robot' : 'fa-comment-dots'} /></div>
+                    <div>
+                      <strong>{settings.chatLlmEnabled && settings.chatLlmApiKey ? 'AI (LLM + RAG)' : 'Rule-based'}</strong>
+                      <p>{settings.chatLlmEnabled && settings.chatLlmApiKey
+                        ? 'Trợ lý hiểu ngôn ngữ tự nhiên và tư vấn dựa trên dữ liệu shop.'
+                        : 'Bot trả lời theo từ khóa + truy vấn DB. Bật AI và nhập key để nâng cấp.'}</p>
+                    </div>
+                  </article>
+                  <article className="settings-note-item">
+                    <div className="settings-note-icon"><AdminIcon name="fa-database" /></div>
+                    <div><strong>Luôn truy DB cho nghiệp vụ</strong><p>Đơn hàng, tồn kho, mã giảm giá luôn lấy dữ liệu thật — AI không bịa.</p></div>
+                  </article>
+                  <article className="settings-note-item">
+                    <div className="settings-note-icon"><AdminIcon name="fa-shield-alt" /></div>
+                    <div><strong>Bảo mật key</strong><p>Key chỉ dùng phía server khi gọi LLM, không gửi về trình duyệt khách.</p></div>
+                  </article>
+                </div>
               </aside>
             </div>
           )}

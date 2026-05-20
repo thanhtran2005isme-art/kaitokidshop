@@ -62,6 +62,11 @@ export interface AdminSettingsConfig {
   notifyNewCustomer: boolean;
   enable2FA: boolean;
   loginNotification: boolean;
+  // Chatbot AI
+  chatLlmEnabled: boolean;
+  chatLlmApiKey: string;
+  chatLlmEndpoint: string;
+  chatLlmModel: string;
   updatedAt?: string;
 }
 
@@ -150,6 +155,10 @@ export const defaultAdminSettings: AdminSettingsConfig = {
   notifyNewCustomer: false,
   enable2FA: false,
   loginNotification: true,
+  chatLlmEnabled: false,
+  chatLlmApiKey: '',
+  chatLlmEndpoint: 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+  chatLlmModel: 'gemini-2.0-flash',
   updatedAt: undefined,
 };
 
@@ -190,6 +199,10 @@ export function normalizeAdminSettings(rawSettings: Partial<AdminSettingsConfig>
     notifyNewCustomer: asBoolean(rawSettings?.notifyNewCustomer, defaultAdminSettings.notifyNewCustomer),
     enable2FA: asBoolean(rawSettings?.enable2FA, defaultAdminSettings.enable2FA),
     loginNotification: asBoolean(rawSettings?.loginNotification, defaultAdminSettings.loginNotification),
+    chatLlmEnabled: asBoolean(rawSettings?.chatLlmEnabled, defaultAdminSettings.chatLlmEnabled),
+    chatLlmApiKey: asString(rawSettings?.chatLlmApiKey, defaultAdminSettings.chatLlmApiKey),
+    chatLlmEndpoint: asString(rawSettings?.chatLlmEndpoint, defaultAdminSettings.chatLlmEndpoint),
+    chatLlmModel: asString(rawSettings?.chatLlmModel, defaultAdminSettings.chatLlmModel),
     updatedAt: asString(rawSettings?.updatedAt) || undefined,
   };
 }

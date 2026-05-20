@@ -5,13 +5,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMatch } from 'react-router-dom';
 import { useChat } from '../../context/ChatContext';
-import type { ChatMessage } from '../../services/chatService';
+import { chatService, type ChatMessage } from '../../services/chatService';
 import '../../styles/chat-widget.css';
 
 export default function ChatWidget({ productContextId }: { productContextId?: number }) {
   const {
-    isOpen, messages, unread, connected, agentTyping,
-    conversation, openWidget, closeWidget, sendMessage, requestHandoff, notifyTyping,
+    isOpen, messages, unread, connected, agentTyping, conversation, history,
+    openWidget, closeWidget, sendMessage, requestHandoff, endSession,
+    startNewSession, loadHistory, openHistoryConversation, notifyTyping,
   } = useChat();
 
   // Nhận diện ngữ cảnh sản phẩm khi đang ở trang chi tiết /product/:id (Req 3.4)
@@ -21,8 +22,17 @@ export default function ChatWidget({ productContextId }: { productContextId?: nu
 
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [botMode, setBotMode] = useState<'llm' | 'rule' | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimer = useRef<number | null>(null);
+
+  // Lấy chế độ bot (AI/cơ bản) khi mở widget để hiển thị badge
+  useEffect(() => {
+    if (isOpen && botMode === null) {
+      void chatService.getBotMode().then((r) => setBotMode(r.mode));
+    }
+  }, [isOpen, botMode]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -54,7 +64,37 @@ export default function ChatWidget({ productContextId }: { productContextId?: nu
     typingTimer.current = window.setTimeout(() => notifyTyping(false), 1500);
   };
 
+  const handleEnd = async () => {
+    if (!window.confirm('Kết thúc phiên trò chuyện này?')) return;
+    await endSession();
+  };
+
+  const handleOpenHistory = async () => {
+    await loadHistory();
+    setShowHistory(true);
+  };
+
+  const handlePickHistory = async (id: number) => {
+    await openHistoryConversation(id);
+    setShowHistory(false);
+  };
+
+  const handleNewSession = async () => {
+    await startNewSession();
+    setShowHistory(false);
+  };
+
   const status = conversation?.status;
+  const isClosed = status === 'closed';
+
+  const statusText = (s?: string) => {
+    switch (s) {
+      case 'agent': return 'Nhân viên';
+      case 'waiting': return 'Chờ nhân viên';
+      case 'closed': return 'Đã đóng';
+      default: return 'Bot';
+    }
+  };
 
   return (
     <div className="kk-chat">
@@ -74,46 +114,93 @@ export default function ChatWidget({ productContextId }: { productContextId?: nu
           <div className="kk-chat__header">
             <div>
               <strong>Hỗ trợ KaitoKid</strong>
+              {status !== 'agent' && botMode && !showHistory && (
+                <span className={`kk-chat__mode kk-chat__mode--${botMode}`}>
+                  {botMode === 'llm' ? '🤖 AI' : '⚙️ Cơ bản'}
+                </span>
+              )}
               <div className="kk-chat__status">
-                {status === 'agent' ? 'Đang chat với nhân viên'
+                {showHistory ? 'Lịch sử trò chuyện'
+                  : status === 'agent' ? 'Đang chat với nhân viên'
                   : status === 'waiting' ? 'Đang kết nối nhân viên…'
+                  : status === 'closed' ? 'Phiên đã kết thúc'
                   : connected ? 'Trợ lý trực tuyến' : 'Đang kết nối…'}
               </div>
             </div>
-            <button className="kk-chat__close" onClick={closeWidget} aria-label="Đóng">✕</button>
+            <div className="kk-chat__header-actions">
+              <button
+                className="kk-chat__icon-btn"
+                title="Lịch sử trò chuyện"
+                onClick={() => (showHistory ? setShowHistory(false) : void handleOpenHistory())}
+              >🕘</button>
+              <button className="kk-chat__close" onClick={closeWidget} aria-label="Đóng">✕</button>
+            </div>
           </div>
 
-          <div className="kk-chat__body" ref={scrollRef}>
-            {messages.length === 0 && (
-              <div className="kk-chat__hint">
-                Xin chào! Mình có thể giúp bạn tra cứu đơn hàng, kiểm tra tồn kho, mã giảm giá hoặc chính sách.
+          {showHistory ? (
+            <div className="kk-chat__body">
+              {history.length === 0 && <div className="kk-chat__hint">Chưa có phiên trò chuyện nào.</div>}
+              {history.map((h) => (
+                <button key={h.id} className="kk-chat__history-item" onClick={() => void handlePickHistory(h.id)}>
+                  <div className="kk-chat__history-top">
+                    <span className={`kk-chat__history-status kk-chat__history-status--${h.status}`}>{statusText(h.status)}</span>
+                    <span className="kk-chat__history-date">{new Date(h.lastMessageAt).toLocaleString('vi-VN')}</span>
+                  </div>
+                  <div className="kk-chat__history-preview">{h.lastMessagePreview || '(trống)'}</div>
+                </button>
+              ))}
+              <button className="kk-chat__newsession" onClick={() => void handleNewSession()}>+ Cuộc trò chuyện mới</button>
+            </div>
+          ) : (
+            <>
+              <div className="kk-chat__body" ref={scrollRef}>
+                {messages.length === 0 && (
+                  <div className="kk-chat__hint">
+                    Xin chào! Mình có thể giúp bạn tra cứu đơn hàng, kiểm tra tồn kho, mã giảm giá hoặc chính sách.
+                  </div>
+                )}
+                {messages.map((m) => (
+                  <MessageBubble key={m.id} msg={m} onQuickReply={handleSend} />
+                ))}
+                {agentTyping && <div className="kk-chat__typing">Nhân viên đang nhập…</div>}
               </div>
-            )}
-            {messages.map((m) => (
-              <MessageBubble key={m.id} msg={m} onQuickReply={handleSend} />
-            ))}
-            {agentTyping && <div className="kk-chat__typing">Nhân viên đang nhập…</div>}
-          </div>
 
-          {status !== 'agent' && (
-            <button className="kk-chat__handoff" onClick={() => void requestHandoff()}>
-              👤 Gặp nhân viên
-            </button>
+              {/* Thanh hành động: gặp nhân viên + kết thúc phiên */}
+              {!isClosed && (
+                <div className="kk-chat__actions">
+                  {status !== 'agent' && (
+                    <button className="kk-chat__action-btn" onClick={() => void requestHandoff()}>
+                      👤 Gặp nhân viên
+                    </button>
+                  )}
+                  <button className="kk-chat__action-btn kk-chat__action-btn--end" onClick={() => void handleEnd()}>
+                    ⏹ Kết thúc
+                  </button>
+                </div>
+              )}
+
+              {isClosed ? (
+                <div className="kk-chat__closed">
+                  <span>Phiên đã kết thúc.</span>
+                  <button onClick={() => void handleNewSession()}>Bắt đầu cuộc trò chuyện mới</button>
+                </div>
+              ) : (
+                <form
+                  className="kk-chat__input"
+                  onSubmit={(e) => { e.preventDefault(); void handleSend(input); }}
+                >
+                  <input
+                    type="text"
+                    value={input}
+                    placeholder="Nhập tin nhắn…"
+                    onChange={(e) => handleInputChange(e.target.value)}
+                    disabled={sending}
+                  />
+                  <button type="submit" disabled={sending || !input.trim()}>Gửi</button>
+                </form>
+              )}
+            </>
           )}
-
-          <form
-            className="kk-chat__input"
-            onSubmit={(e) => { e.preventDefault(); void handleSend(input); }}
-          >
-            <input
-              type="text"
-              value={input}
-              placeholder="Nhập tin nhắn…"
-              onChange={(e) => handleInputChange(e.target.value)}
-              disabled={sending}
-            />
-            <button type="submit" disabled={sending || !input.trim()}>Gửi</button>
-          </form>
         </div>
       )}
     </div>

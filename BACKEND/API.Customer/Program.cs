@@ -64,16 +64,13 @@ builder.Services.AddScoped<API.Customer.Services.Bot.IChatSkill, API.Customer.Se
 builder.Services.AddScoped<API.Customer.Services.Bot.IChatSkill, API.Customer.Services.Bot.Skills.CouponSkill>();
 builder.Services.AddScoped<API.Customer.Services.Bot.IChatSkill, API.Customer.Services.Bot.Skills.FaqSkill>();
 
-// Chatbot: nếu có cấu hình LLM thì dùng LlmChatBot, ngược lại rule-based (giống pattern Email Brevo/Console)
-var chatLlmKey = builder.Configuration["Chat:Llm:ApiKey"];
-if (!string.IsNullOrWhiteSpace(chatLlmKey))
-{
-    builder.Services.AddHttpClient<API.Customer.Services.Bot.IChatBot, API.Customer.Services.Bot.LlmChatBot>();
-}
-else
-{
-    builder.Services.AddScoped<API.Customer.Services.Bot.IChatBot, API.Customer.Services.Bot.RuleBasedChatBot>();
-}
+// Chatbot: dispatcher chọn rule-based hay LLM tại runtime theo cấu hình trong DB
+// (admin đổi trên trang /admin/settings là có hiệu lực ngay, không cần restart)
+builder.Services.AddScoped<API.Customer.Services.Bot.IChatSettingsProvider, API.Customer.Services.Bot.ChatSettingsProvider>();
+builder.Services.AddScoped<API.Customer.Services.Bot.IChatRetriever, API.Customer.Services.Bot.DbChatRetriever>();
+builder.Services.AddScoped<API.Customer.Services.Bot.RuleBasedChatBot>();
+builder.Services.AddHttpClient<API.Customer.Services.Bot.LlmChatBot>();
+builder.Services.AddScoped<API.Customer.Services.Bot.IChatBot, API.Customer.Services.Bot.ChatBotDispatcher>();
 
 builder.Services.AddScoped<IChatService, ChatService>();
 

@@ -21,6 +21,7 @@ export type ChatHubEvents = {
   onReadReceipt?: (conversationId: number, by: string) => void;
   onQueueUpdated?: (conversationId: number) => void;
   onHandoffRequested?: (conversationId: number) => void;
+  onConversationClosed?: (conversationId: number) => void;
   onClaimFailed?: (conversationId: number) => void;
   onReconnected?: () => void;
 };
@@ -45,6 +46,7 @@ export class ChatHubClient {
     this.connection.on('ReadReceipt', (id: number, by: string) => this.events.onReadReceipt?.(id, by));
     this.connection.on('QueueUpdated', (id: number) => this.events.onQueueUpdated?.(id));
     this.connection.on('HandoffRequested', (id: number) => this.events.onHandoffRequested?.(id));
+    this.connection.on('ConversationClosed', (id: number) => this.events.onConversationClosed?.(id));
     this.connection.on('ClaimFailed', (id: number) => this.events.onClaimFailed?.(id));
 
     this.connection.onreconnected(() => this.events.onReconnected?.());
@@ -79,6 +81,10 @@ export class ChatHubClient {
 
   requestHandoff(conversationId: number) {
     return this.connection.invoke('RequestHandoff', conversationId);
+  }
+
+  endConversation(conversationId: number, guestId?: string) {
+    return this.connection.invoke('EndConversation', conversationId, guestId ?? null);
   }
 
   typing(conversationId: number, isTyping: boolean) {

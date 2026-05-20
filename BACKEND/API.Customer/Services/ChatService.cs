@@ -210,16 +210,31 @@ public class ChatService(CustomerDbContext db, IChatBot bot, IConfiguration conf
 
     // ===================== ESCALATION / CLAIM / ĐÓNG =====================
 
-    public async Task<bool> RequestHandoffAsync(int conversationId, string? reason)
+    public async Task<MessageDto?> RequestHandoffAsync(int conversationId, string? reason)
     {
         var conv = await db.Conversations.FindAsync(conversationId);
-        if (conv is null) return false;
-        if (conv.Status is ChatStatus.Agent) return true; // đã có nhân viên
+        if (conv is null) return null;
+        if (conv.Status is ChatStatus.Agent) return null; // đã có nhân viên xử lý
 
         conv.Status = ChatStatus.Waiting;
         conv.UpdatedAt = DateTime.UtcNow;
+
+        // Tin hệ thống (gửi dưới danh nghĩa bot) báo khách đang chờ nhân viên
+        const string waitMsg = "Yêu cầu của bạn đã được chuyển tới nhân viên hỗ trợ. Vui lòng chờ trong giây lát, nhân viên sẽ phản hồi sớm nhất có thể nhé! 🙋";
+        var sysMsg = new ChatMessage
+        {
+            ConversationId = conv.Id,
+            SenderType = ChatSender.Bot,
+            Content = waitMsg,
+            CreatedAt = DateTime.UtcNow,
+        };
+        db.ChatMessages.Add(sysMsg);
+        conv.LastMessageAt = sysMsg.CreatedAt;
+        conv.LastMessagePreview = Preview(waitMsg);
+        conv.UnreadForCustomer += 1;
+
         await db.SaveChangesAsync();
-        return true;
+        return ToDto(sysMsg);
     }
 
     public async Task<bool> ClaimAsync(int staffId, int conversationId)
@@ -253,6 +268,44 @@ public class ChatService(CustomerDbContext db, IChatBot bot, IConfiguration conf
         conv.Status = ChatStatus.Closed;
         conv.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
+    }
+
+    public async Task<bool> CloseByCustomerAsync(ChatIdentity who, int conversationId)
+    {
+        var conv = await db.Conversations.FindAsync(conversationId);
+        if (conv is null) return false;
+        if (!OwnedBy(conv, who)) throw new UnauthorizedAccessException("Bạn không có quyền truy cập phiên hội thoại này.");
+        if (conv.Status == ChatStatus.Closed) return true;
+
+        // Tin hệ thống đánh dấu kết thúc phiên
+        const string endMsg = "Phiên trò chuyện đã kết thúc. Cảm ơn bạn đã liên hệ KaitoKid Shop! 💖";
+        db.ChatMessages.Add(new ChatMessage
+        {
+            ConversationId = conv.Id,
+            SenderType = ChatSender.Bot,
+            Content = endMsg,
+            CreatedAt = DateTime.UtcNow,
+        });
+        conv.Status = ChatStatus.Closed;
+        conv.LastMessageAt = DateTime.UtcNow;
+        conv.LastMessagePreview = Preview(endMsg);
+        conv.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<IReadOnlyList<ConversationDto>> ListForCustomerAsync(ChatIdentity who)
+    {
+        IQueryable<Conversation> q = db.Conversations;
+        if (who.IsAuthenticated)
+            q = q.Where(c => c.UserId == who.UserId);
+        else if (!string.IsNullOrWhiteSpace(who.GuestId))
+            q = q.Where(c => c.GuestId == who.GuestId);
+        else
+            return [];
+
+        var items = await q.OrderByDescending(c => c.LastMessageAt).Take(50).ToListAsync();
+        return items.Select(c => ToDto(c)).ToList();
     }
 
     public async Task MarkReadAsync(int conversationId, ChatActor reader)

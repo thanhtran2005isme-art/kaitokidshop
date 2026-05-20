@@ -54,6 +54,16 @@ export interface CustomerMessageResult {
 }
 
 export const chatService = {
+  /** Chế độ chatbot hiện tại: 'llm' (AI) hoặc 'rule' (cơ bản). */
+  async getBotMode(): Promise<{ mode: 'llm' | 'rule'; label: string }> {
+    try {
+      const res = await apiClient.get('/api/chat/bot-mode');
+      return res.data as { mode: 'llm' | 'rule'; label: string };
+    } catch {
+      return { mode: 'rule', label: 'Trợ lý cơ bản' };
+    }
+  },
+
   /** Lấy/tạo phiên chat cho khách (kèm ngữ cảnh sản phẩm đang xem nếu có). */
   async getOrCreateConversation(productContextId?: number): Promise<Conversation> {
     const guestId = getOrCreateGuestId();
@@ -89,6 +99,19 @@ export const chatService = {
   async requestHandoff(conversationId: number, reason?: string): Promise<void> {
     const guestId = getOrCreateGuestId();
     await apiClient.post(`/api/chat/conversations/${conversationId}/handoff`, { reason, guestId });
+  },
+
+  /** Khách kết thúc phiên trò chuyện. */
+  async endConversation(conversationId: number): Promise<void> {
+    const guestId = getOrCreateGuestId();
+    await apiClient.post(`/api/chat/conversations/${conversationId}/end`, { guestId });
+  },
+
+  /** Danh sách các phiên trò chuyện (lịch sử) của khách. */
+  async listConversations(): Promise<Conversation[]> {
+    const guestId = getOrCreateGuestId();
+    const res = await apiClient.get('/api/chat/conversations', { params: { guestId } });
+    return res.data as Conversation[];
   },
 
   /** Đánh dấu đã đọc (khách). */

@@ -21,10 +21,15 @@ interface ChatContextType {
   unread: number;
   connected: boolean;
   agentTyping: boolean;
+  history: Conversation[];
   openWidget: (productContextId?: number) => Promise<void>;
   closeWidget: () => void;
   sendMessage: (text: string, attach?: ChatAttachment) => Promise<void>;
   requestHandoff: () => Promise<void>;
+  endSession: () => Promise<void>;
+  startNewSession: () => Promise<void>;
+  loadHistory: () => Promise<void>;
+  openHistoryConversation: (conversationId: number) => Promise<void>;
   notifyTyping: (isTyping: boolean) => void;
 }
 
@@ -37,6 +42,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [unread, setUnread] = useState(0);
   const [connected, setConnected] = useState(false);
   const [agentTyping, setAgentTyping] = useState(false);
+  const [history, setHistory] = useState<Conversation[]>([]);
 
   const hubRef = useRef<ChatHubClient | null>(null);
   const convIdRef = useRef<number | null>(null);
@@ -71,6 +77,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       onConversationUpdated: () => { void refreshConversation(); },
       onHandoffRequested: () => {
         setConversation((c) => (c ? { ...c, status: 'waiting' } : c));
+      },
+      onConversationClosed: () => {
+        setConversation((c) => (c ? { ...c, status: 'closed' } : c));
       },
       onReconnected: async () => {
         // Đồng bộ tin lỡ sau khi kết nối lại (Req 7.4)
@@ -162,11 +171,65 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const hub = hubRef.current;
     if (hub && hub.state === 'Connected') {
       await hub.requestHandoff(conversation.id);
+      // Tin hệ thống "đang chờ nhân viên" sẽ về qua onReceiveMessage
     } else {
       await chatService.requestHandoff(conversation.id);
+      // Fallback REST: tự nạp lại lịch sử để thấy tin hệ thống
+      await syncHistory(conversation.id);
     }
     setConversation((c) => (c ? { ...c, status: 'waiting' } : c));
-  }, [conversation]);
+  }, [conversation, syncHistory]);
+
+  // Khách kết thúc phiên hiện tại
+  const endSession = useCallback(async () => {
+    if (!conversation) return;
+    const guestId = getOrCreateGuestId();
+    const hub = hubRef.current;
+    try {
+      if (hub && hub.state === 'Connected') {
+        await hub.endConversation(conversation.id, guestId);
+      } else {
+        await chatService.endConversation(conversation.id);
+      }
+      await syncHistory(conversation.id);
+    } catch { /* ignore */ }
+    setConversation((c) => (c ? { ...c, status: 'closed' } : c));
+  }, [conversation, syncHistory]);
+
+  // Bắt đầu một phiên mới (sau khi đã kết thúc phiên cũ)
+  const startNewSession = useCallback(async () => {
+    const conv = await chatService.getOrCreateConversation();
+    setConversation(conv);
+    convIdRef.current = conv.id;
+    setMessages([]);
+    await syncHistory(conv.id);
+    const hub = await ensureHub();
+    try { await hub.joinConversation(conv.id); } catch { /* ignore */ }
+  }, [ensureHub, syncHistory]);
+
+  // Nạp danh sách lịch sử phiên của khách
+  const loadHistory = useCallback(async () => {
+    try {
+      const list = await chatService.listConversations();
+      setHistory(list);
+    } catch { /* ignore */ }
+  }, []);
+
+  // Mở lại một phiên trong lịch sử (chỉ xem/tiếp tục)
+  const openHistoryConversation = useCallback(async (conversationId: number) => {
+    try {
+      const list = history.length > 0 ? history : await chatService.listConversations();
+      const conv = list.find((c) => c.id === conversationId) ?? null;
+      if (conv) setConversation(conv);
+      convIdRef.current = conversationId;
+      await syncHistory(conversationId);
+      const hub = await ensureHub();
+      try {
+        await hub.joinConversation(conversationId);
+        await hub.markRead(conversationId);
+      } catch { /* ignore */ }
+    } catch { /* ignore */ }
+  }, [history, ensureHub, syncHistory]);
 
   const notifyTyping = useCallback((isTyping: boolean) => {
     const hub = hubRef.current;
@@ -191,8 +254,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   return (
     <ChatContext.Provider value={{
-      isOpen, conversation, messages, unread, connected, agentTyping,
-      openWidget, closeWidget, sendMessage, requestHandoff, notifyTyping,
+      isOpen, conversation, messages, unread, connected, agentTyping, history,
+      openWidget, closeWidget, sendMessage, requestHandoff, endSession, startNewSession,
+      loadHistory, openHistoryConversation, notifyTyping,
     }}>
       {children}
     </ChatContext.Provider>

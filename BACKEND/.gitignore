@@ -3,3 +3,6 @@ obj/
 .vs/
 *.user
 *.suo
+
+# Local secrets — chứa API key (Gemini, GHN, GHTK...). KHÔNG commit.
+appsettings.Development.json

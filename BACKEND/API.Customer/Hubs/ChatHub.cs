@@ -99,9 +99,23 @@ public class ChatHub(IChatService chat) : Hub
     /// <summary>Yêu cầu gặp nhân viên từ phía khách.</summary>
     public async Task RequestHandoff(int conversationId)
     {
-        await chat.RequestHandoffAsync(conversationId, null);
+        var sysMsg = await chat.RequestHandoffAsync(conversationId, null);
+        if (sysMsg is not null)
+            await Clients.Group(ConvGroup(conversationId)).SendAsync("ReceiveMessage", sysMsg);
         await Clients.Group(ConvGroup(conversationId)).SendAsync("HandoffRequested", conversationId);
         await Clients.Group(AgentsGroup).SendAsync("QueueUpdated", conversationId);
+    }
+
+    /// <summary>Khách kết thúc phiên trò chuyện.</summary>
+    public async Task EndConversation(int conversationId, string? guestId)
+    {
+        var who = ResolveCustomer(guestId);
+        var ok = await chat.CloseByCustomerAsync(who, conversationId);
+        if (ok)
+        {
+            await Clients.Group(ConvGroup(conversationId)).SendAsync("ConversationClosed", conversationId);
+            await Clients.Group(AgentsGroup).SendAsync("ConversationUpdated", conversationId);
+        }
     }
 
     /// <summary>Chỉ báo "đang nhập…".</summary>

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using API.Customer.DTOs;
 using API.Customer.Services;
+using API.Customer.Services.Bot;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,9 +14,22 @@ namespace API.Customer.Controllers;
 [ApiController]
 [Route("api/chat")]
 [AllowAnonymous]
-public class ChatController(IChatService chat) : ControllerBase
+public class ChatController(IChatService chat, IChatSettingsProvider chatSettings) : ControllerBase
 {
     private ChatIdentity Resolve(string? guestId) => ChatIdentity.FromPrincipal(User, guestId);
+
+    /// <summary>Cho biết chatbot đang chạy chế độ nào: "llm" (AI) hay "rule" (cơ bản).</summary>
+    [HttpGet("bot-mode")]
+    public async Task<IActionResult> GetBotMode()
+    {
+        var s = await chatSettings.GetAsync();
+        var useLlm = s.LlmEnabled && !string.IsNullOrWhiteSpace(s.ApiKey) && !string.IsNullOrWhiteSpace(s.Endpoint);
+        return Ok(new
+        {
+            mode = useLlm ? "llm" : "rule",
+            label = useLlm ? "Trợ lý AI" : "Trợ lý cơ bản",
+        });
+    }
 
     /// <summary>Lấy/tạo phiên cho khách (kèm ngữ cảnh sản phẩm đang xem).</summary>
     [HttpPost("conversations")]
@@ -59,14 +73,36 @@ public class ChatController(IChatService chat) : ControllerBase
         catch (InvalidOperationException ex) { return BadRequest(new { message = ex.Message }); }
     }
 
-    /// <summary>Yêu cầu gặp nhân viên.</summary>
+    /// <summary>Yêu cầu gặp nhân viên. Trả về tin hệ thống báo đang chờ (nếu có).</summary>
     [HttpPost("conversations/{id:int}/handoff")]
     public async Task<IActionResult> Handoff(int id, [FromQuery] string? guestId, [FromBody] HandoffRequest? body)
     {
         var who = Resolve(guestId ?? body?.GuestId);
         if (!await chat.IsOwnerAsync(id, who)) return Forbid();
-        var ok = await chat.RequestHandoffAsync(id, body?.Reason);
-        return ok ? Ok(new { status = "waiting" }) : NotFound();
+        var sysMsg = await chat.RequestHandoffAsync(id, body?.Reason);
+        return Ok(new { status = "waiting", systemMessage = sysMsg });
+    }
+
+    /// <summary>Khách kết thúc phiên trò chuyện hiện tại.</summary>
+    [HttpPost("conversations/{id:int}/end")]
+    public async Task<IActionResult> End(int id, [FromQuery] string? guestId, [FromBody] HandoffRequest? body)
+    {
+        var who = Resolve(guestId ?? body?.GuestId);
+        try
+        {
+            var ok = await chat.CloseByCustomerAsync(who, id);
+            return ok ? Ok(new { status = "closed" }) : NotFound();
+        }
+        catch (UnauthorizedAccessException) { return Forbid(); }
+    }
+
+    /// <summary>Danh sách các phiên trò chuyện (lịch sử) của khách.</summary>
+    [HttpGet("conversations")]
+    public async Task<IActionResult> ListMine([FromQuery] string? guestId)
+    {
+        var who = Resolve(guestId);
+        var list = await chat.ListForCustomerAsync(who);
+        return Ok(list);
     }
 
     /// <summary>Đánh dấu đã đọc (khách).</summary>

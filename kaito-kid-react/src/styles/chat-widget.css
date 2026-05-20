@@ -34,6 +34,54 @@
 }
 .kk-chat__status { font-size: 12px; opacity: .9; margin-top: 2px; }
 .kk-chat__close { background: transparent; border: none; color: #fff; font-size: 16px; cursor: pointer; }
+.kk-chat__header-actions { display: flex; align-items: center; gap: 6px; }
+.kk-chat__icon-btn { background: rgba(255,255,255,.18); border: none; color: #fff; font-size: 14px; cursor: pointer; border-radius: 8px; padding: 4px 8px; }
+.kk-chat__icon-btn:hover { background: rgba(255,255,255,.3); }
+
+/* Lịch sử trò chuyện */
+.kk-chat__history-item {
+  width: 100%; text-align: left; background: #fff; border: 1px solid #e2e8f0;
+  border-radius: 10px; padding: 10px 12px; cursor: pointer;
+}
+.kk-chat__history-item:hover { background: #fdf2f8; border-color: #f9a8d4; }
+.kk-chat__history-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.kk-chat__history-status { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; }
+.kk-chat__history-status--agent { background: #dcfce7; color: #15803d; }
+.kk-chat__history-status--waiting { background: #fef9c3; color: #a16207; }
+.kk-chat__history-status--closed { background: #f1f5f9; color: #64748b; }
+.kk-chat__history-status--bot { background: #eef2ff; color: #4338ca; }
+.kk-chat__history-date { font-size: 11px; color: #94a3b8; }
+.kk-chat__history-preview { font-size: 13px; color: #475569; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kk-chat__newsession {
+  margin-top: 4px; background: #ec4899; color: #fff; border: none; border-radius: 10px;
+  padding: 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+
+/* Thanh hành động */
+.kk-chat__actions { display: flex; gap: 6px; padding: 6px 8px; border-top: 1px solid #f1f5f9; background: #fff; }
+.kk-chat__action-btn {
+  flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 7px; font-size: 12px; color: #475569; cursor: pointer;
+}
+.kk-chat__action-btn:hover { background: #f8fafc; }
+.kk-chat__action-btn--end { color: #be185d; border-color: #f9a8d4; }
+.kk-chat__action-btn--end:hover { background: #fdf2f8; }
+
+/* Trạng thái đã đóng */
+.kk-chat__closed {
+  display: flex; flex-direction: column; gap: 8px; align-items: center;
+  padding: 14px; border-top: 1px solid #f1f5f9; background: #fff; font-size: 13px; color: #64748b;
+}
+.kk-chat__closed button {
+  background: #ec4899; color: #fff; border: none; border-radius: 20px; padding: 8px 18px; font-size: 13px; cursor: pointer;
+}
+
+.kk-chat__mode {
+  display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 700; vertical-align: middle;
+}
+.kk-chat__mode--llm { background: rgba(255,255,255,.25); color: #fff; }
+.kk-chat__mode--rule { background: rgba(255,255,255,.18); color: #fff; }
 
 .kk-chat__body {
   flex: 1; overflow-y: auto; padding: 14px; background: #f8fafc;

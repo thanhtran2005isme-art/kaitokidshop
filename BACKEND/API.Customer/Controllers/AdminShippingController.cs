@@ -8,12 +8,13 @@ using API.Customer.Services.Shipping;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Customer.Controllers;
 
 [ApiController]
 [Route("api/admin/shipping")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminShippingController(
     CustomerDbContext db,
     IShippingConfigService configService,
@@ -23,6 +24,7 @@ public class AdminShippingController(
 
     /// <summary>Đọc cấu hình shipping hiện tại từ DB</summary>
     [HttpGet("config")]
+    [HasPermission("settings.view")]
     public async Task<ActionResult<ShippingConfig>> GetConfig()
     {
         var cfg = await configService.GetAsync();
@@ -34,6 +36,7 @@ public class AdminShippingController(
 
     /// <summary>Cập nhật cấu hình. Token "********" giữ nguyên giá trị cũ.</summary>
     [HttpPut("config")]
+    [HasPermission("settings.manage")]
     public async Task<IActionResult> UpdateConfig([FromBody] ShippingConfig dto)
     {
         var current = await configService.GetAsync();
@@ -50,6 +53,7 @@ public class AdminShippingController(
 
     /// <summary>Test kết nối tới provider để verify token sống</summary>
     [HttpPost("test/{provider}")]
+    [HasPermission("settings.manage")]
     public async Task<IActionResult> Test(string provider)
     {
         var code = (provider ?? "").Trim().ToLowerInvariant();
@@ -108,6 +112,7 @@ public class AdminShippingController(
 
     /// <summary>Lấy district list từ GHN (dùng để chọn FromDistrictId)</summary>
     [HttpGet("ghn/districts")]
+    [HasPermission("settings.manage")]
     public async Task<IActionResult> GhnDistricts([FromQuery] int? provinceId)
     {
         var cfg = await configService.GetAsync();
@@ -142,6 +147,7 @@ public class AdminShippingController(
 
     /// <summary>Lịch sử trạng thái vận đơn (toàn hệ thống)</summary>
     [HttpGet("history")]
+    [HasPermission("orders.view")]
     public async Task<IActionResult> GetHistory(
         [FromQuery] string? search,
         [FromQuery] string? provider,
@@ -201,6 +207,7 @@ public class AdminShippingController(
 
     /// <summary>Tổng quan: số đơn theo provider + theo trạng thái vận chuyển</summary>
     [HttpGet("overview")]
+    [HasPermission("orders.view")]
     public async Task<IActionResult> GetOverview()
     {
         var byProvider = await db.Orders

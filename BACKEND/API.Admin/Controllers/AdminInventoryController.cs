@@ -4,16 +4,18 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/inventory")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminInventoryController(AdminDbContext db) : ControllerBase
 {
     /// <summary>Danh sách tồn kho sản phẩm</summary>
     [HttpGet]
+    [HasPermission("inventory.view")]
     public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] bool? lowStock)
     {
         var q = db.SanPham.AsQueryable();
@@ -43,6 +45,7 @@ public class AdminInventoryController(AdminDbContext db) : ControllerBase
 
     /// <summary>Điều chỉnh tồn kho (nhập/xuất/đặt lại)</summary>
     [HttpPost("adjust")]
+    [HasPermission("inventory.manage")]
     public async Task<IActionResult> Adjust([FromBody] AdjustStockDto dto)
     {
         if (string.IsNullOrEmpty(dto.LoaiThayDoi) || !new[] { "import", "export", "set" }.Contains(dto.LoaiThayDoi))
@@ -97,6 +100,7 @@ public class AdminInventoryController(AdminDbContext db) : ControllerBase
 
     /// <summary>Lịch sử nhập/xuất kho</summary>
     [HttpGet("history")]
+    [HasPermission("inventory.history")]
     public async Task<IActionResult> GetHistory([FromQuery] int? sanPhamId, [FromQuery] int page = 1, [FromQuery] int pageSize = 50)
     {
         var q = db.TonKhoLichSu.AsQueryable();

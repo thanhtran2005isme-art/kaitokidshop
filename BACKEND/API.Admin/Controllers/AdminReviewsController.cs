@@ -2,15 +2,17 @@ using API.Admin.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/reviews")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminReviewsController(AdminDbContext db) : ControllerBase
 {
     [HttpGet]
+    [HasPermission("reviews.view")]
     public async Task<IActionResult> GetAll([FromQuery] string? status, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
         var q = db.DanhGia.AsQueryable();
@@ -22,6 +24,7 @@ public class AdminReviewsController(AdminDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}/approve")]
+    [HasPermission("reviews.moderate")]
     public async Task<IActionResult> Approve(int id)
     {
         var dg = await db.DanhGia.FindAsync(id);
@@ -32,6 +35,7 @@ public class AdminReviewsController(AdminDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}/reject")]
+    [HasPermission("reviews.moderate")]
     public async Task<IActionResult> Reject(int id)
     {
         var dg = await db.DanhGia.FindAsync(id);
@@ -42,6 +46,7 @@ public class AdminReviewsController(AdminDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}/reply")]
+    [HasPermission("reviews.moderate")]
     public async Task<IActionResult> Reply(int id, [FromBody] ReplyDto dto)
     {
         var dg = await db.DanhGia.FindAsync(id);
@@ -52,6 +57,7 @@ public class AdminReviewsController(AdminDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [HasPermission("reviews.moderate")]
     public async Task<IActionResult> Delete(int id)
     {
         var dg = await db.DanhGia.FindAsync(id);

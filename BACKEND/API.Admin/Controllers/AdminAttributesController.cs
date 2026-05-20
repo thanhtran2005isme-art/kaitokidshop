@@ -3,12 +3,14 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/attributes")]
-[Authorize(Roles = "admin")]
+[Authorize]
+[HasPermission("attributes.manage")]
 public class AdminAttributesController(AdminDbContext db) : ControllerBase
 {
     [HttpGet]

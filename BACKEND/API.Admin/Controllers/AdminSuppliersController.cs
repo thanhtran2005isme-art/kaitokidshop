@@ -4,16 +4,18 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/suppliers")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminSuppliersController(AdminDbContext db) : ControllerBase
 {
     /// <summary>Danh sách nhà cung cấp</summary>
     [HttpGet]
+    [HasPermission("suppliers.view")]
     public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] bool? active)
     {
         var q = db.NhaCungCap.AsQueryable();
@@ -42,6 +44,7 @@ public class AdminSuppliersController(AdminDbContext db) : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [HasPermission("suppliers.view")]
     public async Task<IActionResult> GetById(int id)
     {
         var s = await db.NhaCungCap.FindAsync(id);
@@ -50,6 +53,7 @@ public class AdminSuppliersController(AdminDbContext db) : ControllerBase
     }
 
     [HttpPost]
+    [HasPermission("suppliers.manage")]
     public async Task<IActionResult> Create([FromBody] CreateSupplierDTO dto)
     {
         if (string.IsNullOrWhiteSpace(dto.TenNhaCungCap))
@@ -73,6 +77,7 @@ public class AdminSuppliersController(AdminDbContext db) : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [HasPermission("suppliers.manage")]
     public async Task<IActionResult> Update(int id, [FromBody] CreateSupplierDTO dto)
     {
         var s = await db.NhaCungCap.FindAsync(id);
@@ -93,6 +98,7 @@ public class AdminSuppliersController(AdminDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [HasPermission("suppliers.manage")]
     public async Task<IActionResult> Delete(int id)
     {
         var s = await db.NhaCungCap.FindAsync(id);

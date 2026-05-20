@@ -3,12 +3,14 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/lookbook")]
-[Authorize(Roles = "admin")]
+[Authorize]
+[HasPermission("lookbook.manage")]
 public class AdminLookbookController(AdminDbContext db) : ControllerBase
 {
     [HttpGet]

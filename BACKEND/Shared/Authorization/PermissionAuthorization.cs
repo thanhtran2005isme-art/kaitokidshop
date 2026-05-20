@@ -10,10 +10,14 @@ namespace Shared.Authorization;
 //  truy cập đúng những endpoint mà vai trò của họ được cấp quyền.
 //
 //  Quy tắc cho phép (theo thứ tự, chỉ cần 1 điều kiện đúng):
-//   1. Super admin nhân viên   → claim is_super_admin = "true"
-//   2. Admin "kế thừa"          → role = "admin" (tài khoản NguoiDung admin cũ
-//                                  hoặc super admin staff cũng mang role admin)
-//   3. Nhân viên có quyền       → claim "permission" = mã quyền yêu cầu
+//   1. Super admin nhân viên   → claim is_super_admin = "true" (toàn quyền)
+//   2. Nhân viên có quyền       → claim "permission" = mã quyền yêu cầu
+//
+//  LƯU Ý (fix Lỗ hổng 2): KHÔNG bypass theo role "admin" nữa.
+//  Trước đây bất kỳ ai mang role "admin" đều vượt qua mọi check, bỏ qua
+//  permission chi tiết → quyền chỉ là "trang trí". Nay tài khoản role
+//  "admin" vẫn phải có permission claim tương ứng (role admin được seed
+//  đầy đủ quyền nên không mất quyền), còn super admin thật mới được bypass.
 // =============================================================
 
 /// <summary>Requirement chứa mã quyền cần kiểm tra (vd "orders.view").</summary>
@@ -44,21 +48,15 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
     {
         var user = context.User;
 
-        // 1) Super admin nhân viên → toàn quyền
+        // 1) Super admin nhân viên → toàn quyền (bypass duy nhất được phép)
         if (user.HasClaim("is_super_admin", "true"))
         {
             context.Succeed(requirement);
             return Task.CompletedTask;
         }
 
-        // 2) Tài khoản mang role "admin" (NguoiDung admin cũ / super admin staff)
-        if (user.IsInRole("admin"))
-        {
-            context.Succeed(requirement);
-            return Task.CompletedTask;
-        }
-
-        // 3) Nhân viên được cấp đúng mã quyền
+        // 2) Nhân viên được cấp đúng mã quyền (kể cả tài khoản role "admin"
+        //    — role admin được seed đầy đủ quyền nên vẫn truy cập bình thường)
         if (user.HasClaim("permission", requirement.Permission))
         {
             context.Succeed(requirement);

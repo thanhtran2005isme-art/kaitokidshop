@@ -3,6 +3,7 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
@@ -11,7 +12,8 @@ namespace API.Admin.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/admin/homepage-blocks")]
-[Authorize(Roles = "admin")]
+[Authorize]
+[HasPermission("homepage.manage")]
 public class AdminHomepageBlocksController(AdminDbContext db) : ControllerBase
 {
     [HttpGet]

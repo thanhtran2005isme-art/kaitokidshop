@@ -1,5 +1,6 @@
 using API.Admin.Data;
 using DbHelper;
+using Shared.Authorization;
 using Shared.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +10,9 @@ builder.Services.AddSqlServerDb<AdminDbContext>(builder.Configuration);
 
 // JWT Authentication từ Shared
 builder.Services.AddJwtAuthentication(builder.Configuration);
+
+// Permission-based authorization (RBAC granular) — thay cho Roles="admin" cứng
+builder.Services.AddPermissionAuthorization();
 
 // CORS cho React frontend
 builder.Services.AddCors(options =>

@@ -2,12 +2,16 @@ using API.Customer.Data;
 using API.Customer.Services;
 using API.Customer.Services.Shipping;
 using DbHelper;
+using Shared.Authorization;
 using Shared.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSqlServerDb<CustomerDbContext>(builder.Configuration);
 builder.Services.AddJwtAuthentication(builder.Configuration);
+
+// Permission-based authorization (RBAC granular) — dùng cho AdminShippingController
+builder.Services.AddPermissionAuthorization();
 
 // SignalR cho chat real-time. Cho phép đọc access_token từ query string khi kết nối hub
 // (WebSocket không gửi được header Authorization) — chỉ áp dụng cho path /hubs.

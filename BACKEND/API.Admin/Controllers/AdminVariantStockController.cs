@@ -5,16 +5,18 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/variant-stock")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminVariantStockController(AdminDbContext db) : ControllerBase
 {
     /// <summary>Danh sách tồn theo biến thể (có filter SP, low stock)</summary>
     [HttpGet]
+    [HasPermission("inventory.view")]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? sanPhamId,
         [FromQuery] string? search,
@@ -52,6 +54,7 @@ public class AdminVariantStockController(AdminDbContext db) : ControllerBase
 
     /// <summary>Tổng tồn theo SP — để hiển thị card tóm tắt (theo biến thể)</summary>
     [HttpGet("by-product/{sanPhamId:int}")]
+    [HasPermission("inventory.view")]
     public async Task<IActionResult> GetByProduct(int sanPhamId)
     {
         var sp = await db.SanPham.FindAsync(sanPhamId);
@@ -89,6 +92,7 @@ public class AdminVariantStockController(AdminDbContext db) : ControllerBase
 
     /// <summary>Điều chỉnh tồn 1 biến thể (kiểm kê / sửa lệch)</summary>
     [HttpPut("{id:int}")]
+    [HasPermission("inventory.manage")]
     public async Task<IActionResult> AdjustVariant(int id, [FromBody] AdjustVariantDTO dto)
     {
         if (dto.SoLuong < 0) return BadRequest(new { error = "Số lượng không được âm." });

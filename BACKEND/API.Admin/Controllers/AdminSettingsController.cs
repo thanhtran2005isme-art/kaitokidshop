@@ -3,16 +3,18 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/settings")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminSettingsController(AdminDbContext db) : ControllerBase
 {
     /// <summary>Lấy tất cả cấu hình (hoặc theo nhóm)</summary>
     [HttpGet]
+    [HasPermission("settings.view")]
     public async Task<IActionResult> GetAll([FromQuery] string? group)
     {
         var q = db.CauHinhCuaHang.AsQueryable();
@@ -23,6 +25,7 @@ public class AdminSettingsController(AdminDbContext db) : ControllerBase
 
     /// <summary>Lấy 1 cấu hình theo key</summary>
     [HttpGet("{key}")]
+    [HasPermission("settings.view")]
     public async Task<IActionResult> GetByKey(string key)
     {
         var c = await db.CauHinhCuaHang.FirstOrDefaultAsync(x => x.MaCauHinh == key);
@@ -31,6 +34,7 @@ public class AdminSettingsController(AdminDbContext db) : ControllerBase
 
     /// <summary>Cập nhật hoặc tạo mới cấu hình</summary>
     [HttpPut]
+    [HasPermission("settings.manage")]
     public async Task<IActionResult> Upsert([FromBody] List<SettingDto> settings)
     {
         foreach (var s in settings)

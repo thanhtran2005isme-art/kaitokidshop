@@ -797,26 +797,24 @@ GO
 -- ================================================================
 
 -- ================================================================
--- Tài khoản admin mặc định
--- Email: admin@kaitokid.vn / Mật khẩu: Admin@123
--- (BCrypt hash của "Admin@123")
+-- Tài khoản admin / nhân viên KHÔNG còn nằm ở bảng NguoiDung.
+-- Quản trị viên & nhân viên được quản lý ở bảng NhanVien (xem scripts/add-staff-rbac.sql),
+-- đăng nhập qua /api/auth/staff/login. NguoiDung CHỈ chứa khách hàng.
+-- (Fix Lỗ hổng 4 — tránh 2 mô hình người dùng chồng lấn, mơ hồ "admin" là ai.)
 -- ================================================================
-INSERT INTO NguoiDung (HoTen, Email, MatKhauHash, SoDienThoai, VaiTro)
-VALUES (
-    N'Admin KaitoKid',
-    'admin@kaitokid.vn',
-    '$2a$11$K8GpahMYCWMKJxBzXjH1/.7JYOqFHvFMiYJJSlELOUB8.p4kK6Wm6',
-    '0901234567',
-    'admin'
-);
 GO
 
 -- Tài khoản khách hàng mẫu
-INSERT INTO NguoiDung (HoTen, Email, MatKhauHash, SoDienThoai, VaiTro)
+-- Dùng IDENTITY_INSERT để giữ Id = 2,3,4 (khớp các đơn hàng / đánh giá mẫu phía dưới
+-- vốn tham chiếu NguoiDungId = 2,3,4). Id = 1 bỏ trống do trước đây là admin,
+-- nay admin nằm ở bảng NhanVien.
+SET IDENTITY_INSERT NguoiDung ON;
+INSERT INTO NguoiDung (Id, HoTen, Email, MatKhauHash, SoDienThoai, VaiTro)
 VALUES
-    (N'Nguyễn Thị Thảo', 'thao@gmail.com', '$2a$11$K8GpahMYCWMKJxBzXjH1/.7JYOqFHvFMiYJJSlELOUB8.p4kK6Wm6', '0912345678', 'user'),
-    (N'Trần Minh Hoàng', 'hoang@gmail.com', '$2a$11$K8GpahMYCWMKJxBzXjH1/.7JYOqFHvFMiYJJSlELOUB8.p4kK6Wm6', '0923456789', 'user'),
-    (N'Lê Phương Linh', 'linh@gmail.com', '$2a$11$K8GpahMYCWMKJxBzXjH1/.7JYOqFHvFMiYJJSlELOUB8.p4kK6Wm6', '0934567890', 'user');
+    (2, N'Nguyễn Thị Thảo', 'thao@gmail.com', '$2a$11$K8GpahMYCWMKJxBzXjH1/.7JYOqFHvFMiYJJSlELOUB8.p4kK6Wm6', '0912345678', 'user'),
+    (3, N'Trần Minh Hoàng', 'hoang@gmail.com', '$2a$11$K8GpahMYCWMKJxBzXjH1/.7JYOqFHvFMiYJJSlELOUB8.p4kK6Wm6', '0923456789', 'user'),
+    (4, N'Lê Phương Linh', 'linh@gmail.com', '$2a$11$K8GpahMYCWMKJxBzXjH1/.7JYOqFHvFMiYJJSlELOUB8.p4kK6Wm6', '0934567890', 'user');
+SET IDENTITY_INSERT NguoiDung OFF;
 GO
 
 -- ================================================================

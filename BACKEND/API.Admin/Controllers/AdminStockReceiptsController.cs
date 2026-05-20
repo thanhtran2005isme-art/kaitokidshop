@@ -5,16 +5,18 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/stock-receipts")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminStockReceiptsController(AdminDbContext db) : ControllerBase
 {
     /// <summary>Danh sách phiếu nhập (có phân trang + filter)</summary>
     [HttpGet]
+    [HasPermission("stock_receipts.view")]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? search,
         [FromQuery] int? supplierId,
@@ -48,6 +50,7 @@ public class AdminStockReceiptsController(AdminDbContext db) : ControllerBase
 
     /// <summary>Chi tiết phiếu nhập</summary>
     [HttpGet("{id:int}")]
+    [HasPermission("stock_receipts.view")]
     public async Task<IActionResult> GetById(int id)
     {
         var p = await db.PhieuNhap
@@ -90,6 +93,7 @@ public class AdminStockReceiptsController(AdminDbContext db) : ControllerBase
     ///  4. Ghi TonKhoLichSu cho mỗi item
     /// </summary>
     [HttpPost]
+    [HasPermission("stock_receipts.create")]
     public async Task<IActionResult> Create([FromBody] CreateStockReceiptDTO dto)
     {
         if (dto.Items == null || dto.Items.Count == 0)
@@ -235,6 +239,7 @@ public class AdminStockReceiptsController(AdminDbContext db) : ControllerBase
 
     /// <summary>Hủy phiếu nhập (rollback tồn)</summary>
     [HttpPost("{id:int}/cancel")]
+    [HasPermission("stock_receipts.cancel")]
     public async Task<IActionResult> Cancel(int id, [FromBody] CancelReceiptDTO? dto = null)
     {
         var p = await db.PhieuNhap

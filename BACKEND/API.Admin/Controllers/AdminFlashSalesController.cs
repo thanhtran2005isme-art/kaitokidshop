@@ -3,12 +3,14 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/flash-sales")]
-[Authorize(Roles = "admin")]
+[Authorize]
+[HasPermission("flash_sales.manage")]
 public class AdminFlashSalesController(AdminDbContext db) : ControllerBase
 {
     [HttpGet]

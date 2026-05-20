@@ -3,12 +3,14 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/banners")]
-[Authorize(Roles = "admin")]
+[Authorize]
+[HasPermission("banners.manage")]
 public class AdminBannersController(AdminDbContext db) : ControllerBase
 {
     [HttpGet]

@@ -3,15 +3,17 @@ using API.Admin.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/products")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminProductsController(AdminDbContext db) : ControllerBase
 {
     [HttpGet]
+    [HasPermission("products.view")]
     public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] string? category,
         [FromQuery] string? status, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
@@ -28,6 +30,7 @@ public class AdminProductsController(AdminDbContext db) : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [HasPermission("products.view")]
     public async Task<IActionResult> GetById(int id)
     {
         var sp = await db.SanPham.FindAsync(id);
@@ -35,6 +38,7 @@ public class AdminProductsController(AdminDbContext db) : ControllerBase
     }
 
     [HttpPost]
+    [HasPermission("products.create")]
     public async Task<IActionResult> Create([FromBody] SanPham sp)
     {
         sp.NgayTao = DateTime.UtcNow;
@@ -44,6 +48,7 @@ public class AdminProductsController(AdminDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [HasPermission("products.update")]
     public async Task<IActionResult> Update(int id, [FromBody] SanPham dto)
     {
         var sp = await db.SanPham.FindAsync(id);
@@ -66,6 +71,7 @@ public class AdminProductsController(AdminDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [HasPermission("products.delete")]
     public async Task<IActionResult> Delete(int id)
     {
         var sp = await db.SanPham.FindAsync(id);

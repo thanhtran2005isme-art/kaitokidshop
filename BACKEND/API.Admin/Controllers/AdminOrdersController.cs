@@ -2,15 +2,17 @@ using API.Admin.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/orders")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminOrdersController(AdminDbContext db) : ControllerBase
 {
     [HttpGet]
+    [HasPermission("orders.view")]
     public async Task<IActionResult> GetAll([FromQuery] string? status, [FromQuery] string? search,
         [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
@@ -26,6 +28,7 @@ public class AdminOrdersController(AdminDbContext db) : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [HasPermission("orders.view")]
     public async Task<IActionResult> GetById(int id)
     {
         var dh = await db.DonHang.Include(d => d.ChiTiet).Include(d => d.NguoiDung)
@@ -34,6 +37,7 @@ public class AdminOrdersController(AdminDbContext db) : ControllerBase
     }
 
     [HttpPut("{id}/status")]
+    [HasPermission("orders.update_status")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusDto dto)
     {
         var dh = await db.DonHang.Include(d => d.ChiTiet).FirstOrDefaultAsync(d => d.Id == id);
@@ -108,6 +112,7 @@ public class AdminOrdersController(AdminDbContext db) : ControllerBase
     }
 
     [HttpGet("stats")]
+    [HasPermission("orders.view")]
     public async Task<IActionResult> GetStats()
     {
         var total = await db.DonHang.CountAsync();

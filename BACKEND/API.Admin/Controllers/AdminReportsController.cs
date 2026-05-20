@@ -2,16 +2,18 @@ using API.Admin.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Shared.Authorization;
 
 namespace API.Admin.Controllers;
 
 [ApiController]
 [Route("api/admin/reports")]
-[Authorize(Roles = "admin")]
+[Authorize]
 public class AdminReportsController(AdminDbContext db) : ControllerBase
 {
     /// <summary>Tổng quan dashboard</summary>
     [HttpGet("dashboard")]
+    [HasPermission("dashboard.view")]
     public async Task<IActionResult> Dashboard()
     {
         var totalProducts = await db.SanPham.CountAsync();
@@ -27,6 +29,7 @@ public class AdminReportsController(AdminDbContext db) : ControllerBase
 
     /// <summary>Doanh thu theo ngày (30 ngày gần nhất)</summary>
     [HttpGet("revenue")]
+    [HasPermission("reports.view")]
     public async Task<IActionResult> Revenue([FromQuery] int days = 30)
     {
         var fromDate = DateTime.UtcNow.AddDays(-days);
@@ -41,6 +44,7 @@ public class AdminReportsController(AdminDbContext db) : ControllerBase
 
     /// <summary>Top sản phẩm bán chạy</summary>
     [HttpGet("top-products")]
+    [HasPermission("reports.view")]
     public async Task<IActionResult> TopProducts([FromQuery] int count = 10, [FromQuery] int days = 30)
     {
         // Lấy sản phẩm có đơn completed trong kỳ
@@ -80,6 +84,7 @@ public class AdminReportsController(AdminDbContext db) : ControllerBase
 
     /// <summary>Thống kê đơn hàng theo trạng thái</summary>
     [HttpGet("order-stats")]
+    [HasPermission("reports.view")]
     public async Task<IActionResult> OrderStats([FromQuery] int days = 30)
     {
         var fromDate = DateTime.UtcNow.AddDays(-days);

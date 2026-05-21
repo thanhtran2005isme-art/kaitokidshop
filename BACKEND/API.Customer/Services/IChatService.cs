@@ -9,6 +9,9 @@ namespace API.Customer.Services;
 /// </summary>
 public record CustomerMessageResult(MessageDto CustomerMessage, MessageDto? BotMessage, bool HandedOff);
 
+/// <summary>Kết quả khi nhân viên nhận phiên: thành công hay không + tin hệ thống báo đã kết nối.</summary>
+public record ClaimResult(bool Success, MessageDto? SystemMessage, int StaffId);
+
 /// <summary>
 /// Nghiệp vụ chat thuần (không phụ thuộc transport) — dùng chung cho Controller và Hub.
 /// </summary>
@@ -22,6 +25,8 @@ public interface IChatService
     /// <summary>Chuyển phiên sang chờ nhân viên + tạo tin hệ thống báo khách đang chờ. Trả null nếu đã có nhân viên.</summary>
     Task<MessageDto?> RequestHandoffAsync(int conversationId, string? reason);
     Task<bool> ClaimAsync(int staffId, int conversationId);
+    /// <summary>Nhân viên nhận phiên + tạo tin hệ thống báo khách đã kết nối với nhân viên.</summary>
+    Task<ClaimResult> ClaimWithMessageAsync(int staffId, int conversationId, string? staffName);
     Task CloseAsync(int conversationId, ChatActor by);
     /// <summary>Khách tự kết thúc phiên (có kiểm tra quyền sở hữu).</summary>
     Task<bool> CloseByCustomerAsync(ChatIdentity who, int conversationId);

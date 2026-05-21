@@ -28,10 +28,12 @@ export default function AdminChat() {
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
   const [reply, setReply] = useState('');
   const [loading, setLoading] = useState(false);
+  const [customerTyping, setCustomerTyping] = useState(false);
 
   const hubRef = useRef<ChatHubClient | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeIdRef = useRef<number | null>(null);
+  const typingTimer = useRef<number | null>(null);
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
   const loadList = useCallback(async (status: string) => {
@@ -54,7 +56,11 @@ export default function AdminChat() {
       onReceiveMessage: (m) => {
         if (m.conversationId === activeIdRef.current) {
           setMessages((prev) => prev.some((x) => x.id === m.id) ? prev : [...prev, m].sort((a, b) => a.id - b.id));
+          if (m.senderType === 'customer') setCustomerTyping(false);
         }
+      },
+      onTypingChanged: (id, role, typing) => {
+        if (id === activeIdRef.current && role === 'customer') setCustomerTyping(typing);
       },
       onConversationUpdated: () => { void loadList(tab); },
       onQueueUpdated: () => { void loadList(tab); toast('Có hội thoại mới trong hàng đợi', { icon: '🔔' }); },
@@ -73,6 +79,7 @@ export default function AdminChat() {
 
   const openConversation = async (id: number) => {
     setActiveId(id);
+    setCustomerTyping(false);
     try {
       const detail = await adminChatApi.detail(id);
       setMessages(detail.messages);
@@ -87,7 +94,14 @@ export default function AdminChat() {
 
   const handleClaim = async (id: number) => {
     try {
-      await adminChatApi.claim(id);
+      const hub = hubRef.current;
+      // Ưu tiên claim qua hub để khách nhận tin "đã kết nối" real-time
+      if (hub && hub.state === 'Connected') {
+        await hub.joinConversation(id).catch(() => {});
+        await hub.claimConversation(id);
+      } else {
+        await adminChatApi.claim(id);
+      }
       toast.success('Đã nhận phiên');
       await loadList(tab);
       await openConversation(id);
@@ -105,12 +119,26 @@ export default function AdminChat() {
     try {
       if (hub && hub.state === 'Connected') {
         await hub.agentSendMessage(activeId, text);
+        await hub.typing(activeId, false).catch(() => {});
       } else {
         const msg = await adminChatApi.reply(activeId, text);
         setMessages((prev) => [...prev, msg]);
       }
     } catch {
       toast.error('Gửi tin thất bại');
+    }
+  };
+
+  // Nhân viên đang gõ → gửi tín hiệu typing cho khách (debounce tắt sau 1.5s)
+  const handleReplyChange = (v: string) => {
+    setReply(v);
+    const hub = hubRef.current;
+    if (hub && hub.state === 'Connected' && activeId) {
+      void hub.typing(activeId, true).catch(() => {});
+      if (typingTimer.current) window.clearTimeout(typingTimer.current);
+      typingTimer.current = window.setTimeout(() => {
+        void hub.typing(activeId, false).catch(() => {});
+      }, 1500);
     }
   };
 
@@ -194,13 +222,21 @@ export default function AdminChat() {
                   <div className="admin-msg__text">{m.content}</div>
                 </div>
               ))}
+              {customerTyping && (
+                <div className="admin-msg admin-msg--customer">
+                  <div className="admin-msg__meta">Khách</div>
+                  <div className="admin-msg__text admin-typing-bubble">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {canReply && activeConv?.status !== 'closed' ? (
               <form className="admin-chat__reply" onSubmit={(e) => { e.preventDefault(); void handleSend(); }}>
                 <input
                   value={reply}
-                  onChange={(e) => setReply(e.target.value)}
+                  onChange={(e) => handleReplyChange(e.target.value)}
                   placeholder={activeConv?.status === 'waiting' ? 'Nhận phiên trước khi trả lời…' : 'Nhập trả lời…'}
                   disabled={activeConv?.status === 'waiting'}
                 />

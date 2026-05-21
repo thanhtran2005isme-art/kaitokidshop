@@ -83,10 +83,13 @@ public class ChatHub(IChatService chat) : Hub
         if (!IsStaff) throw new HubException("Không có quyền.");
         if (UserId is not int staffId) throw new HubException("Phiên đăng nhập không hợp lệ.");
 
-        var ok = await chat.ClaimAsync(staffId, conversationId);
-        if (ok)
+        var result = await chat.ClaimWithMessageAsync(staffId, conversationId, UserName);
+        if (result.Success)
         {
             await Groups.AddToGroupAsync(Context.ConnectionId, ConvGroup(conversationId));
+            // Tin hệ thống "đã kết nối với nhân viên" → gửi cho cả khách và nhân viên trong phiên
+            if (result.SystemMessage is not null)
+                await Clients.Group(ConvGroup(conversationId)).SendAsync("ReceiveMessage", result.SystemMessage);
             await Clients.Group(ConvGroup(conversationId)).SendAsync("ConversationUpdated", conversationId);
             await Clients.Group(AgentsGroup).SendAsync("QueueUpdated", conversationId);
         }

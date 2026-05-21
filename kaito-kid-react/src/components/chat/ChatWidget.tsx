@@ -162,7 +162,13 @@ export default function ChatWidget({ productContextId }: { productContextId?: nu
                 {messages.map((m) => (
                   <MessageBubble key={m.id} msg={m} onQuickReply={handleSend} />
                 ))}
-                {agentTyping && <div className="kk-chat__typing">Nhân viên đang nhập…</div>}
+                {agentTyping && (
+                  <div className="kk-msg kk-msg--them">
+                    <div className="kk-msg__text kk-typing-bubble">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Thanh hành động: gặp nhân viên + kết thúc phiên */}

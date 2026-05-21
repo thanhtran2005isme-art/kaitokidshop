@@ -127,6 +127,7 @@ public class ChatController(IChatService chat, IChatSettingsProvider chatSetting
 public class AdminChatController(IChatService chat) : ControllerBase
 {
     private int StaffId => int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    private string? StaffName => User.FindFirstValue(ClaimTypes.Name);
 
     /// <summary>Danh sách hội thoại trong inbox (lọc theo trạng thái).</summary>
     [HttpGet("conversations")]
@@ -154,9 +155,10 @@ public class AdminChatController(IChatService chat) : ControllerBase
     [HttpPost("conversations/{id:int}/claim")]
     public async Task<IActionResult> Claim(int id)
     {
-        var ok = await chat.ClaimAsync(StaffId, id);
-        return ok ? Ok(new { status = "agent", assignedStaffId = StaffId })
-                  : Conflict(new { message = "Phiên đã được nhân viên khác nhận." });
+        var result = await chat.ClaimWithMessageAsync(StaffId, id, StaffName);
+        return result.Success
+            ? Ok(new { status = "agent", assignedStaffId = StaffId, systemMessage = result.SystemMessage })
+            : Conflict(new { message = "Phiên đã được nhân viên khác nhận." });
     }
 
     /// <summary>Trả lời khách (fallback REST).</summary>

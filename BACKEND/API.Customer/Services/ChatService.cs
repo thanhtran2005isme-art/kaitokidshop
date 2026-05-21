@@ -261,6 +261,36 @@ public class ChatService(CustomerDbContext db, IChatBot bot, IConfiguration conf
         return affected > 0;
     }
 
+    public async Task<ClaimResult> ClaimWithMessageAsync(int staffId, int conversationId, string? staffName)
+    {
+        var ok = await ClaimAsync(staffId, conversationId);
+        if (!ok) return new ClaimResult(false, null, staffId);
+
+        // Tin hệ thống báo khách đã được kết nối với nhân viên
+        var name = string.IsNullOrWhiteSpace(staffName) ? "Nhân viên hỗ trợ" : staffName;
+        var text = $"Bạn đã được kết nối với {name}. Nhân viên sẽ hỗ trợ bạn ngay bây giờ! 👩‍💼";
+        var sysMsg = new ChatMessage
+        {
+            ConversationId = conversationId,
+            SenderType = ChatSender.Bot,
+            Content = text,
+            CreatedAt = DateTime.UtcNow,
+        };
+        db.ChatMessages.Add(sysMsg);
+
+        var conv = await db.Conversations.FindAsync(conversationId);
+        if (conv is not null)
+        {
+            conv.LastMessageAt = sysMsg.CreatedAt;
+            conv.LastMessagePreview = Preview(text);
+            conv.UnreadForCustomer += 1;
+            conv.UpdatedAt = DateTime.UtcNow;
+        }
+        await db.SaveChangesAsync();
+
+        return new ClaimResult(true, ToDto(sysMsg), staffId);
+    }
+
     public async Task CloseAsync(int conversationId, ChatActor by)
     {
         var conv = await db.Conversations.FindAsync(conversationId);

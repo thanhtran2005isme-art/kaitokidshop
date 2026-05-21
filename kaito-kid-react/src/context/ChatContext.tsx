@@ -110,8 +110,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   const refreshConversation = useCallback(async () => {
     if (!convIdRef.current) return;
-    // Không có endpoint GET conversation phía khách → giữ trạng thái hiện có,
-    // hub events đã cập nhật status khi cần.
+    // Cập nhật trạng thái phiên hiện tại (vd: bot/waiting → agent khi nhân viên nhận phiên)
+    try {
+      const list = await chatService.listConversations();
+      const cur = list.find((c) => c.id === convIdRef.current);
+      if (cur) setConversation(cur);
+    } catch { /* ignore */ }
   }, []);
 
   const openWidget = useCallback(async (productContextId?: number) => {

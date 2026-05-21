@@ -34,11 +34,21 @@ public class SearchService(CustomerDbContext db) : ISearchService
         var baseQ = db.Products.Where(p => p.Status == "active");
         if (!string.IsNullOrEmpty(query))
         {
-            var q = query;
-            baseQ = baseQ.Where(p =>
-                EF.Functions.Like(p.Name, $"%{q}%") ||
-                EF.Functions.Like(p.Description, $"%{q}%") ||
-                EF.Functions.Like(p.Sku, $"%{q}%"));
+            // Tách query thành từng từ: mỗi từ phải xuất hiện (AND) ở tên/mô tả/SKU.
+            // Nhờ vậy "áo polo" khớp cả "Váy ... cổ polo" lẫn "Áo Polo ..." thay vì
+            // chỉ khớp đúng cụm liền nhau "áo polo".
+            var tokens = query
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct()
+                .ToList();
+            foreach (var token in tokens)
+            {
+                var t = token;
+                baseQ = baseQ.Where(p =>
+                    EF.Functions.Like(p.Name, $"%{t}%") ||
+                    EF.Functions.Like(p.Description, $"%{t}%") ||
+                    EF.Functions.Like(p.Sku, $"%{t}%"));
+            }
         }
 
         // 2. Pull sample (giới hạn để facet không OOM)
@@ -126,10 +136,21 @@ public class SearchService(CustomerDbContext db) : ISearchService
         var q = query.Trim();
         if (q.Length < 2) return new SuggestionDTO();
 
-        var products = await db.Products
-            .Where(p => p.Status == "active" && (
-                EF.Functions.Like(p.Name, $"%{q}%") ||
-                EF.Functions.Like(p.Sku, $"%{q}%")))
+        var tokens = q
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct()
+            .ToList();
+
+        var pq = db.Products.Where(p => p.Status == "active");
+        foreach (var token in tokens)
+        {
+            var t = token;
+            pq = pq.Where(p =>
+                EF.Functions.Like(p.Name, $"%{t}%") ||
+                EF.Functions.Like(p.Sku, $"%{t}%"));
+        }
+
+        var products = await pq
             .OrderByDescending(p => p.SoldCount)
             .Take(limit)
             .Select(p => MapToDTO(p))

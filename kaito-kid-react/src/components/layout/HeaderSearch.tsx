@@ -3,10 +3,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PiMagnifyingGlassBold, PiClockCounterClockwise } from 'react-icons/pi';
+import toast from 'react-hot-toast';
+import { PiMagnifyingGlassBold, PiClockCounterClockwise, PiMicrophoneBold, PiMicrophoneFill } from 'react-icons/pi';
 import { searchApi } from '../../services/api';
 import type { Product } from '../../types';
 import { formatCurrency } from '../../utils/format';
+import { useVoiceSearch } from '../../hooks/useVoiceSearch';
 
 const HISTORY_KEY = 'kk-search-history';
 const MAX_HISTORY = 6;
@@ -101,6 +103,19 @@ export default function HeaderSearch() {
     submit(query);
   };
 
+  // Voice search: điền kết quả vào ô + tự tìm khi nói xong
+  const voice = useVoiceSearch({
+    onInterim: (text) => { setQuery(text); setOpen(true); },
+    onResult: (text) => {
+      setQuery(text);
+      submit(text);
+    },
+  });
+
+  useEffect(() => {
+    if (voice.error) toast.error(voice.error);
+  }, [voice.error]);
+
   const showHistory = query.trim().length === 0;
   const hasResults = suggestions.length > 0 || products.length > 0;
 
@@ -122,12 +137,26 @@ export default function HeaderSearch() {
         aria-autocomplete="list"
         aria-expanded={open}
       />
+      {voice.supported && (
+        <button
+          type="button"
+          className={`search-voice-btn${voice.listening ? ' is-listening' : ''}`}
+          onClick={() => (voice.listening ? voice.stop() : voice.start())}
+          aria-label={voice.listening ? 'Đang nghe… bấm để dừng' : 'Tìm kiếm bằng giọng nói'}
+          title={voice.listening ? 'Đang nghe…' : 'Tìm bằng giọng nói'}
+        >
+          {voice.listening ? <PiMicrophoneFill aria-hidden="true" /> : <PiMicrophoneBold aria-hidden="true" />}
+        </button>
+      )}
       <button type="submit" aria-label="Tìm kiếm">
         <PiMagnifyingGlassBold aria-hidden="true" />
       </button>
 
       {open && (
         <div className="hsearch-dropdown" role="listbox">
+          {voice.listening && (
+            <div className="hsearch-listening">🎤 Đang nghe… hãy nói tên sản phẩm bạn tìm</div>
+          )}
           {showHistory ? (
             history.length > 0 ? (
               <>

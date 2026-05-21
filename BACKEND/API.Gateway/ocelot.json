@@ -73,6 +73,36 @@
                                                   ]
                    },
                    {
+                       "UpstreamPathTemplate":  "/api/search/{everything}",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/search/{everything}",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
+                       "UpstreamPathTemplate":  "/api/search",
+                       "UpstreamHttpMethod":  [
+                                                  "GET",
+                                                  "OPTIONS"
+                                              ],
+                       "DownstreamPathTemplate":  "/api/search",
+                       "DownstreamScheme":  "http",
+                       "DownstreamHostAndPorts":  [
+                                                      {
+                                                          "Host":  "localhost",
+                                                          "Port":  5265
+                                                      }
+                                                  ]
+                   },
+                   {
                        "UpstreamPathTemplate":  "/api/categories/{everything}",
                        "UpstreamHttpMethod":  [
                                                   "GET",

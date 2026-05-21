@@ -789,6 +789,15 @@
 /* ===== Header Search Autocomplete ===== */
 .search-bar { position: relative; }
 
+.hsearch-listening {
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #be185d;
+  background: #fdf2f8;
+  border-bottom: 1px solid #fbcfe8;
+}
+
 .hsearch-dropdown {
   position: absolute;
   top: calc(100% + 6px);

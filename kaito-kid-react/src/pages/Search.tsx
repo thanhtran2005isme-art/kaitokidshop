@@ -14,8 +14,11 @@ import {
   PiFunnelBold,
   PiSortAscendingBold,
   PiCaretDownBold,
+  PiMicrophoneBold,
+  PiMicrophoneFill,
 } from 'react-icons/pi';
 import { productApi, searchApi, type SearchFacets, type SuggestionResponse } from '../services/api';
+import { useVoiceSearch } from '../hooks/useVoiceSearch';
 import {
   trackSearch,
   getSearchHistory,
@@ -90,6 +93,12 @@ export default function Search() {
 
   // Khi URL ?q= đổi → đồng bộ vào input
   useEffect(() => { setKeyword(queryParam); }, [queryParam]);
+
+  // Voice search: đổ kết quả vào ô tìm kiếm (keyword → debounced → tự search)
+  const voice = useVoiceSearch({
+    onInterim: (text) => setKeyword(text),
+    onResult: (text) => setKeyword(text),
+  });
 
   // Load history + trending lúc mount
   useEffect(() => {
@@ -258,7 +267,7 @@ export default function Search() {
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
             placeholder="Tìm áo sơ mi, quần jeans, váy..."
             style={{
-              width: '100%', padding: '14px 14px 14px 44px',
+              width: '100%', padding: '14px 88px 14px 44px',
               border: '2px solid #e5e7eb', borderRadius: 12,
               fontSize: 15, outline: 'none',
               transition: 'border-color 0.2s',
@@ -270,11 +279,27 @@ export default function Search() {
             <button
               onClick={() => { setKeyword(''); inputRef.current?.focus(); }}
               style={{
-                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                position: 'absolute', right: voice.supported ? 48 : 12, top: '50%', transform: 'translateY(-50%)',
                 background: '#f1f5f9', border: 'none', width: 28, height: 28,
                 borderRadius: '50%', cursor: 'pointer', color: '#64748b',
               }}
             ><PiX /></button>
+          )}
+          {voice.supported && (
+            <button
+              type="button"
+              onClick={() => (voice.listening ? voice.stop() : voice.start())}
+              aria-label={voice.listening ? 'Đang nghe… bấm để dừng' : 'Tìm bằng giọng nói'}
+              title={voice.listening ? 'Đang nghe…' : 'Tìm bằng giọng nói'}
+              style={{
+                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                background: voice.listening ? '#ef4444' : '#fff',
+                border: `2px solid ${voice.listening ? '#ef4444' : '#e5e7eb'}`,
+                width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
+                color: voice.listening ? '#fff' : '#ec4899',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >{voice.listening ? <PiMicrophoneFill /> : <PiMicrophoneBold />}</button>
           )}
 
           {/* Dropdown suggestions */}
@@ -521,21 +546,7 @@ export default function Search() {
           ) : results.length > 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
               {results.map((p) => (
-                <div key={p.id} style={{ position: 'relative' }}>
-                  <ProductCard product={p} />
-                  {/* Highlight overlay tên SP */}
-                  {debounced && (
-                    <div style={{
-                      position: 'absolute', bottom: 0, left: 0, right: 0,
-                      pointerEvents: 'none',
-                      padding: '6px 8px',
-                      background: 'linear-gradient(0deg, rgba(255,255,255,0.95), transparent)',
-                      fontSize: 12, color: '#0f172a',
-                    }}>
-                      {highlightText(p.name, debounced)}
-                    </div>
-                  )}
-                </div>
+                <ProductCard key={p.id} product={p} />
               ))}
             </div>
           ) : debounced.length >= 2 || filterCount > 0 ? (

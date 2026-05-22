@@ -40,7 +40,7 @@ export { ghnLocationApi, type GhnProvince as GhnProvinceItem2, type GhnDistrict 
 
 export { paymentApi, type PaymentStatus, type PaymentConfig } from './paymentApi';
 
-export { searchApi, type SearchRequest, type SearchResult, type SearchFacets, type SuggestionResponse } from './searchApi';
+export { searchApi, type SearchRequest, type SearchResult, type SearchFacets, type SuggestionResponse, type ImageSearchItem, type ImageSearchResult } from './searchApi';
 
 export { newsletterApi, type NewsletterSubscribeResult } from './newsletterApi';
 

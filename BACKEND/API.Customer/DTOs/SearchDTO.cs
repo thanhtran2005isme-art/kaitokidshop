@@ -41,3 +41,21 @@ public class SuggestionDTO
     public List<string> Suggestions { get; set; } = new();
     public List<ProductDTO> Products { get; set; } = new();
 }
+
+/// <summary>Một kết quả tìm bằng hình ảnh: sản phẩm + độ tương đồng thị giác (0..1).</summary>
+public class ImageSearchItemDTO
+{
+    public ProductDTO Product { get; set; } = new();
+    /// <summary>Cosine similarity 0..1 (đã L2-normalize vector).</summary>
+    public double Similarity { get; set; }
+}
+
+public class ImageSearchResultDTO
+{
+    public List<ImageSearchItemDTO> Items { get; set; } = new();
+    public int Total { get; set; }
+    /// <summary>True nếu engine sẵn sàng (đã nạp model + có vector). False → FE báo tính năng chưa bật.</summary>
+    public bool Ready { get; set; }
+    /// <summary>Thông điệp khi Ready=false (vd chưa cấu hình model).</summary>
+    public string? Message { get; set; }
+}

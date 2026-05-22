@@ -52,6 +52,19 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ISearchService, SearchService>();
+
+// ===== Tìm kiếm bằng hình ảnh (visual similarity với CLIP embedding qua ONNX) =====
+builder.Services.Configure<API.Customer.Services.ImageSearch.ImageSearchOptions>(
+    builder.Configuration.GetSection(API.Customer.Services.ImageSearch.ImageSearchOptions.SectionName));
+// Embedder nạp model 1 lần → singleton. Store giữ vector in-memory → singleton.
+builder.Services.AddSingleton<API.Customer.Services.ImageSearch.IImageEmbedder, API.Customer.Services.ImageSearch.OnnxClipImageEmbedder>();
+builder.Services.AddSingleton<API.Customer.Services.ImageSearch.ImageEmbeddingStore>();
+builder.Services.AddHttpClient<API.Customer.Services.ImageSearch.ProductImageFetcher>(c =>
+{
+    c.Timeout = TimeSpan.FromSeconds(20);
+});
+builder.Services.AddScoped<API.Customer.Services.ImageSearch.IImageSearchService, API.Customer.Services.ImageSearch.ImageSearchService>();
+builder.Services.AddHostedService<API.Customer.Services.ImageSearch.ImageEmbeddingIndexer>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddScoped<IComboDiscountService, ComboDiscountService>();
 builder.Services.AddScoped<API.Customer.Services.Email.IEmailService, API.Customer.Services.Email.SmtpEmailService>();

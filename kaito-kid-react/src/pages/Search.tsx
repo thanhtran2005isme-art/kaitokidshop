@@ -16,9 +16,12 @@ import {
   PiCaretDownBold,
   PiMicrophoneBold,
   PiMicrophoneFill,
+  PiCameraBold,
+  PiImageBold,
 } from 'react-icons/pi';
 import { productApi, searchApi, type SearchFacets, type SuggestionResponse } from '../services/api';
 import { useVoiceSearch } from '../hooks/useVoiceSearch';
+import { useImageSearch } from '../hooks/useImageSearch';
 import {
   trackSearch,
   getSearchHistory,
@@ -99,6 +102,30 @@ export default function Search() {
     onInterim: (text) => setKeyword(text),
     onResult: (text) => setKeyword(text),
   });
+
+  // Image search: tìm sản phẩm tương đồng từ ảnh upload/chụp
+  const image = useImageSearch(48);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const onPickImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void image.searchFile(file);
+    e.target.value = ''; // cho phép chọn lại cùng 1 ảnh
+  };
+
+  // Khi điều hướng từ header bằng ?img=1 → tự mở bộ chọn ảnh (1 lần) rồi dọn param.
+  const imgParamHandled = useRef(false);
+  useEffect(() => {
+    if (imgParamHandled.current) return;
+    if (searchParams.get('img') === '1' && image.available) {
+      imgParamHandled.current = true;
+      fileInputRef.current?.click();
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('img');
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams, image.available, setSearchParams]);
 
   // Load history + trending lúc mount
   useEffect(() => {
@@ -267,7 +294,7 @@ export default function Search() {
             onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
             placeholder="Tìm áo sơ mi, quần jeans, váy..."
             style={{
-              width: '100%', padding: '14px 88px 14px 44px',
+              width: '100%', padding: '14px 128px 14px 44px',
               border: '2px solid #e5e7eb', borderRadius: 12,
               fontSize: 15, outline: 'none',
               transition: 'border-color 0.2s',
@@ -275,11 +302,22 @@ export default function Search() {
             onFocusCapture={(e) => (e.target.style.borderColor = '#ec4899')}
             onBlurCapture={(e) => (e.target.style.borderColor = '#e5e7eb')}
           />
+          {/* input file ẩn cho tìm bằng ảnh (capture=environment → mở camera sau trên mobile) */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            capture="environment"
+            onChange={onPickImage}
+            style={{ display: 'none' }}
+          />
           {keyword && (
             <button
               onClick={() => { setKeyword(''); inputRef.current?.focus(); }}
               style={{
-                position: 'absolute', right: voice.supported ? 48 : 12, top: '50%', transform: 'translateY(-50%)',
+                position: 'absolute',
+                right: 12 + (voice.supported ? 38 : 0) + (image.available ? 38 : 0),
+                top: '50%', transform: 'translateY(-50%)',
                 background: '#f1f5f9', border: 'none', width: 28, height: 28,
                 borderRadius: '50%', cursor: 'pointer', color: '#64748b',
               }}
@@ -292,7 +330,7 @@ export default function Search() {
               aria-label={voice.listening ? 'Đang nghe… bấm để dừng' : 'Tìm bằng giọng nói'}
               title={voice.listening ? 'Đang nghe…' : 'Tìm bằng giọng nói'}
               style={{
-                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                position: 'absolute', right: image.available ? 50 : 12, top: '50%', transform: 'translateY(-50%)',
                 background: voice.listening ? '#ef4444' : '#fff',
                 border: `2px solid ${voice.listening ? '#ef4444' : '#e5e7eb'}`,
                 width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
@@ -300,6 +338,22 @@ export default function Search() {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
             >{voice.listening ? <PiMicrophoneFill /> : <PiMicrophoneBold />}</button>
+          )}
+          {image.available && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Tìm kiếm bằng hình ảnh"
+              title="Tìm bằng hình ảnh (chụp hoặc tải ảnh lên)"
+              style={{
+                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                background: image.previewUrl ? '#ec4899' : '#fff',
+                border: `2px solid ${image.previewUrl ? '#ec4899' : '#e5e7eb'}`,
+                width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
+                color: image.previewUrl ? '#fff' : '#ec4899',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            ><PiCameraBold /></button>
           )}
 
           {/* Dropdown suggestions */}
@@ -496,6 +550,83 @@ export default function Search() {
 
         {/* MAIN RESULTS */}
         <main>
+          {/* ===== KẾT QUẢ TÌM BẰNG HÌNH ẢNH ===== */}
+          {image.hasSearched && (
+            <div style={{
+              background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12,
+              padding: 16, marginBottom: 16,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14, flexWrap: 'wrap' }}>
+                {image.previewUrl && (
+                  <img
+                    src={image.previewUrl}
+                    alt="Ảnh tìm kiếm"
+                    style={{ width: 64, height: 80, objectFit: 'cover', borderRadius: 8, border: '1px solid #e5e7eb' }}
+                  />
+                )}
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ fontWeight: 600, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <PiImageBold style={{ color: '#ec4899' }} /> Tìm theo hình ảnh
+                  </div>
+                  <div style={{ fontSize: 13, color: '#64748b', marginTop: 2 }}>
+                    {image.loading
+                      ? 'Đang phân tích ảnh và tìm sản phẩm tương đồng…'
+                      : image.error
+                        ? <span style={{ color: '#dc2626' }}>{image.error}</span>
+                        : `Tìm thấy ${image.results.length} sản phẩm trông giống nhất`}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      background: '#fdf2f8', color: '#be185d', border: '1px solid #fbcfe8',
+                      borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    }}
+                  ><PiCameraBold /> Đổi ảnh</button>
+                  <button
+                    onClick={image.reset}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      background: '#f1f5f9', color: '#475569', border: '1px solid #e5e7eb',
+                      borderRadius: 8, padding: '8px 12px', cursor: 'pointer', fontSize: 13,
+                    }}
+                  ><PiX /> Thoát</button>
+                </div>
+              </div>
+
+              {image.loading ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} style={{ aspectRatio: '4/5', background: '#f1f5f9', borderRadius: 8 }} />
+                  ))}
+                </div>
+              ) : image.results.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+                  {image.results.map(({ product, similarity }) => (
+                    <div key={product.id} style={{ position: 'relative' }}>
+                      <span style={{
+                        position: 'absolute', top: 8, left: 8, zIndex: 2,
+                        background: 'rgba(236,72,153,0.92)', color: '#fff',
+                        fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 20,
+                      }}>{Math.round(similarity * 100)}% giống</span>
+                      <ProductCard product={product} />
+                    </div>
+                  ))}
+                </div>
+              ) : !image.error ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+                  <PiImageBold style={{ fontSize: 48, marginBottom: 8 }} />
+                  <p>Không tìm thấy sản phẩm trông giống ảnh này. Hãy thử ảnh khác rõ nét hơn.</p>
+                </div>
+              ) : null}
+            </div>
+          )}
+
+          {/* ===== KẾT QUẢ TÌM BẰNG TỪ KHÓA (ẩn khi đang xem kết quả ảnh) ===== */}
+          {!image.hasSearched && (
+          <>
           <div style={{
             background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12,
             padding: '12px 16px', marginBottom: 16, display: 'flex',
@@ -580,6 +711,8 @@ export default function Search() {
               <PiMagnifyingGlassBold style={{ fontSize: 48, marginBottom: 12 }} />
               <p>Nhập tối thiểu 2 ký tự để bắt đầu tìm kiếm.</p>
             </div>
+          )}
+          </>
           )}
         </main>
       </div>

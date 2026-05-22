@@ -33,6 +33,7 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
     public DbSet<VariantStock> VariantStocks => Set<VariantStock>();
     public DbSet<Conversation> Conversations => Set<Conversation>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+    public DbSet<ProductImageEmbedding> ProductImageEmbeddings => Set<ProductImageEmbedding>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -80,6 +81,12 @@ public class CustomerDbContext(DbContextOptions<CustomerDbContext> options) : Db
         modelBuilder.Entity<ChatMessage>(e =>
         {
             e.HasIndex(m => new { m.ConversationId, m.Id });
+        });
+
+        modelBuilder.Entity<ProductImageEmbedding>(e =>
+        {
+            e.HasIndex(x => x.ProductId).IsUnique();
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

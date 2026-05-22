@@ -789,6 +789,31 @@ GO
 CREATE NONCLUSTERED INDEX IX_TinNhan_CuocHoiThoaiId ON TinNhan(CuocHoiThoaiId, Id);
 GO
 
+-- ================================================================
+-- BẢNG: SanPhamEmbedding
+-- ================================================================
+-- Vector đặc trưng (embedding) thị giác của ảnh sản phẩm — phục vụ
+-- tìm kiếm bằng hình ảnh (visual similarity, CLIP/ONNX).
+-- Mỗi sản phẩm tối đa 1 dòng. Vector lưu JSON float array, đã L2-normalize.
+-- Bảng do API.Customer (ImageEmbeddingIndexer) tự ghi/cập nhật, không nhập tay.
+-- ================================================================
+CREATE TABLE SanPhamEmbedding (
+    Id              INT IDENTITY(1,1)   PRIMARY KEY,
+    SanPhamId       INT                 NOT NULL,               -- FK đến SanPham
+    SoChieu         INT                 NOT NULL,               -- Số chiều vector (vd 512)
+    Vector          NVARCHAR(MAX)       NOT NULL,               -- JSON: [0.12,-0.03,...]
+    Model           NVARCHAR(200)       NOT NULL,               -- Tên/phiên bản model sinh embedding
+    NguonHash       NVARCHAR(100)       NOT NULL,               -- Hash URL ảnh nguồn (phát hiện đổi ảnh)
+    NgayCapNhat     DATETIME2           NOT NULL DEFAULT GETUTCDATE(),
+
+    CONSTRAINT FK_SanPhamEmbedding_SanPham FOREIGN KEY (SanPhamId)
+        REFERENCES SanPham(Id) ON DELETE CASCADE
+);
+GO
+
+CREATE UNIQUE NONCLUSTERED INDEX IX_SanPhamEmbedding_SanPhamId ON SanPhamEmbedding(SanPhamId);
+GO
+
 
 -- ================================================================
 -- ================================================================

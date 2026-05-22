@@ -76,6 +76,7 @@
                        "UpstreamPathTemplate":  "/api/search/{everything}",
                        "UpstreamHttpMethod":  [
                                                   "GET",
+                                                  "POST",
                                                   "OPTIONS"
                                               ],
                        "DownstreamPathTemplate":  "/api/search/{everything}",

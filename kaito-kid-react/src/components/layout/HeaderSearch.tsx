@@ -4,11 +4,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { PiMagnifyingGlassBold, PiClockCounterClockwise, PiMicrophoneBold, PiMicrophoneFill } from 'react-icons/pi';
+import { PiMagnifyingGlassBold, PiClockCounterClockwise, PiMicrophoneBold, PiMicrophoneFill, PiCameraBold } from 'react-icons/pi';
 import { searchApi } from '../../services/api';
 import type { Product } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import { useVoiceSearch } from '../../hooks/useVoiceSearch';
+import { useImageSearch } from '../../hooks/useImageSearch';
 
 const HISTORY_KEY = 'kk-search-history';
 const MAX_HISTORY = 6;
@@ -112,6 +113,14 @@ export default function HeaderSearch() {
     },
   });
 
+  // Image search: chỉ cần biết tính năng có khả dụng để hiện nút.
+  // Việc chọn ảnh + hiển thị kết quả thực hiện ở trang /search (điều hướng kèm ?img=1).
+  const image = useImageSearch();
+  const openImageSearch = () => {
+    setOpen(false);
+    navigate('/search?img=1');
+  };
+
   useEffect(() => {
     if (voice.error) toast.error(voice.error);
   }, [voice.error]);
@@ -146,6 +155,17 @@ export default function HeaderSearch() {
           title={voice.listening ? 'Đang nghe…' : 'Tìm bằng giọng nói'}
         >
           {voice.listening ? <PiMicrophoneFill aria-hidden="true" /> : <PiMicrophoneBold aria-hidden="true" />}
+        </button>
+      )}
+      {image.available && (
+        <button
+          type="button"
+          className="search-image-btn"
+          onClick={openImageSearch}
+          aria-label="Tìm kiếm bằng hình ảnh"
+          title="Tìm bằng hình ảnh"
+        >
+          <PiCameraBold aria-hidden="true" />
         </button>
       )}
       <button type="submit" aria-label="Tìm kiếm">

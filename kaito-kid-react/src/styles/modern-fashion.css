@@ -358,7 +358,7 @@ body {
   font-weight: 500;
 }
 
-.search-bar button {
+.search-bar button[type="submit"] {
   position: absolute;
   right: 8px;
   top: 50%;
@@ -379,19 +379,19 @@ body {
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-.search-bar button svg {
+.search-bar button[type="submit"] svg {
   width: 18px;
   height: 18px;
 }
 
-.search-bar button:hover {
+.search-bar button[type="submit"]:hover {
   transform: translateY(-50%) scale(1.1) rotate(10deg);
   box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
 
-/* Nút tìm bằng giọng nói (đặt cạnh nút submit) */
+/* Nút tìm bằng giọng nói + hình ảnh (đặt cạnh nút submit) */
 .search-bar input {
-  padding-right: 96px; /* chừa chỗ cho 2 nút: mic + submit */
+  padding-right: 142px; /* chừa chỗ cho tối đa 3 nút: camera + mic + submit */
 }
 .search-voice-btn {
   position: absolute;
@@ -419,6 +419,27 @@ body {
   color: #fff;
   animation: voice-pulse 1.2s infinite;
 }
+/* Nút tìm bằng hình ảnh */
+.search-image-btn {
+  position: absolute;
+  right: 100px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #ffffff;
+  border: 2px solid #e9ecef;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #ec4899;
+  transition: all 0.25s ease;
+  z-index: 2;
+}
+.search-image-btn svg { width: 18px; height: 18px; }
+.search-image-btn:hover { border-color: #ec4899; background: #fdf2f8; }
 @keyframes voice-pulse {
   0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .5); }
   70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }

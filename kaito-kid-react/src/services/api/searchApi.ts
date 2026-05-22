@@ -63,6 +63,19 @@ export interface SuggestionResponse {
   products: Product[];
 }
 
+/** Một kết quả tìm bằng hình ảnh: sản phẩm + độ tương đồng 0..1. */
+export interface ImageSearchItem {
+  product: Product;
+  similarity: number;
+}
+
+export interface ImageSearchResult {
+  items: ImageSearchItem[];
+  total: number;
+  ready: boolean;
+  message?: string | null;
+}
+
 function mapDtoToProduct(dto: BackendProductDTO): Product {
   return {
     id: dto.id,
@@ -145,6 +158,47 @@ export const searchApi = {
         data: {
           suggestions: res.data.suggestions,
           products: res.data.products.map(mapDtoToProduct),
+        },
+      };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Kiểm tra tính năng tìm bằng hình ảnh đã sẵn sàng chưa (để ẩn/hiện nút). */
+  async imageSearchStatus(): Promise<ApiResponse<{ ready: boolean }>> {
+    try {
+      const res = await apiClient.get<{ ready: boolean }>('/api/search/by-image/status');
+      return { success: true, data: res.data };
+    } catch (error) {
+      return { success: false, error: getErrorMessage(error) };
+    }
+  },
+
+  /** Tìm sản phẩm tương đồng từ một ảnh (upload/chụp). */
+  async searchByImage(file: File, limit = 48): Promise<ApiResponse<ImageSearchResult>> {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await apiClient.post<{
+        items: { product: BackendProductDTO; similarity: number }[];
+        total: number;
+        ready: boolean;
+        message?: string | null;
+      }>(`/api/search/by-image?limit=${limit}`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
+      });
+      return {
+        success: true,
+        data: {
+          items: res.data.items.map((it) => ({
+            product: mapDtoToProduct(it.product),
+            similarity: it.similarity,
+          })),
+          total: res.data.total,
+          ready: res.data.ready,
+          message: res.data.message,
         },
       };
     } catch (error) {
